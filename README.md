@@ -64,17 +64,17 @@ Agent가 `workspace/tasks/active/`에서 해당 태스크의 `plan.md`와 `chang
 이 시스템은 3개의 레벨로 구성된다. 각 레벨은 상위 레벨의 산출물이다.
 
 ```
-principles/          ← 레벨 0: 왜 (Why)
-                       AI 협업의 기본 원칙
-                       변경: 협업 방식의 근본이 바뀔 때
+principles/              ← 레벨 0: 왜 (Why)
+                           AI 협업의 기본 원칙
+                           변경: 협업 방식의 근본이 바뀔 때
         ↓ 근거 제공
-harness/             ← 레벨 1: 어떻게 (How)
-                       하네스를 만들고 운용하는 시스템
-                       변경: 방법론이 개선될 때
+my-pacemaker-agent/      ← 레벨 1: 어떻게 (How)
+                           하네스를 만들고 운용하는 시스템
+                           변경: 방법론이 개선될 때
         ↓ 템플릿 제공
-workspace/           ← 레벨 2: 무엇을 (What)
-                       이 프로젝트의 실제 하네스
-                       변경: 프로젝트가 진행될 때
+workspace/               ← 레벨 2: 무엇을 (What)
+                           이 프로젝트의 실제 하네스
+                           변경: 프로젝트가 진행될 때
 ```
 
 **레벨 구분의 의미:**  
@@ -86,7 +86,7 @@ workspace/           ← 레벨 2: 무엇을 (What)
 
 ## 구조 원칙
 
-| | 레벨 0 (principles/) | 레벨 1 (harness/) | 레벨 2 (workspace/) |
+| | 레벨 0 (principles/) | 레벨 1 (my-pacemaker-agent/) | 레벨 2 (workspace/) |
 |--|---------------------|------------------|---------------------|
 | 질문 | 왜 이렇게 일하는가 | 어떻게 일하는가 | 이 프로젝트는 무엇인가 |
 | 내용 | 기본 원칙, 판단 기준 | 방법, 절차, 템플릿 | 프로젝트 데이터 |
@@ -98,11 +98,7 @@ workspace/           ← 레벨 2: 무엇을 (What)
 ## 전체 구조
 
 ```
-think-more/                           ← 사고 실험/탐구 공간 (하네스 외부)
-                                        철학, 설계 원칙, 기술 동향, 실전 사례 연구
-                                        하네스 구조에 인코딩되기 전 단계의 생각들
-
-harness/                              ← 마스터 레포 (git)
+my-pacemaker-agent/                   ← 마스터 레포 (git)
 │
 ├── dist/                             ← 설치 소스 (프로젝트에 복사되는 파일들)
 │   │
@@ -126,77 +122,33 @@ harness/                              ← 마스터 레포 (git)
 │       └── docs/
 │           ├── README.md
 │           └── docs_template.md
-    │
-    ├── tasks/
-    │   ├── GUIDE.md
-    │   ├── INDEX.md
-    │   ├── _template_request.md
-    │   ├── active/
-    │   └── done/
-    │
-    └── docs/
-        ├── GUIDE.md
-        ├── INDEX.md
-        └── _template_doc.md
+│
+├── agent-specs/                      ← agent별 설치 스펙
+├── think-more/                       ← 사고 실험/탐구 공간 (설치되지 않음)
+├── install.py                        ← 설치 스크립트
+└── install.md                        ← 설치 가이드 (agent가 참조)
 ```
 
 ---
 
-## 새 프로젝트 시작
-
-`install.py`를 사용한다. 자세한 사용법은 `install.md` 참조.
-
-```bash
-python harness/install.py
-```
-
-신규 설치와 업그레이드를 자동으로 감지하며, upgrade-candidates 이전도 함께 처리한다.
-
-프로젝트 디렉토리 구조:
+## 설치된 프로젝트 구조
 
 ```
 [project]/
-├── .mpa-workspace/    ← 방법론 (덮어쓰기로 업데이트 가능)
+├── .mpa-workspace/    ← 방법론 (업그레이드로 최신화, 직접 수정 금지)
 │   ├── core/, personas/, skills/, workflows/, inject/
 │   └── upgrade-candidates/   ← 작업 중 발견된 하네스 개선 후보
 │
-└── workspace/            ← 프로젝트 데이터 (직접 수정)
+└── workspace/            ← 프로젝트 데이터 (agent가 직접 관리)
     ├── memory/
     ├── tasks/
     └── docs/
 ```
 
-**두 폴더의 역할:**
-
 | 폴더 | 역할 | 업데이트 방식 |
 |------|------|--------------|
-| `.mpa-workspace/` | 방법론 (HOW) — 건드리지 않음 | 하네스에서 덮어쓰기 |
-| `workspace/` | 프로젝트 데이터 (WHAT) — 매 세션 업데이트 | 직접 수정 |
-
----
-
-## 세션 사용법
-
-1. `.mpa-workspace/core/session_protocol.md`에서 오늘 작업에 맞는 세션 유형 선택
-2. `.mpa-workspace/inject/`에서 해당 파일 열기
-3. 플레이스홀더를 `workspace/` 파일 내용으로 채우기
-4. 완성된 텍스트를 새 AI 스레드 첫 메시지로 붙여넣기
-5. 작업 종료 후 보고 내용을 `workspace/`에 반영
-
-```
-inject 파일 열기 (.mpa-workspace/inject/)
-      ↓
-personas/ → [페르소나] 채우기
-      ↓
-workspace/ → [컨텍스트] 채우기
-      ↓
-새 AI 스레드에 붙여넣기
-      ↓
-작업
-      ↓
-세션 종료 보고 → workspace/ 업데이트
-              → 하네스 개선 후보 → .mpa-workspace/upgrade-candidates/
-```
+| `.mpa-workspace/` | 방법론 (HOW) — 직접 수정 금지 | 업그레이드로만 교체 |
+| `workspace/` | 프로젝트 데이터 (WHAT) — agent가 관리 | 작업할 때마다 자동 업데이트 |
 
 ---
 
@@ -207,10 +159,10 @@ workspace/ → [컨텍스트] 채우기
       ↓
 [project]/.mpa-workspace/upgrade-candidates/ 에 후보 파일 추가
       ↓
-.mpa-workspace/ 업데이트 시 harness/dist/.mpa-workspace/upgrade-candidates/ 로 자동 이동 (1단계)
+.mpa-workspace/ 업데이트 시 my-pacemaker-agent/dist/.mpa-workspace/upgrade-candidates/ 로 자동 이동 (1단계)
       ↓
-검토 및 정제 → harness/dist/.mpa-workspace/ 해당 파일에 반영
-              (절차: harness/harness-maintenance.md 참조)
+검토 및 정제 → my-pacemaker-agent/dist/.mpa-workspace/ 해당 파일에 반영
+              (절차: my-pacemaker-agent/harness-maintenance.md 참조)
       ↓
 다음 프로젝트 업데이트 시 새 스냅샷으로 배포
 ```
