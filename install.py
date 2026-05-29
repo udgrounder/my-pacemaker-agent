@@ -12,8 +12,9 @@ from pathlib import Path
 from typing import Optional
 
 HARNESS_ROOT = Path(__file__).parent
-AGENTS_WORKSPACE_SRC = HARNESS_ROOT / ".mpa-workspace"
-WORKSPACE_TEMPLATE_SRC = HARNESS_ROOT / "workspace-template"
+DIST_ROOT = HARNESS_ROOT / "dist"
+AGENTS_WORKSPACE_SRC = DIST_ROOT / ".mpa-workspace"
+WORKSPACE_TEMPLATE_SRC = DIST_ROOT / "workspace"
 AGENT_SPECS_SRC = HARNESS_ROOT / "agent-specs"
 AGENT_CONFIGS_SRC = HARNESS_ROOT / "agent-configs"  # 레거시 fallback
 
@@ -131,24 +132,33 @@ def copy_agents_workspace(dst: Path):
 
 
 
-def _merge_dir(src: Path, dst: Path, base: Path, label: str = ""):
-    """src 구조를 dst에 병합한다. 없는 항목만 추가하고 기존 항목은 건드리지 않는다."""
+def _is_harness_managed(name: str) -> bool:
+    """하네스가 관리하는 파일 여부 — upgrade 시 항상 최신으로 교체한다."""
+    return name == "README.md" or name.endswith("_template.md")
+
+
+def _merge_dir(src: Path, dst: Path, base: Path, label: str = "", upgrade: bool = False):
+    """src 구조를 dst에 병합한다.
+    - 신규: 없는 항목만 추가
+    - 업그레이드: 하네스 관리 파일(README.md, *_template.md)은 항상 교체, 나머지는 없는 것만 추가
+    """
     dst.mkdir(parents=True, exist_ok=True)
     added = 0
     for item in src.iterdir():
         if item.name in (".DS_Store", ".gitkeep"):
             continue
         dst_item = dst / item.name
-        if dst_item.exists():
-            if item.is_dir():
-                added += _merge_dir(item, dst_item, base, label)
-        else:
-            if item.is_dir():
-                shutil.copytree(item, dst_item, ignore=_IGNORE)
-            else:
-                shutil.copy2(item, dst_item)
-            rel = dst_item.relative_to(base)
-            prefix = f"{label}/" if label else ""
+        rel = dst_item.relative_to(base)
+        prefix = f"{label}/" if label else ""
+
+        if item.is_dir():
+            added += _merge_dir(item, dst_item, base, label, upgrade)
+        elif upgrade and _is_harness_managed(item.name) and dst_item.exists():
+            shutil.copy2(item, dst_item)
+            print(f"  [업데이트] {prefix}{rel}")
+            added += 1
+        elif not dst_item.exists():
+            shutil.copy2(item, dst_item)
             print(f"  [추가] {prefix}{rel}")
             added += 1
     return added
@@ -191,8 +201,8 @@ def copy_agent_spec_files(agent: str, project_path: Path):
         print(f"  [확인] {agent} spec 파일 추가할 항목 없음")
 
 
-def copy_workspace_template(dst: Path):
-    added = _merge_dir(WORKSPACE_TEMPLATE_SRC, dst, dst, label="workspace")
+def copy_workspace_template(dst: Path, upgrade: bool = False):
+    added = _merge_dir(WORKSPACE_TEMPLATE_SRC, dst, dst, label="workspace", upgrade=upgrade)
     if added == 0:
         print("  [확인] workspace/ 추가할 항목 없음")
 
@@ -210,8 +220,8 @@ def run_install(project_path: Path, agents: list, upgrade: bool):
         copy_agents_workspace(agents_workspace_dst)
         clear_upgrade_candidates(agents_workspace_dst)
 
-        print("\n[3단계] workspace 누락 항목 추가")
-        copy_workspace_template(workspace_dst)
+        print("\n[3단계] workspace 템플릿 업데이트 및 누락 항목 추가")
+        copy_workspace_template(workspace_dst, upgrade=True)
     else:
         print("\n[1단계] .mpa-workspace 설치")
         copy_agents_workspace(agents_workspace_dst)

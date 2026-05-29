@@ -68,58 +68,28 @@ think-more/                           ← 사고 실험/탐구 공간 (하네스
 
 harness/                              ← 마스터 레포 (git)
 │
-├── .mpa-workspace/                ← 방법론 스냅샷 (복사 소스)
-│   ├── core/                         ← 원칙과 프로토콜
-│   │   ├── principles.md
-│   │   └── session_protocol.md
+├── dist/                             ← 설치 소스 (프로젝트에 복사되는 파일들)
 │   │
-│   ├── personas/                     ← agent 역할 정의 (WHO)
-│   │   ├── architect.md
-│   │   ├── plan_critic.md
-│   │   ├── implementer.md
-│   │   ├── code_reviewer.md
-│   │   └── integration_auditor.md
+│   ├── .mpa-workspace/               ← 방법론 스냅샷 (복사 소스)
+│   │   ├── core/                         ← 원칙과 프로토콜
+│   │   ├── personas/                     ← agent 역할 정의 (WHO)
+│   │   ├── skills/                       ← agent 능력 정의 (WHAT IT KNOWS)
+│   │   ├── inject/                       ← 세션 패키지
+│   │   └── upgrade-candidates/           ← 하네스 업그레이드 후보 수집
 │   │
-│   ├── skills/                       ← agent 능력 정의 (WHAT IT KNOWS)
-│   │   ├── analysis/
-│   │   │   ├── silent_decision_extraction.md
-│   │   │   ├── counterexample_finding.md
-│   │   │   ├── path_tracing.md
-│   │   │   └── dependency_mapping.md
-│   │   └── tech/
-│   │       ├── _template.md
-│   │       ├── spring.md
-│   │       ├── python.md
-│   │       ├── react.md
-│   │       └── nodejs.md
-│   │
-│   ├── workflows/                    ← 세션 시퀀스 (HOW TO RUN)
-│   │   ├── new_feature.md
-│   │   ├── bug_fix.md
-│   │   ├── refactoring.md
-│   │   ├── code_review.md
-│   │   └── team_collaboration.md
-│   │
-│   ├── inject/                       ← 세션 패키지 (새 AI 스레드에 붙여넣기)
-│   │   ├── layer0_init.md
-│   │   ├── layer1_design.md
-│   │   ├── layer1_implement.md
-│   │   ├── layer1_review.md
-│   │   └── layer2_checkpoint.md
-│   │
-│   └── upgrade-candidates/           ← 하네스 업그레이드 후보 수집
-│
-└── workspace-template/               ← workspace/ 초기화 템플릿 (복사 소스)
-    ├── project_memory/
-    │   ├── GUIDE.md
-    │   ├── shared/
-    │   │   ├── project_identity.md
-    │   │   ├── architecture.md
-    │   │   └── contracts.md
-    │   ├── domains/
-    │   │   └── _template.md
-    │   └── roles/                        ← 페르소나별 프로젝트 누적 학습
-    │       └── _template.md
+│   └── workspace/                    ← workspace/ 초기화 템플릿 (복사 소스)
+│       ├── memory/
+│       │   ├── README.md
+│       │   ├── shared/shared_template.md
+│       │   ├── domains/domains_template.md
+│       │   └── roles/roles_template.md
+│       ├── tasks/
+│       │   ├── README.md
+│       │   ├── _template/plan_template.md
+│       │   └── _template/changelog_template.md
+│       └── docs/
+│           ├── README.md
+│           └── docs_template.md
     │
     ├── tasks/
     │   ├── GUIDE.md
@@ -155,7 +125,7 @@ python harness/install.py
 │   └── upgrade-candidates/   ← 작업 중 발견된 하네스 개선 후보
 │
 └── workspace/            ← 프로젝트 데이터 (직접 수정)
-    ├── project_memory/
+    ├── memory/
     ├── tasks/
     └── docs/
 ```
@@ -201,9 +171,9 @@ workspace/ → [컨텍스트] 채우기
       ↓
 [project]/.mpa-workspace/upgrade-candidates/ 에 후보 파일 추가
       ↓
-.mpa-workspace/ 업데이트 시 harness/upgrade-candidates/ 로 자동 이동 (1단계)
+.mpa-workspace/ 업데이트 시 harness/dist/.mpa-workspace/upgrade-candidates/ 로 자동 이동 (1단계)
       ↓
-검토 및 정제 → harness/.mpa-workspace/ 해당 파일에 반영
+검토 및 정제 → harness/dist/.mpa-workspace/ 해당 파일에 반영
               (절차: harness/harness-maintenance.md 참조)
       ↓
 다음 프로젝트 업데이트 시 새 스냅샷으로 배포

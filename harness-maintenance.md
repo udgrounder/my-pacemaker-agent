@@ -7,7 +7,7 @@
 
 ## 업그레이드 후보 반영
 
-프로젝트들에서 수집된 `.mpa-workspace/upgrade-candidates/` 파일을 하네스 템플릿에 반영한다.
+프로젝트들에서 수집된 `dist/.mpa-workspace/upgrade-candidates/` 파일을 하네스 템플릿에 반영한다.
 
 ### 원칙
 
@@ -17,7 +17,7 @@
 
 ### 작업 절차
 
-1. `.mpa-workspace/upgrade-candidates/` 파일 목록을 읽고 전체를 사용자에게 제시한다:
+1. `dist/.mpa-workspace/upgrade-candidates/` 파일 목록을 읽고 전체를 사용자에게 제시한다:
 
 ```
 ## 하네스 개선 후보 목록
@@ -49,7 +49,7 @@
 ```
 
 3. 사용자 응답 후 다음 후보로 넘어간다. 모든 선택 항목이 처리될 때까지 반복한다.
-4. 반영 완료된 파일을 `.mpa-workspace/upgrade-candidates/` 에서 제거한다.
+4. 반영 완료된 파일을 `dist/.mpa-workspace/upgrade-candidates/` 에서 제거한다.
 
 ---
 
