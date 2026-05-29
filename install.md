@@ -1,4 +1,4 @@
-# my-pace-agent 설치 가이드
+# my-pacemaker-agent 설치 가이드
 
 이 문서를 읽고 아래 판단 절차에 따라 `install.py` 를 실행한다.
 

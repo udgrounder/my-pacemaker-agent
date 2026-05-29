@@ -1,4 +1,4 @@
-# my pace agent 가이드북
+# my pacemaker agent 가이드북
 
 > **이 문서의 성격:** 하네스를 처음 접하는 사람이 "왜 이런 구조인가"부터 "어떻게 쓰는가"까지 이해할 수 있도록 작성된 실용 안내서.  
 > 설계 사고의 과정은 `logs/discussion_log.md` 참조.
@@ -19,7 +19,7 @@
 
 ## 3. 구조
 
-<!-- 파일 구조와 역할 (3레벨: philosophy/harness/workspace) -->
+<!-- 파일 구조와 역할 (3레벨: principles/harness/workspace) -->
 <!-- .agents-workspace/ vs workspace/ 구분 -->
 <!-- 의존성 방향 (CLI→harness, harness≠CLI 내부) -->
 

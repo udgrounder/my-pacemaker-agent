@@ -238,7 +238,7 @@ def prompt_project_path() -> Path:
 
 
 def main():
-    print("=== my-pace-agent 설치 ===")
+    print("=== my-pacemaker-agent 설치 ===")
 
     # 1. 프로젝트 경로
     project_path = prompt_project_path()
@@ -273,7 +273,7 @@ def main():
 
     run_install(project_path, agents, upgrade)
 
-    print(f"\n=== my-pace-agent {mode} 완료 ===\n")
+    print(f"\n=== my-pacemaker-agent {mode} 완료 ===\n")
     return 0
 
 

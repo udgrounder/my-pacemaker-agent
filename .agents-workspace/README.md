@@ -1,4 +1,4 @@
-# my pace agent — Agents Workspace
+# my pacemaker agent — Agents Workspace
 
 이 폴더는 AI agent 협업 방법론 파일들이다. **되도록 직접 수정하지 않는다.**  
 개선이 필요하면 `upgrade-candidates/` 에 후보를 기록하고, 하네스 업데이트로 반영한다.
