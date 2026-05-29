@@ -6,7 +6,7 @@
 
 ## 역할
 
-`.agents-workspace/personas/code_reviewer.md` 를 읽고 그 역할로 작업한다.
+`.mpa-workspace/personas/code_reviewer.md` 를 읽고 그 역할로 작업한다.
 
 ---
 
@@ -26,10 +26,10 @@
 ## 스킬 참조
 
 필요 시 다음을 읽는다:
-- `.agents-workspace/skills/analysis/counterexample_finding.md`
-- `.agents-workspace/skills/analysis/path_tracing.md`
+- `.mpa-workspace/skills/analysis/counterexample_finding.md`
+- `.mpa-workspace/skills/analysis/path_tracing.md`
 
-관련 기술 스킬이 있으면 `.agents-workspace/skills/tech/` 에서 해당 파일을 읽는다.
+관련 기술 스킬이 있으면 `.mpa-workspace/skills/tech/` 에서 해당 파일을 읽는다.
 
 ---
 
@@ -98,4 +98,4 @@
 
 1. 새 아키텍처 규칙 또는 안티패턴 발견 → `workspace/project_memory/shared/architecture.md`
 2. 역할 메모리 업데이트 → 놀라움 필터 적용 후 `workspace/project_memory/roles/code_reviewer.md`에 기록 (기억할 것이 없으면 생략)
-3. 하네스 개선 후보 발견 → `.agents-workspace/upgrade-candidates/[내용].md`
+3. 하네스 개선 후보 발견 → `.mpa-workspace/upgrade-candidates/[내용].md`

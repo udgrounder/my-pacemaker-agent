@@ -10,6 +10,19 @@
 
 ---
 
+## 설치
+
+`install.md`를 참조하도록 설정된 agent에게 설치 요청을 하면 된다.
+
+```
+@install.md 설치해줘
+```
+
+Agent가 `install.md`의 절차에 따라 프로젝트 경로와 agent를 확인한 뒤 자동으로 설치한다.  
+이미 설치된 프로젝트는 업그레이드 모드로 자동 감지하여 처리한다.
+
+---
+
 ## 3레벨 구조
 
 이 시스템은 3개의 레벨로 구성된다. 각 레벨은 상위 레벨의 산출물이다.
@@ -55,7 +68,7 @@ think-more/                           ← 사고 실험/탐구 공간 (하네스
 
 harness/                              ← 마스터 레포 (git)
 │
-├── .agents-workspace/                ← 방법론 스냅샷 (복사 소스)
+├── .mpa-workspace/                ← 방법론 스냅샷 (복사 소스)
 │   ├── core/                         ← 원칙과 프로토콜
 │   │   ├── principles.md
 │   │   └── session_protocol.md
@@ -137,7 +150,7 @@ python harness/install.py
 
 ```
 [project]/
-├── .agents-workspace/    ← 방법론 (덮어쓰기로 업데이트 가능)
+├── .mpa-workspace/    ← 방법론 (덮어쓰기로 업데이트 가능)
 │   ├── core/, personas/, skills/, workflows/, inject/
 │   └── upgrade-candidates/   ← 작업 중 발견된 하네스 개선 후보
 │
@@ -151,21 +164,21 @@ python harness/install.py
 
 | 폴더 | 역할 | 업데이트 방식 |
 |------|------|--------------|
-| `.agents-workspace/` | 방법론 (HOW) — 건드리지 않음 | 하네스에서 덮어쓰기 |
+| `.mpa-workspace/` | 방법론 (HOW) — 건드리지 않음 | 하네스에서 덮어쓰기 |
 | `workspace/` | 프로젝트 데이터 (WHAT) — 매 세션 업데이트 | 직접 수정 |
 
 ---
 
 ## 세션 사용법
 
-1. `.agents-workspace/core/session_protocol.md`에서 오늘 작업에 맞는 세션 유형 선택
-2. `.agents-workspace/inject/`에서 해당 파일 열기
+1. `.mpa-workspace/core/session_protocol.md`에서 오늘 작업에 맞는 세션 유형 선택
+2. `.mpa-workspace/inject/`에서 해당 파일 열기
 3. 플레이스홀더를 `workspace/` 파일 내용으로 채우기
 4. 완성된 텍스트를 새 AI 스레드 첫 메시지로 붙여넣기
 5. 작업 종료 후 보고 내용을 `workspace/`에 반영
 
 ```
-inject 파일 열기 (.agents-workspace/inject/)
+inject 파일 열기 (.mpa-workspace/inject/)
       ↓
 personas/ → [페르소나] 채우기
       ↓
@@ -176,7 +189,7 @@ workspace/ → [컨텍스트] 채우기
 작업
       ↓
 세션 종료 보고 → workspace/ 업데이트
-              → 하네스 개선 후보 → .agents-workspace/upgrade-candidates/
+              → 하네스 개선 후보 → .mpa-workspace/upgrade-candidates/
 ```
 
 ---
@@ -186,11 +199,11 @@ workspace/ → [컨텍스트] 채우기
 ```
 작업 중 더 나은 방법 발견
       ↓
-[project]/.agents-workspace/upgrade-candidates/ 에 후보 파일 추가
+[project]/.mpa-workspace/upgrade-candidates/ 에 후보 파일 추가
       ↓
-.agents-workspace/ 업데이트 시 harness/upgrade-candidates/ 로 자동 이동 (1단계)
+.mpa-workspace/ 업데이트 시 harness/upgrade-candidates/ 로 자동 이동 (1단계)
       ↓
-검토 및 정제 → harness/.agents-workspace/ 해당 파일에 반영
+검토 및 정제 → harness/.mpa-workspace/ 해당 파일에 반영
               (절차: harness/harness-maintenance.md 참조)
       ↓
 다음 프로젝트 업데이트 시 새 스냅샷으로 배포
@@ -209,7 +222,7 @@ workspace/ → [컨텍스트] 채우기
 
 ```
 [breaking]     layer1_design: [요청 문서] 섹션 추가
-               → 기존 프로젝트: .agents-workspace/ 재복사 필요
+               → 기존 프로젝트: .mpa-workspace/ 재복사 필요
 
 [non-breaking] principles: T9 설명 보완
                → 기존 프로젝트 영향 없음
@@ -221,9 +234,9 @@ workspace/ → [컨텍스트] 채우기
 
 | 상황 | inject 파일 |
 |------|------------|
-| 새 프로젝트 초기화 | `.agents-workspace/inject/layer0_init.md` |
-| 하네스 업데이트 / 재설치 | `.agents-workspace/inject/layer0_update.md` |
-| 기능 설계 | `.agents-workspace/inject/layer1_design.md` |
-| 구현 | `.agents-workspace/inject/layer1_implement.md` |
-| 코드 검토 | `.agents-workspace/inject/layer1_review.md` |
-| 정합성 점검 | `.agents-workspace/inject/layer2_checkpoint.md` |
+| 새 프로젝트 초기화 | `.mpa-workspace/inject/layer0_init.md` |
+| 하네스 업데이트 / 재설치 | `.mpa-workspace/inject/layer0_update.md` |
+| 기능 설계 | `.mpa-workspace/inject/layer1_design.md` |
+| 구현 | `.mpa-workspace/inject/layer1_implement.md` |
+| 코드 검토 | `.mpa-workspace/inject/layer1_review.md` |
+| 정합성 점검 | `.mpa-workspace/inject/layer2_checkpoint.md` |

@@ -6,7 +6,7 @@
 
 ## 역할
 
-`.agents-workspace/personas/plan_critic.md` 를 읽고 그 역할로 작업한다.
+`.mpa-workspace/personas/plan_critic.md` 를 읽고 그 역할로 작업한다.
 
 ---
 
@@ -27,8 +27,8 @@
 ## 스킬 참조
 
 필요 시 다음을 읽는다:
-- `.agents-workspace/skills/analysis/silent_decision_extraction.md`
-- `.agents-workspace/skills/analysis/counterexample_finding.md`
+- `.mpa-workspace/skills/analysis/silent_decision_extraction.md`
+- `.mpa-workspace/skills/analysis/counterexample_finding.md`
 
 ---
 
@@ -100,4 +100,5 @@
      - **에이전트 가정**: 브리핑에 없어 임의로 채운 내용 + 근거 + 틀렸을 때 영향
    - `구현 진행 상태` 테이블을 실제 구현 단계로 채운다 (템플릿의 "Step 1/Step 2" 대체)
 3. tasks/INDEX.md 업데이트 → 새 태스크 항목 추가, 상태: `설계 완료`
-4. 하네스 개선 후보 발견 → `.agents-workspace/upgrade-candidates/[내용].md`
+4. 하네스 개선 후보 발견 → `.mpa-workspace/upgrade-candidates/[내용].md`
+5. **계획서를 사용자에게 제시하고 승인을 기다린다 — 사용자가 명시적으로 즉시 진행을 요청한 경우가 아니라면 구현을 시작하지 않는다**

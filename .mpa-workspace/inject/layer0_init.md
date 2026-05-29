@@ -6,14 +6,14 @@
 
 ## 역할
 
-`.agents-workspace/personas/architect.md` 를 읽고 그 역할로 작업한다.
+`.mpa-workspace/personas/architect.md` 를 읽고 그 역할로 작업한다.
 
 ---
 
 ## 작업 시작 전 읽을 파일
 
-1. `.agents-workspace/skills/analysis/dependency_mapping.md`
-2. `.agents-workspace/skills/analysis/silent_decision_extraction.md`
+1. `.mpa-workspace/skills/analysis/dependency_mapping.md`
+2. `.mpa-workspace/skills/analysis/silent_decision_extraction.md`
 
 기존 코드베이스가 있는 경우 프로젝트 루트를 탐색해 구조를 파악한다.
 

@@ -6,7 +6,7 @@
 
 ## 역할
 
-`.agents-workspace/personas/implementer.md` 를 읽고 그 역할로 작업한다.
+`.mpa-workspace/personas/implementer.md` 를 읽고 그 역할로 작업한다.
 
 ---
 
@@ -23,14 +23,14 @@
 7. `workspace/tasks/INDEX.md` — 이번 작업의 원본 요청 확인
 8. 이번 태스크의 설계 계획 파일 (`workspace/tasks/active/[태스크명]/plan.md`)
 
-관련 기술 스킬이 있으면 `.agents-workspace/skills/tech/` 에서 해당 파일을 읽는다.
+관련 기술 스킬이 있으면 `.mpa-workspace/skills/tech/` 에서 해당 파일을 읽는다.
 
 ---
 
 ## 스킬 참조
 
 필요 시 다음을 읽는다:
-- `.agents-workspace/skills/analysis/silent_decision_extraction.md`
+- `.mpa-workspace/skills/analysis/silent_decision_extraction.md`
 
 ---
 
@@ -88,4 +88,4 @@
 5. 역할 메모리 업데이트 → 놀라움 필터 적용 후 `workspace/project_memory/roles/implementer.md`에 기록 (기억할 것이 없으면 생략)
 6. 기능 문서 업데이트 → 요청 문서의 "완료 시 문서 업데이트 대상" 확인 후 `workspace/docs/` 반영
 7. 요청 상태 → `workspace/tasks/` 해당 파일을 `done/`으로 이동
-8. 하네스 개선 후보 발견 → `.agents-workspace/upgrade-candidates/[내용].md`
+8. 하네스 개선 후보 발견 → `.mpa-workspace/upgrade-candidates/[내용].md`

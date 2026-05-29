@@ -20,7 +20,7 @@
 ## 3. 구조
 
 <!-- 파일 구조와 역할 (3레벨: principles/harness/workspace) -->
-<!-- .agents-workspace/ vs workspace/ 구분 -->
+<!-- .mpa-workspace/ vs workspace/ 구분 -->
 <!-- 의존성 방향 (CLI→harness, harness≠CLI 내부) -->
 
 ---

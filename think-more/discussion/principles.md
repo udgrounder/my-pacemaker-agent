@@ -65,7 +65,7 @@ Task 문서가 완성되기 전까지는 설계 단계다.
 
 | 디렉토리 | 역할 | 읽는 주체 | 시점 |
 |---------|-----|---------|-----|
-| `.agents-workspace/` | 행동 규칙, 역할, 스킬 | 에이전트 | 매 세션 |
+| `.mpa-workspace/` | 행동 규칙, 역할, 스킬 | 에이전트 | 매 세션 |
 | `workspace/` | 프로젝트 지식, 태스크 상태 | 에이전트 | 매 세션 (on-demand) |
 | `agent-configs/` | CLI/IDE 브리지 파일 | CLI/IDE | layer0 설치 시 1회 |
 
@@ -82,13 +82,13 @@ harness  →  CLI/IDE 내부를 읽는다  ✗ (블랙박스)
 - Raw LLM API는 지원 범위 밖 (파일 접근 불가)
 - CLI/IDE 내장 기억은 블랙박스 — 의존하지 않는다
 
-### .agents-workspace/ = 프로젝트에 복사되는 템플릿
+### .mpa-workspace/ = 프로젝트에 복사되는 템플릿
 
-`install.py`가 `.agents-workspace/` 전체를 프로젝트에 복사한다.
+`install.py`가 `.mpa-workspace/` 전체를 프로젝트에 복사한다.
 
 ```
 하네스 내부 관리 지침  →  harness 루트에 위치 (복사 안 됨)
-프로젝트용 지침       →  .agents-workspace/ 하위에 위치 (복사됨)
+프로젝트용 지침       →  .mpa-workspace/ 하위에 위치 (복사됨)
 ```
 
 - **복사 안 됨**: 하네스 시스템 파일 수정, 배포, 유지보수 지침

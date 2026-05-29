@@ -6,7 +6,7 @@
 
 ## 역할
 
-`.agents-workspace/personas/architect.md` 를 읽고 그 역할로 작업한다.
+`.mpa-workspace/personas/architect.md` 를 읽고 그 역할로 작업한다.
 
 ---
 
@@ -28,7 +28,7 @@
 
 ### 1단계 — 아웃바운드: upgrade-candidates 수집
 
-`.agents-workspace/upgrade-candidates/` 를 확인한다.
+`.mpa-workspace/upgrade-candidates/` 를 확인한다.
 
 파일이 있는 경우:
 1. 각 파일을 읽고 목록으로 정리한다
@@ -45,10 +45,10 @@
 ```
 
 3. 사용자가 선택한 항목을:
-   - **하네스 프로젝트 경로를 알 수 있는 경우**: 해당 경로의 `.agents-workspace/upgrade-candidates/` 로 복사
+   - **하네스 프로젝트 경로를 알 수 있는 경우**: 해당 경로의 `.mpa-workspace/upgrade-candidates/` 로 복사
    - **경로를 모르는 경우**: 이전할 파일 목록과 내용을 요약해 사용자에게 전달 (수동 이전)
 
-4. 이전 완료된 항목은 `.agents-workspace/upgrade-candidates/` 에서 제거한다.
+4. 이전 완료된 항목은 `.mpa-workspace/upgrade-candidates/` 에서 제거한다.
 
 파일이 없는 경우: 이 단계를 건너뛴다.
 
@@ -85,5 +85,5 @@
 
 ## 세션 종료 시
 
-1. `.agents-workspace/upgrade-candidates/` 잔여 파일 없는지 확인
+1. `.mpa-workspace/upgrade-candidates/` 잔여 파일 없는지 확인
 2. 업데이트 내역 요약을 사용자에게 보고

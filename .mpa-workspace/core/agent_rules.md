@@ -7,14 +7,15 @@
 사용자가 작업 생성을 요청하면:
 
 1. `workspace/tasks/active/[작업명]/` 폴더 생성
-2. `.agents-workspace/inject/layer1_design.md` 지시에 따라 `plan.md` 초안 작성
+2. `.mpa-workspace/inject/layer1_design.md` 지시에 따라 `plan.md` 초안 작성
    → `에이전트 보고` 섹션을 반드시 채운다:
       - **사용자 결정 필요**: 가치 결정 또는 비즈니스 맥락에 의존하는 항목 (AI가 결정해서는 안 되는 것)
       - **에이전트 가정**: 브리핑에 없어 임의로 채운 내용, 그 근거, 틀렸을 때 계획 변경 사항
    → `구현 진행 상태` 테이블을 실제 구현 단계 목록으로 채운다 (템플릿의 "Step 1/Step 2" 대체)
 3. 사용자에게 검토 요청
+4. **사용자의 명시적 승인을 기다린다 — 승인 전까지 구현을 시작하지 않는다**
 
-> 사용자가 "바로 진행"을 함께 요청한 경우 → 검토 단계 없이 즉시 작업 진행
+> 사용자가 "바로 진행" / "바로 해줘" 등 즉시 구현을 명시적으로 요청한 경우에만 → 검토 단계 없이 즉시 작업 진행
 
 ---
 
@@ -22,7 +23,7 @@
 
 사용자가 계획서를 검토하고 진행을 승인하면:
 
-1. `.agents-workspace/inject/layer1_implement.md` 지시에 따라 작업 진행
+1. `.mpa-workspace/inject/layer1_implement.md` 지시에 따라 작업 진행
 2. 작업 완료 후 `changelog.md` 작성:
    - 수정한 파일 경로
    - 변경된 메소드 / 함수 / 클래스 이름과 위치
@@ -49,12 +50,12 @@
 
 | 작업 유형 | inject 파일 |
 |---------|------------|
-| 새 프로젝트 초기화 / 하네스 첫 적용 | `.agents-workspace/inject/layer0_init.md` |
-| 하네스 업데이트 / 재설치 | `.agents-workspace/inject/layer0_update.md` |
-| 기능 설계 / 버그픽스 계획 / 리팩터링 계획 | `.agents-workspace/inject/layer1_design.md` |
-| 구현 | `.agents-workspace/inject/layer1_implement.md` |
-| 코드 검토 | `.agents-workspace/inject/layer1_review.md` |
-| 전체 정합성 점검 | `.agents-workspace/inject/layer2_checkpoint.md` |
+| 새 프로젝트 초기화 / 하네스 첫 적용 | `.mpa-workspace/inject/layer0_init.md` |
+| 하네스 업데이트 / 재설치 | `.mpa-workspace/inject/layer0_update.md` |
+| 기능 설계 / 버그픽스 계획 / 리팩터링 계획 | `.mpa-workspace/inject/layer1_design.md` |
+| 구현 | `.mpa-workspace/inject/layer1_implement.md` |
+| 코드 검토 | `.mpa-workspace/inject/layer1_review.md` |
+| 전체 정합성 점검 | `.mpa-workspace/inject/layer2_checkpoint.md` |
 
 작업 유형이 불분명하면 사용자에게 확인한다.
 
@@ -102,7 +103,7 @@
 
 inject 파일의 "세션 종료 시" 항목을 확인하고 필요한 `workspace/` 파일을 업데이트한다.
 
-하네스 개선 후보 발견 시 `.agents-workspace/upgrade-candidates/[내용].md` 에 기록한다:
+하네스 개선 후보 발견 시 `.mpa-workspace/upgrade-candidates/[내용].md` 에 기록한다:
 
 ```markdown
 # [개선 내용 제목]
@@ -116,7 +117,7 @@ inject 파일의 "세션 종료 시" 항목을 확인하고 필요한 `workspace
 [더 나은 방법]
 
 ## 적용 대상 파일
-- `.agents-workspace/[파일명]`
+- `.mpa-workspace/[파일명]`
 ```
 
 > 코드·비즈니스 개선이 아닌 **에이전트 운영 방식**의 개선만 여기에 기록한다.  

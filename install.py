@@ -4,6 +4,7 @@ Agents Workspace 설치 스크립트
 사용법: install.md 참조
 """
 
+import argparse
 import shutil
 import sys
 import uuid
@@ -11,13 +12,16 @@ from pathlib import Path
 from typing import Optional
 
 HARNESS_ROOT = Path(__file__).parent
-AGENTS_WORKSPACE_SRC = HARNESS_ROOT / ".agents-workspace"
+AGENTS_WORKSPACE_SRC = HARNESS_ROOT / ".mpa-workspace"
 WORKSPACE_TEMPLATE_SRC = HARNESS_ROOT / "workspace-template"
-AGENT_CONFIGS_SRC = HARNESS_ROOT / "agent-configs"
+AGENT_SPECS_SRC = HARNESS_ROOT / "agent-specs"
+AGENT_CONFIGS_SRC = HARNESS_ROOT / "agent-configs"  # 레거시 fallback
 
 AGENT_CONFIG_MAP = {
-    "claude": "CLAUDE.md",
-    "codex": "AGENTS.md",
+    "claude":       "CLAUDE.md",
+    "codex":        "AGENTS.md",
+    "antigravity":  "GEMINI.md",
+    "openagent":    None,   # spec.md 질의로 결정 — 파일 주입은 AI agent가 처리
 }
 
 
@@ -40,17 +44,28 @@ def ask_yes_no(prompt: str, default: bool = True) -> bool:
 
 
 def read_config_content(agent: str) -> Optional[str]:
-    """agent-configs 파일에서 설치 안내 주석 블록을 제거하고 실제 내용만 반환"""
-    config_file = AGENT_CONFIGS_SRC / AGENT_CONFIG_MAP[agent]
-    if not config_file.exists():
+    """agent-specs/{agent}/inject/ 에서 진입점 파일 내용을 읽어 반환.
+    없으면 레거시 agent-configs/ 에서 fallback."""
+    filename = AGENT_CONFIG_MAP.get(agent)
+    if not filename:
         return None
 
-    lines = config_file.read_text(encoding="utf-8").splitlines()
+    # agent-specs 우선
+    inject_file = AGENT_SPECS_SRC / agent / "inject" / filename
+    if inject_file.exists():
+        lines = inject_file.read_text(encoding="utf-8").splitlines()
+        for i, line in enumerate(lines):
+            if line.startswith("## "):
+                return "\n".join(lines[i:]).strip()
+        return None
 
-    # 첫 번째 ## 섹션부터 시작 (설치 안내 주석 블록 건너뜀)
-    for i, line in enumerate(lines):
-        if line.startswith("## "):
-            return "\n".join(lines[i:]).strip()
+    # 레거시 fallback
+    legacy_file = AGENT_CONFIGS_SRC / filename
+    if legacy_file.exists():
+        lines = legacy_file.read_text(encoding="utf-8").splitlines()
+        for i, line in enumerate(lines):
+            if line.startswith("## "):
+                return "\n".join(lines[i:]).strip()
 
     return None
 
@@ -107,43 +122,50 @@ def clear_upgrade_candidates(agents_workspace_dst: Path):
     print("  [초기화] upgrade-candidates/ 비움")
 
 
+_IGNORE = shutil.ignore_patterns(".DS_Store", ".gitkeep")
+
+
 def copy_agents_workspace(dst: Path):
-    shutil.copytree(AGENTS_WORKSPACE_SRC, dst)
-    print(f"  [복사] .agents-workspace/ → {dst}")
+    shutil.copytree(AGENTS_WORKSPACE_SRC, dst, ignore=_IGNORE)
+    print(f"  [복사] .mpa-workspace/ → {dst}")
 
 
-def copy_workspace_template(dst: Path):
-    added = _merge_dir(WORKSPACE_TEMPLATE_SRC, dst, dst)
-    if added == 0:
-        print("  [확인] workspace/ 추가할 항목 없음")
 
-
-def _merge_dir(src: Path, dst: Path, base: Path):
+def _merge_dir(src: Path, dst: Path, base: Path, label: str = ""):
     """src 구조를 dst에 병합한다. 없는 항목만 추가하고 기존 항목은 건드리지 않는다."""
     dst.mkdir(parents=True, exist_ok=True)
     added = 0
     for item in src.iterdir():
+        if item.name in (".DS_Store", ".gitkeep"):
+            continue
         dst_item = dst / item.name
         if dst_item.exists():
             if item.is_dir():
-                added += _merge_dir(item, dst_item, base)
+                added += _merge_dir(item, dst_item, base, label)
         else:
             if item.is_dir():
-                shutil.copytree(item, dst_item)
+                shutil.copytree(item, dst_item, ignore=_IGNORE)
             else:
                 shutil.copy2(item, dst_item)
-            print(f"  [추가] workspace/{dst_item.relative_to(base)}")
+            rel = dst_item.relative_to(base)
+            prefix = f"{label}/" if label else ""
+            print(f"  [추가] {prefix}{rel}")
             added += 1
     return added
 
 
 def append_agent_config(agent: str, project_path: Path):
-    filename = AGENT_CONFIG_MAP[agent]
+    """진입점 파일(CLAUDE.md 등)에 Agents Workspace 섹션을 추가한다."""
+    filename = AGENT_CONFIG_MAP.get(agent)
+    if not filename:
+        print(f"  [건너뜀] {agent} — 진입점 파일 없음 (AI agent가 처리)")
+        return
+
     config_dst = project_path / filename
     content = read_config_content(agent)
 
     if content is None:
-        print(f"  [경고] agent-configs/{filename} 없음, 건너뜀")
+        print(f"  [경고] {agent} inject 파일 없음, 건너뜀")
         return
 
     if config_dst.exists():
@@ -159,32 +181,50 @@ def append_agent_config(agent: str, project_path: Path):
         print(f"  [생성] {filename}")
 
 
+def copy_agent_spec_files(agent: str, project_path: Path):
+    """agent-specs/{agent}/files/ 의 파일을 프로젝트에 복사한다 (없는 경우만)."""
+    files_src = AGENT_SPECS_SRC / agent / "files"
+    if not files_src.exists():
+        return
+    added = _merge_dir(files_src, project_path, project_path, label="")
+    if added == 0:
+        print(f"  [확인] {agent} spec 파일 추가할 항목 없음")
+
+
+def copy_workspace_template(dst: Path):
+    added = _merge_dir(WORKSPACE_TEMPLATE_SRC, dst, dst, label="workspace")
+    if added == 0:
+        print("  [확인] workspace/ 추가할 항목 없음")
+
+
 def run_install(project_path: Path, agents: list, upgrade: bool):
-    agents_workspace_dst = project_path / ".agents-workspace"
+    agents_workspace_dst = project_path / ".mpa-workspace"
     workspace_dst = project_path / "workspace"
 
     if upgrade:
         print("\n[1단계] upgrade-candidates 이동")
         migrate_upgrade_candidates(agents_workspace_dst)
 
-        print("\n[2단계] .agents-workspace 교체")
+        print("\n[2단계] .mpa-workspace 교체")
         shutil.rmtree(agents_workspace_dst)
         copy_agents_workspace(agents_workspace_dst)
         clear_upgrade_candidates(agents_workspace_dst)
 
-        print("\n[3단계] workspace 누락 항목 추가 (하네스 신규 구조 반영)")
+        print("\n[3단계] workspace 누락 항목 추가")
         copy_workspace_template(workspace_dst)
     else:
-        print("\n[1단계] .agents-workspace 설치")
+        print("\n[1단계] .mpa-workspace 설치")
         copy_agents_workspace(agents_workspace_dst)
         clear_upgrade_candidates(agents_workspace_dst)
 
         print("\n[2단계] workspace 초기화")
         copy_workspace_template(workspace_dst)
 
-    print("\n[마지막] agent 설정 파일 업데이트")
+    print("\n[마지막] agent 설정 적용")
     for agent in agents:
+        print(f"\n  ── {agent} ──")
         append_agent_config(agent, project_path)
+        copy_agent_spec_files(agent, project_path)
 
 
 # ──────────────────────────────────────────────
@@ -192,12 +232,14 @@ def run_install(project_path: Path, agents: list, upgrade: bool):
 # ──────────────────────────────────────────────
 
 def detect_agents(project_path: Path) -> list:
-    """프로젝트 경로에서 사용 중인 agent를 감지한다"""
+    """프로젝트 경로에서 사용 중인 agent를 감지한다."""
     detected = []
     if (project_path / "CLAUDE.md").exists() or (project_path / ".claude").exists():
         detected.append("claude")
     if (project_path / "AGENTS.md").exists():
         detected.append("codex")
+    if (project_path / "GEMINI.md").exists() or (project_path / ".gemini").exists():
+        detected.append("antigravity")
     return detected
 
 
@@ -207,10 +249,11 @@ def prompt_agents(project_path: Path) -> list:
     print("\n사용 중인 agent:")
     for i, (key, filename) in enumerate(AGENT_CONFIG_MAP.items(), 1):
         mark = "✓" if key in detected else " "
-        print(f"  [{mark}] {i}. {key} ({filename})")
+        label = filename if filename else "spec.md 질의"
+        print(f"  [{mark}] {i}. {key} ({label})")
 
     print("\n설정할 agent를 입력하세요.")
-    print("  예) claude / codex / claude,codex")
+    print("  예) claude / codex / claude,codex / claude,codex,antigravity")
 
     default = ",".join(detected) if detected else ""
     answer = ask("agent", default)
@@ -237,23 +280,48 @@ def prompt_project_path() -> Path:
     return project_path
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="my-pacemaker-agent 설치 스크립트")
+    parser.add_argument("--project", help="설치 대상 프로젝트 경로")
+    parser.add_argument("--agents", help="사용 중인 agent (claude, codex, antigravity, openagent 또는 조합)")
+    parser.add_argument("--upgrade", action="store_true", help="업그레이드 모드로 실행")
+    return parser.parse_args()
+
+
 def main():
     print("=== my-pacemaker-agent 설치 ===")
 
+    cli = parse_args()
+
     # 1. 프로젝트 경로
-    project_path = prompt_project_path()
+    if cli.project:
+        project_path = Path(cli.project).resolve()
+        if not project_path.exists():
+            print(f"오류: 경로가 존재하지 않습니다: {project_path}")
+            return 1
+        print(f"\n프로젝트 경로: {project_path}")
+    else:
+        project_path = prompt_project_path()
 
     # 2. 신규 설치 vs 업그레이드 자동 판단
-    agents_workspace_dst = project_path / ".agents-workspace"
-    upgrade = agents_workspace_dst.exists()
+    agents_workspace_dst = project_path / ".mpa-workspace"
+    upgrade = cli.upgrade or agents_workspace_dst.exists()
 
     if upgrade:
-        print(f"\n.agents-workspace/ 가 이미 존재합니다 → 업그레이드 모드")
+        print(f"\n.mpa-workspace/ 가 이미 존재합니다 → 업그레이드 모드")
     else:
-        print(f"\n.agents-workspace/ 없음 → 신규 설치 모드")
+        print(f"\n.mpa-workspace/ 없음 → 신규 설치 모드")
 
     # 3. agent 선택
-    agents = prompt_agents(project_path)
+    if cli.agents:
+        agents = [a.strip().lower() for a in cli.agents.split(",") if a.strip()]
+        invalid = [a for a in agents if a not in AGENT_CONFIG_MAP]
+        if invalid:
+            print(f"오류: 지원하지 않는 agent: {', '.join(invalid)}")
+            return 1
+        print(f"\nagents: {', '.join(agents)}")
+    else:
+        agents = prompt_agents(project_path)
 
     if not agents:
         print("오류: agent를 하나 이상 선택해야 합니다.")
@@ -267,7 +335,7 @@ def main():
     print(f"  agents  : {', '.join(agents)}")
     print(f"─────────────────────────────")
 
-    if not ask_yes_no("\n진행할까요?", default=True):
+    if not cli.project and not ask_yes_no("\n진행할까요?", default=True):
         print("취소되었습니다.")
         return 0
 

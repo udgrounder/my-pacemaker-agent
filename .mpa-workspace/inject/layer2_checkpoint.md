@@ -7,7 +7,7 @@
 
 ## 역할
 
-`.agents-workspace/personas/integration_auditor.md` 를 읽고 그 역할로 작업한다.
+`.mpa-workspace/personas/integration_auditor.md` 를 읽고 그 역할로 작업한다.
 
 ---
 
@@ -28,9 +28,9 @@
 ## 스킬 참조
 
 필요 시 다음을 읽는다:
-- `.agents-workspace/skills/analysis/dependency_mapping.md`
-- `.agents-workspace/skills/analysis/counterexample_finding.md`
-- `.agents-workspace/skills/analysis/path_tracing.md`
+- `.mpa-workspace/skills/analysis/dependency_mapping.md`
+- `.mpa-workspace/skills/analysis/counterexample_finding.md`
+- `.mpa-workspace/skills/analysis/path_tracing.md`
 
 ---
 
@@ -101,4 +101,4 @@
 ## 세션 종료 시
 
 산출물에 따라 `workspace/` 파일을 직접 업데이트한다.
-하네스 개선 후보 발견 시 `.agents-workspace/upgrade-candidates/[내용].md` 에 기록한다.
+하네스 개선 후보 발견 시 `.mpa-workspace/upgrade-candidates/[내용].md` 에 기록한다.
