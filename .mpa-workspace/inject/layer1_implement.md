@@ -21,7 +21,7 @@
 5. `workspace/project_memory/domains/[작업 도메인]/registry.md` (존재하는 경우)
 6. `workspace/project_memory/roles/implementer.md` (존재하는 경우) — 이 프로젝트에서 implementer 역할이 축적한 학습
 7. `workspace/tasks/INDEX.md` — 이번 작업의 원본 요청 확인
-8. 이번 태스크의 설계 계획 파일 (`workspace/tasks/active/[태스크명]/plan.md`)
+8. 이번 태스크의 설계 계획 파일 (`workspace/tasks/active/yyyymmdd_[태스크명]/plan.md`)
 
 관련 기술 스킬이 있으면 `.mpa-workspace/skills/tech/` 에서 해당 파일을 읽는다.
 
