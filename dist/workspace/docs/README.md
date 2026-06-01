@@ -41,7 +41,7 @@ workspace/docs/
 
 ## 새 문서 추가 절차
 
-1. `docs_template.md`를 복사해서 적절한 경로에 저장
+1. `.mpa-workspace/templates/docs_template.md`를 복사해서 적절한 경로에 저장
 2. 프론트매터(title, domain, tags, updated, related_tasks) 채우기
 3. `INDEX.md`에 한 줄 추가
 

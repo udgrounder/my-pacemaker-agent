@@ -59,6 +59,17 @@ workspace/memory/
 > 핵심 질문 (전역): **"다음 AI 세션이 이걸 모르면 다른 결정을 내리는가?"**  
 > 핵심 질문 (역할별): **"다음에 이 역할이 몰랐다면 실수했을 내용인가?"**
 
+### 기술/도메인 지식 기록 위치
+
+| 지식 유형 | 기록 위치 |
+|---------|---------|
+| 기술 지식 (하면 안 되는 것만) | `domains/[관련 도메인]/rules.md` 절대 금지 섹션 |
+| 이 프로젝트 한정 도메인 규칙 | `domains/[도메인]/rules.md` |
+| 다른 프로젝트에도 유효한 도메인 지식 | `upgrade-candidates/` → `.mpa-workspace/knowledge/` |
+| 역할 행동 패턴 | `roles/[페르소나명].md` |
+
+> **기술 지식 원칙:** Agent 훈련 데이터를 신뢰한다. 일반적인 Best Practice는 기록하지 않고, "하면 안 되는 것"만 기록한다.
+
 ```
 작업 완료
     ↓
@@ -149,22 +160,12 @@ workspace/memory/
 
 ## 템플릿 사용법
 
-### shared_template.md
-- `shared/[파일명].md` 로 저장
-- **Tier 1~2** — 모든 세션 시작 시 주입
-- 거의 변하지 않는 정보(Tier 1)와 결정·패턴(Tier 2)을 분리해서 작성
+### 템플릿 위치
 
-### domains_template.md
-- `domains/[도메인명]/rules.md` 로 저장
-- **Tier 2** — 해당 도메인 세션 시작 시만 주입. 다른 도메인 세션에는 주입하지 않음
-- 재사용 요소 목록이 커지면 `registry.md` 로 분리 권장
-- 다른 도메인 에이전트는 이 파일을 수정하지 않음
+템플릿은 `.mpa-workspace/templates/`에 있다. 각 파일 상단의 사용법을 참고해서 복사 후 작성한다.
 
-### roles_template.md
-- `roles/[페르소나명].md` 로 저장
-- 해당 페르소나가 이 프로젝트에서 작업하면서 발견한 내용만 기록
-- **기록 기준:** "다음에 이 역할이 몰랐다면 실수했을 내용인가?"
-  - 코드·문서에서 직접 읽을 수 있는 내용 → 기록하지 않음
-  - 일회성 결정 → 기록하지 않음
-  - 기억할 것이 없으면 파일을 비워 둠
-- 해당 페르소나만 작성·관리. 다른 역할이 수정하지 않음
+| 템플릿 | 복사 위치 |
+|--------|---------|
+| `shared_template.md` | `workspace/memory/shared/[파일명].md` |
+| `domains_template.md` | `workspace/memory/domains/[도메인명]/rules.md` |
+| `roles_template.md` | `workspace/memory/roles/[페르소나명].md` |

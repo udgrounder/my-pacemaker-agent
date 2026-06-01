@@ -58,3 +58,22 @@
 - [ ] 후보 전체 목록 사용자에게 제시됨
 - [ ] 선택된 항목이 모두 사용자 확인 후 처리됨
 - [ ] 처리 완료된 upgrade-candidates 파일 제거됨
+
+---
+
+## 도메인 지식 라이브러리 관리
+
+upgrade-candidates 중 도메인 지식에 해당하는 것은 `dist/.mpa-workspace/knowledge/`에 반영한다.
+
+### 판단 기준
+
+> "이 도메인을 다루는 다른 프로젝트에서도 모르면 실수할 내용인가?"
+
+- **Yes** → `knowledge/[도메인명].md` 에 추가 또는 업데이트
+- **No** → 해당 프로젝트의 `workspace/memory/domains/`에만 남김
+
+### 파일 반영 방법
+
+1. `knowledge/[도메인명].md` 파일이 없으면 `knowledge_template.md` 복사해서 생성
+2. 해당 섹션(절대 금지 / 핵심 제약 / 검증된 패턴 / 주의사항)에 내용 추가
+3. 출처 프로젝트명 명시

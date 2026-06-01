@@ -44,7 +44,7 @@ workspace/tasks/
 
 ## 새 작업 추가 절차
 
-1. `_template/plan_template.md`를 복사해서 `active/yyyymmdd_[작업명]/plan.md`로 저장
+1. `.mpa-workspace/templates/plan_template.md`를 복사해서 `active/yyyymmdd_[작업명]/plan.md`로 저장
 2. 내용 채우기
 3. `INDEX.md`에 한 줄 추가
 

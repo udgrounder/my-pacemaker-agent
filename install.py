@@ -134,7 +134,7 @@ def copy_agents_workspace(dst: Path):
 
 def _is_harness_managed(name: str) -> bool:
     """하네스가 관리하는 파일 여부 — upgrade 시 항상 최신으로 교체한다."""
-    return name == "README.md" or name.endswith("_template.md")
+    return name == "README.md"
 
 
 def _merge_dir(src: Path, dst: Path, base: Path, label: str = "", upgrade: bool = False):
