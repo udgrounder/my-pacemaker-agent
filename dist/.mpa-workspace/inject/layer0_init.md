@@ -14,6 +14,7 @@
 
 1. `.mpa-workspace/skills/analysis/dependency_mapping.md`
 2. `.mpa-workspace/skills/analysis/silent_decision_extraction.md`
+3. `.mpa-workspace/knowledge/` — 이 프로젝트와 관련된 도메인 파일이 있으면 읽는다 (존재하는 경우)
 
 기존 코드베이스가 있는 경우 프로젝트 루트를 탐색해 구조를 파악한다.
 

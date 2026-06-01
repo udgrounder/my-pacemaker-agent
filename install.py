@@ -5,6 +5,7 @@ Agents Workspace 설치 스크립트
 """
 
 import argparse
+import datetime
 import shutil
 import sys
 import uuid
@@ -126,6 +127,23 @@ def clear_upgrade_candidates(agents_workspace_dst: Path):
 _IGNORE = shutil.ignore_patterns(".DS_Store", ".gitkeep")
 
 
+def write_version(agents_workspace_dst: Path, mode: str):
+    """설치/업그레이드 날짜를 .mpa-version에 기록한다."""
+    version_src = agents_workspace_dst / ".mpa-version"
+    if not version_src.exists():
+        return
+    harness_date = ""
+    for line in version_src.read_text(encoding="utf-8").splitlines():
+        if line.startswith("harness_date:"):
+            harness_date = line
+            break
+    today = datetime.date.today().isoformat()
+    version_src.write_text(
+        f"{harness_date}\n{mode}_at: {today}\n",
+        encoding="utf-8"
+    )
+
+
 def copy_agents_workspace(dst: Path):
     shutil.copytree(AGENTS_WORKSPACE_SRC, dst, ignore=_IGNORE)
     print(f"  [복사] .mpa-workspace/ → {dst}")
@@ -219,6 +237,7 @@ def run_install(project_path: Path, agents: list, upgrade: bool):
         shutil.rmtree(agents_workspace_dst)
         copy_agents_workspace(agents_workspace_dst)
         clear_upgrade_candidates(agents_workspace_dst)
+        write_version(agents_workspace_dst, "upgraded")
 
         print("\n[3단계] workspace 템플릿 업데이트 및 누락 항목 추가")
         copy_workspace_template(workspace_dst, upgrade=True)
@@ -226,6 +245,7 @@ def run_install(project_path: Path, agents: list, upgrade: bool):
         print("\n[1단계] .mpa-workspace 설치")
         copy_agents_workspace(agents_workspace_dst)
         clear_upgrade_candidates(agents_workspace_dst)
+        write_version(agents_workspace_dst, "installed")
 
         print("\n[2단계] workspace 초기화")
         copy_workspace_template(workspace_dst)

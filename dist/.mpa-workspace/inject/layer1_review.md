@@ -17,9 +17,10 @@
 1. `workspace/memory/shared/project_identity.md`
 2. `workspace/memory/shared/architecture.md`
 3. `workspace/memory/shared/contracts.md` (존재하는 경우)
-4. `workspace/memory/roles/code_reviewer.md` (존재하는 경우)
-5. 이번 태스크의 설계 계획 파일 (`workspace/tasks/active/[태스크명]/plan.md`)
-6. 이번 태스크의 구현 내역서 (`workspace/tasks/active/[태스크명]/changelog.md`) — 존재하면 읽기
+4. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
+5. `workspace/memory/roles/code_reviewer.md` (존재하는 경우)
+6. 이번 태스크의 설계 계획 파일 (`workspace/tasks/active/[태스크명]/plan.md`)
+7. 이번 태스크의 구현 내역서 (`workspace/tasks/active/[태스크명]/changelog.md`) — 존재하면 읽기
 
 ---
 

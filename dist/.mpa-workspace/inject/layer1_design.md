@@ -19,6 +19,7 @@
 3. `workspace/memory/shared/contracts.md` (존재하는 경우)
 4. `workspace/memory/roles/architect.md` (존재하는 경우) — 이 프로젝트에서 architect 역할이 축적한 학습
 5. `workspace/tasks/INDEX.md` — 진행 중인 요청 파악
+6. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
 
 관련 기존 문서가 있으면 `workspace/docs/INDEX.md` 도 확인한다.
 
@@ -98,7 +99,7 @@
    - `에이전트 보고` 섹션을 채운다:
      - **사용자 결정 필요**: 가치 결정 또는 비즈니스 맥락 의존 항목 (결정 없이 구현 불가능한 것)
      - **에이전트 가정**: 브리핑에 없어 임의로 채운 내용 + 근거 + 틀렸을 때 영향
-   - `구현 진행 상태` 테이블을 실제 구현 단계로 채운다 (템플릿의 "Step 1/Step 2" 대체)
+   - `구현 단계` 체크리스트를 실제 구현 단계로 채운다 (템플릿의 "Step 1/Step 2" 대체)
 3. tasks/INDEX.md 업데이트 → 새 태스크 항목 추가, 상태: `설계 완료`
 4. 하네스 개선 후보 발견 → `.mpa-workspace/upgrade-candidates/[내용].md`
 5. **태스크 분리 검토** — 아래 중 하나에 해당하면 분리안을 계획서와 함께 제안한다

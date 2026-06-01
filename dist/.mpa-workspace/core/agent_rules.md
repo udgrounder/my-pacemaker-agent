@@ -11,12 +11,12 @@
    → `에이전트 보고` 섹션을 반드시 채운다:
       - **사용자 결정 필요**: 가치 결정 또는 비즈니스 맥락에 의존하는 항목 (AI가 결정해서는 안 되는 것)
       - **에이전트 가정**: 브리핑에 없어 임의로 채운 내용, 그 근거, 틀렸을 때 계획 변경 사항
-   → `구현 진행 상태` 테이블을 실제 구현 단계 목록으로 채운다 (템플릿의 "Step 1/Step 2" 대체)
+   → `구현 단계` 체크리스트를 실제 구현 단계 목록으로 채운다 (템플릿의 "Step 1/Step 2" 대체)
 3. **태스크 분리 필요 여부 판단** — 아래 기준으로 판단하고, 분리가 필요하면 분리안을 함께 제안한다
    - 구현 단계가 5개 이상
    - 독립적으로 완료·검증 가능한 단위가 2개 이상 존재
    - 단계 간 의존성이 낮아 병렬 진행이 가능한 경우
-   - **분리 시 파일 구조:** 별도 폴더를 만들지 않고 같은 태스크 폴더 안에 파일로 분리한다
+   - **분리 시 파일 구조:** 별도 폴더를 만들지 않고 같은 태스크 폴더 안에 파일로 분리한다 (`.mpa-workspace/templates/sub_template.md` 참조)
      ```
      workspace/tasks/active/yyyymmdd_[작업명]/
        plan.md          ← 전체 계획 (분리 개요 포함)
@@ -57,16 +57,25 @@
 
 ## 일반 작업 (작업 생성 없이 바로 요청하는 경우)
 
-요청 내용을 보고 작업 유형을 판단하고 해당 inject 파일을 읽은 뒤 지시에 따른다.
+### workflows/ vs inject/ 구분
 
-| 작업 유형 | inject 파일 |
-|---------|------------|
-| 새 프로젝트 초기화 / 하네스 첫 적용 | `.mpa-workspace/inject/layer0_init.md` |
-| 하네스 업데이트 / 재설치 | `.mpa-workspace/inject/layer0_update.md` |
-| 기능 설계 / 버그픽스 계획 / 리팩터링 계획 | `.mpa-workspace/inject/layer1_design.md` |
-| 구현 | `.mpa-workspace/inject/layer1_implement.md` |
-| 코드 검토 | `.mpa-workspace/inject/layer1_review.md` |
-| 전체 정합성 점검 | `.mpa-workspace/inject/layer2_checkpoint.md` |
+| 파일 위치 | 역할 | 언제 읽는가 |
+|---------|------|-----------|
+| `.mpa-workspace/workflows/` | 작업 유형별 **전체 흐름** — 어떤 세션을 어떤 순서로 진행하는지 | 작업 시작 전 전체 그림이 필요할 때 |
+| `.mpa-workspace/inject/` | **개별 세션** 실행 패키지 — 역할·읽을 파일·작업·완료 기준 | 각 세션 시작 시 |
+
+workflows/ 파일은 inject/ 파일들을 어떤 순서로 사용할지 안내한다. 세션마다 해당 inject 파일을 읽고 지시에 따른다.
+
+| 작업 유형 | workflow 파일 | 시작 inject |
+|---------|-------------|-----------|
+| 새 기능 개발 | `workflows/new_feature.md` | `inject/layer1_design.md` |
+| 버그 수정 | `workflows/bug_fix.md` | `inject/layer1_design.md` |
+| 리팩터링 | `workflows/refactoring.md` | `inject/layer1_design.md` |
+| 코드 검토 | `workflows/code_review.md` | `inject/layer1_review.md` |
+| 팀 협업 | `workflows/team_collaboration.md` | `inject/layer0_init.md` |
+| 새 프로젝트 초기화 | — | `inject/layer0_init.md` |
+| 하네스 업데이트 | — | `inject/layer0_update.md` |
+| 전체 정합성 점검 | — | `inject/layer2_checkpoint.md` |
 
 작업 유형이 불분명하면 사용자에게 확인한다.
 
@@ -166,10 +175,14 @@
 
 inject 파일의 "세션 종료 시" 항목을 확인하고 필요한 `workspace/` 파일을 업데이트한다.
 
-하네스 개선 후보 발견 시 `.mpa-workspace/upgrade-candidates/[내용].md` 에 기록한다:
+하네스 개선 후보 발견 시 `.mpa-workspace/upgrade-candidates/[내용].md` 에 기록한다.
 
+**타입에 따라 다른 포맷을 사용한다:**
+
+**타입 A — 방법론 개선** (agent 운영 방식, inject 파일, 규칙 등)
 ```markdown
 # [개선 내용 제목]
+**타입**: 방법론 개선
 **발견 상황**: [어떤 작업 중 발견했는지]
 **적용 범위**: 이 프로젝트 / 모든 프로젝트
 
@@ -183,5 +196,19 @@ inject 파일의 "세션 종료 시" 항목을 확인하고 필요한 `workspace
 - `.mpa-workspace/[파일명]`
 ```
 
-> 코드·비즈니스 개선이 아닌 **에이전트 운영 방식**의 개선만 여기에 기록한다.  
+**타입 B — 도메인 지식** (다른 프로젝트에도 유효한 도메인·업종 지식)
+```markdown
+# [도메인명]: [지식 제목]
+**타입**: 도메인 지식
+**도메인**: [결제 / 인증 / 알림 / ...]
+**발견 상황**: [어떤 작업 중 발견했는지]
+
+## 내용
+[기록할 지식 — 절대 금지 / 핵심 제약 / 검증된 패턴 / 주의사항]
+
+## 적용 대상 파일
+- `.mpa-workspace/knowledge/[도메인명].md`
+```
+
+> 코드·비즈니스 개선이 아닌 **에이전트 운영 방식 또는 도메인 지식**만 여기에 기록한다.  
 > **적용 범위**: "이 프로젝트"는 로컬 workspace/에만 반영. "모든 프로젝트"는 하네스 업데이트/설치 시 하네스 프로젝트로 이전 대상.

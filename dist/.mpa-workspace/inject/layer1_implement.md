@@ -19,9 +19,10 @@
 3. `workspace/memory/shared/contracts.md` (존재하는 경우)
 4. `workspace/memory/domains/[작업 도메인]/rules.md`
 5. `workspace/memory/domains/[작업 도메인]/registry.md` (존재하는 경우)
-6. `workspace/memory/roles/implementer.md` (존재하는 경우) — 이 프로젝트에서 implementer 역할이 축적한 학습
-7. `workspace/tasks/INDEX.md` — 이번 작업의 원본 요청 확인
-8. 이번 태스크의 설계 계획 파일 (`workspace/tasks/active/yyyymmdd_[태스크명]/plan.md`)
+6. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
+7. `workspace/memory/roles/implementer.md` (존재하는 경우) — 이 프로젝트에서 implementer 역할이 축적한 학습
+8. `workspace/tasks/INDEX.md` — 이번 작업의 원본 요청 확인
+9. 이번 태스크의 설계 계획 파일 (`workspace/tasks/active/yyyymmdd_[태스크명]/plan.md`)
 
 관련 기술 스킬이 있으면 `.mpa-workspace/skills/tech/` 에서 해당 파일을 읽는다.
 
@@ -44,9 +45,9 @@
    - 구현 범위가 plan에서 예상한 것과 맞는가?
    → **불일치 또는 계획 수정이 필요한 발견 시: 구현 시작 전 사용자에게 보고하고 plan 재검토**
 
-1. **이전 진행 확인** — `plan.md`의 "구현 진행 상태" 섹션을 읽는다.
+1. **이전 진행 확인** — `plan.md`의 "구현 단계" 체크리스트를 읽는다.
    - `changelog.md`가 이미 존재하면 읽어서 완료된 부분을 파악한다.
-   - 이미 완료된 단계는 건너뛰고, 중단된 단계부터 이어간다.
+   - 체크된 단계는 건너뛰고, 첫 번째 미완료 단계부터 이어간다.
    - 이어가는 경우: plan.md 상태를 `구현 중`으로 업데이트하고 시작.
 
 2. **가역성 확보** — 현재 브랜치/커밋 상태가 clean한가?
@@ -74,7 +75,7 @@
 
 > **구현이 완료되지 않은 채 세션을 끝내야 하는 경우:**
 > 1. `plan.md` 상태를 `구현 중`으로 업데이트
-> 2. 구현 진행 상태 섹션에서 완료된 단계는 ✅, 미완료는 🔄 또는 ⏳로 표시
+> 2. 구현 단계 체크리스트에서 완료된 항목은 체크, 건너뛴 항목은 ~~취소선~~ 후 이유 메모
 > 3. `changelog.md`에 완료된 부분까지 기록 (다음 세션에 이어가기 위해)
 >
 > → 다음 세션은 이 정보를 읽고 중단된 지점부터 재개한다.
