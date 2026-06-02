@@ -436,6 +436,36 @@ AI를 잘 쓰는 사람과 못 쓰는 사람의 차이는 프롬프트 실력이
 
 각 파일이 언제 쓰이는지는 이후 각 장에서 작업 흐름과 함께 설명한다.
 
+#### 5.2-1 workspace/ 안에 무엇이 있는가
+
+`workspace/`는 이 프로젝트 고유의 데이터가 쌓이는 공간이다. 설치 직후에는 비어있고, 프로젝트가 진행되면서 채워진다.
+
+```
+workspace/
+├── project_memory/              ← 프로젝트를 이해하는 데 필요한 지식
+│   ├── shared/                  ← 모든 작업에 항상 주입되는 핵심
+│   │   ├── project_identity.md  ← 이 프로젝트가 무엇인가 (1-2 문장)
+│   │   ├── architecture.md      ← 아키텍처 결정과 이유
+│   │   └── contracts.md         ← 모듈 간 인터페이스 계약
+│   └── domains/                 ← 도메인별 규칙 (프로젝트 구조에 맞게 구성)
+│       └── [도메인명]/
+│           ├── rules.md         ← 이 도메인의 규칙과 제약
+│           └── registry.md      ← 컴포넌트/패턴 레지스트리
+│
+├── tasks/                       ← 작업 단위 관리
+│   ├── active/                  ← 현재 진행 중인 작업
+│   │   └── [태스크명]/
+│   │       └── plan.md          ← 설계·진행 상태·에이전트 보고 (Layer 1의 핵심)
+│   └── done/                    ← 완료된 작업 아카이브
+│
+└── docs/                        ← 구현된 기능의 결과 문서
+    └── INDEX.md
+```
+
+`project_memory/shared/`가 가장 중요하다. 모든 Layer 1 세션에 항상 주입되는 핵심 컨텍스트다. 여기에 없는 것은 에이전트에게 존재하지 않는 것과 같다.
+
+`tasks/active/[태스크명]/plan.md`는 현재 진행 중인 작업의 상태 파일이다. 에이전트가 계획서를 작성하고, 사용자가 검토·승인하고, 에이전트가 구현 결과를 기록하는 공간이다. 세션이 끊겨도 이 파일을 읽으면 어디까지 왔는지 알 수 있다.
+
 #### 5.3 CLI/IDE와 체계는 어떻게 연결되는가
 
 체계 파일은 텍스트다. Claude Code든 Cursor든 어디서든 읽을 수 있어야 한다. 그래서 의존성 방향을 한 방향으로만 유지한다.
@@ -823,23 +853,42 @@ C. 부정 컨텍스트 — "건드리지 말아야 할 것" 명시
 
 #### 9.1 install.py 사용법
 
-`install.py`가 `.mpa-workspace/` 전체를 프로젝트에 복사한다.
+**신규 설치**
 
-```
-신규 설치:  에이전트 없음 감지 → .mpa-workspace/ 복사 → agent-configs/ 설치
-업그레이드: 기존 에이전트 있음 감지 → upgrade-candidates/ 이전 → 템플릿 최신화
+체계 저장소를 클론하고, install.py를 실행한다.
+
+```bash
+# 1. 체계 저장소 클론 (최초 1회)
+git clone https://github.com/your-org/my-pacemaker-agent.git
+
+# 2. 새 프로젝트에 설치
+python my-pacemaker-agent/install.py --project /path/to/my-project
+
+# 설치 후 프로젝트 구조
+my-project/
+├── .mpa-workspace/    ← 체계 파일 (에이전트 행동 규칙)
+├── workspace/         ← 프로젝트 데이터 (비어있는 상태)
+└── agent-configs/     ← CLI/IDE 브리지 파일
 ```
 
-설치와 업데이트의 방향:
+install.py가 하는 일: `.mpa-workspace/` 전체를 프로젝트에 복사하고, `agent-configs/`의 파일을 현재 CLI/IDE에 맞게 설치한다. 이미 `.mpa-workspace/`가 있는 프로젝트에서는 업그레이드 모드로 동작한다.
+
+**업그레이드**
+
+```bash
+# 기존 프로젝트에서 체계를 최신 버전으로 업데이트
+python my-pacemaker-agent/install.py --project /path/to/my-project
 ```
-설치:    체계 → 프로젝트  (단방향)
-업데이트: 프로젝트 → 체계  (upgrade-candidates 이전)
-         + 체계 → 프로젝트  (템플릿 최신화)
+
+업그레이드 시 흐름:
+```
+1. 프로젝트의 upgrade-candidates/ → 체계 저장소로 이전 (발견한 것 반영)
+2. 체계 최신 .mpa-workspace/ → 프로젝트에 복사 (템플릿 최신화)
 ```
 
 복사되는 것과 복사 안 되는 것:
-- **복사됨 (프로젝트용)**: upgrade-candidates 기록·이전 등 "프로젝트 → 체계" 방향 작업 관련 파일
-- **복사 안 됨**: 체계 시스템 파일 수정, 배포, 유지보수 지침
+- **복사됨**: 에이전트 행동 규칙, inject 파일, 페르소나, 스킬 등 체계 운영 파일
+- **복사 안 됨**: workspace/ 내 프로젝트 데이터 (건드리지 않는다)
 
 #### 9.2 설치가 "지식 전달의 트리거"인 이유
 
@@ -1123,6 +1172,59 @@ A와 B는 외부에서 관찰 불가능하다. 둘 다 침묵한다.
 ---
 
 ## 부록
+
+### E. 빠른 시작 가이드
+
+> 가이드북을 다 읽을 시간이 없거나, 일단 시작해보고 싶을 때 여기서 시작한다.  
+> 각 단계에서 막히면 해당 장으로 돌아간다.
+
+---
+
+**Step 1 — 설치** (9장 참조)
+
+```bash
+git clone https://github.com/your-org/my-pacemaker-agent.git
+python my-pacemaker-agent/install.py --project /path/to/my-project
+```
+
+설치 후 프로젝트에 `.mpa-workspace/`, `workspace/`, `agent-configs/`가 생긴다.  
+Claude Code를 쓴다면 `agent-configs/CLAUDE.md` 내용을 프로젝트 루트 `CLAUDE.md`에 추가한다.
+
+---
+
+**Step 2 — Layer 0: 프로젝트 초기화** (6.2 참조)
+
+새 채팅 스레드를 열고 `.mpa-workspace/inject/layer0_init.md` 파일을 붙여넣는다.  
+플레이스홀더에 프로젝트 정보를 채운 뒤 실행한다.
+
+에이전트와 대화를 통해 만들어지는 것:
+- `workspace/project_memory/shared/project_identity.md` — 프로젝트 정의
+- `workspace/project_memory/shared/architecture.md` — 아키텍처 규칙
+- 작업 목록과 의존성 정의
+
+Layer 0가 완료되면 "이 컨텍스트 없이 시작하면 어떤 잘못된 결정이 내려지는가?"에 답할 수 있어야 한다.
+
+---
+
+**Step 3 — Layer 1: 첫 번째 작업** (6.3 참조)
+
+새 채팅 스레드를 열고 `.mpa-workspace/inject/layer1_design.md`를 붙여넣는다.  
+플레이스홀더에 `workspace/project_memory/shared/` 파일 내용을 채운다.
+
+에이전트가 `workspace/tasks/active/[태스크명]/plan.md`를 작성한다.  
+계획서에서 **에이전트 보고 섹션**을 먼저 확인한다 — 에이전트가 임의로 채운 가정이 여기 나온다.
+
+검토 → 승인 후, 새 스레드에서 `layer1_implement.md`로 구현을 시작한다.
+
+---
+
+**Step 4 — 작업이 익숙해지면**
+
+- Layer 2 체크포인트 (6.4): 3~5개 작업마다 전체 정합성 확인
+- 체계 개선 발견 시 (12장): `upgrade-candidates/`에 기록
+- 세션이 끊기면 (10장): `plan.md` + `project_memory/` 파일을 새 스레드에 주입해 재개
+
+---
 
 ### A. 자주 발생하는 실패 패턴
 
