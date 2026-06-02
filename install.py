@@ -6,7 +6,9 @@ Agents Workspace 설치 스크립트
 
 import argparse
 import datetime
+import json
 import shutil
+import stat
 import sys
 import uuid
 from pathlib import Path
@@ -25,6 +27,36 @@ AGENT_CONFIG_MAP = {
     "antigravity":  "GEMINI.md",
     "openagent":    None,   # spec.md 질의로 결정 — 파일 주입은 AI agent가 처리
 }
+
+# hook 자동 와이어링이 확인된 agent와 설정 파일 경로 (프로젝트 루트 기준)
+# antigravity / openagent 는 hook 지원이 확인되지 않아 설치 시 agent 질의로 처리한다.
+HOOK_SETTINGS_PATH = {
+    "claude": (".claude", "settings.json"),
+    "codex":  (".codex", "hooks.json"),
+}
+
+HOOK_DIR_REL = ".mpa-workspace/hooks"
+HOOK_MARKER = "mpa-workspace/hooks"  # 멱등성 판별용 (이미 등록됐는지)
+
+
+def _hook_cmd(script: str, agent: str) -> str:
+    return f"python3 {HOOK_DIR_REL}/{script} --agent {agent}"
+
+
+def build_hook_block(agent: str) -> dict:
+    """claude/codex 공통 settings 구조의 hooks 블록을 만든다."""
+    return {
+        "SessionStart": [
+            {"hooks": [{"type": "command", "command": _hook_cmd("session_start.py", agent)}]}
+        ],
+        "PreToolUse": [
+            {"matcher": "Edit|Write",
+             "hooks": [{"type": "command", "command": _hook_cmd("code_gate.py", agent)}]}
+        ],
+        "Stop": [
+            {"hooks": [{"type": "command", "command": _hook_cmd("turn_end.py", agent)}]}
+        ],
+    }
 
 
 # ──────────────────────────────────────────────
@@ -225,6 +257,72 @@ def copy_workspace_template(dst: Path, upgrade: bool = False):
         print("  [확인] workspace/ 추가할 항목 없음")
 
 
+def make_hooks_executable(project_path: Path):
+    """설치된 hook 스크립트에 실행 권한을 부여한다."""
+    hooks_dir = project_path / ".mpa-workspace" / "hooks"
+    if not hooks_dir.exists():
+        return
+    for f in hooks_dir.glob("*.py"):
+        mode = f.stat().st_mode
+        f.chmod(mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def _block_already_registered(arr: list) -> bool:
+    """이벤트 배열에 이미 mpa hook이 등록돼 있는지 검사 (멱등성)."""
+    for entry in arr:
+        for h in entry.get("hooks", []) if isinstance(entry, dict) else []:
+            if HOOK_MARKER in str(h.get("command", "")):
+                return True
+    return False
+
+
+def wire_hooks(agent: str, project_path: Path):
+    """claude/codex 의 settings 파일에 hook 블록을 안전 병합한다.
+    - 기존 설정을 보존한다 (덮어쓰지 않음)
+    - 이미 등록돼 있으면 건너뛴다 (멱등)
+    - 파일이 손상된 JSON이면 건드리지 않고 경고만 출력한다
+    """
+    rel = HOOK_SETTINGS_PATH.get(agent)
+    if rel is None:
+        return
+    settings_path = project_path / rel[0] / rel[1]
+
+    data: dict = {}
+    if settings_path.exists():
+        text = settings_path.read_text(encoding="utf-8").strip()
+        if text:
+            try:
+                data = json.loads(text)
+            except json.JSONDecodeError:
+                print(f"  [경고] {settings_path.name} 파싱 실패 — hook 등록 건너뜀 (수동 등록 필요)")
+                return
+        if not isinstance(data, dict):
+            print(f"  [경고] {settings_path.name} 형식이 예상과 다름 — hook 등록 건너뜀")
+            return
+
+    hooks = data.setdefault("hooks", {})
+    added = 0
+    for event, entries in build_hook_block(agent).items():
+        arr = hooks.setdefault(event, [])
+        if not isinstance(arr, list):
+            print(f"  [경고] {settings_path.name} hooks.{event} 형식 이상 — 건너뜀")
+            continue
+        if _block_already_registered(arr):
+            continue
+        arr.extend(entries)
+        added += 1
+
+    if added == 0:
+        print(f"  [확인] {rel[0]}/{rel[1]} hook 이미 등록됨")
+        return
+
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    print(f"  [등록] {rel[0]}/{rel[1]} — hook {added}개 이벤트")
+
+
 def run_install(project_path: Path, agents: list, upgrade: bool):
     agents_workspace_dst = project_path / ".mpa-workspace"
     workspace_dst = project_path / "workspace"
@@ -250,11 +348,19 @@ def run_install(project_path: Path, agents: list, upgrade: bool):
         print("\n[2단계] workspace 초기화")
         copy_workspace_template(workspace_dst)
 
+    print("\n[hook] 스크립트 실행 권한 부여")
+    make_hooks_executable(project_path)
+
     print("\n[마지막] agent 설정 적용")
     for agent in agents:
         print(f"\n  ── {agent} ──")
         append_agent_config(agent, project_path)
         copy_agent_spec_files(agent, project_path)
+        if agent in HOOK_SETTINGS_PATH:
+            wire_hooks(agent, project_path)
+        elif agent in ("antigravity", "openagent"):
+            print(f"  [안내] {agent} — hook 지원 확인 필요. "
+                  f"agent-specs/{agent}/spec.md 질의 절차에 따라 설정하세요.")
 
 
 # ──────────────────────────────────────────────

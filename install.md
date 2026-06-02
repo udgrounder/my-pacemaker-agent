@@ -97,9 +97,14 @@ workspace는 어떤 agent를 사용하든 동일하므로 프로젝트 루트에
 **install.py가 자동 처리하는 항목:**
 - `inject/` → 진입점 파일(CLAUDE.md 등)에 Agents Workspace 섹션 추가
 - `files/` → agent 전용 폴더에 파일 복사 (없는 경우만)
+- **hook 등록** → `claude`/`codex`는 settings 파일(`.claude/settings.json` / `.codex/hooks.json`)에 안전 병합 (기존 설정 보존, 멱등)
+
+**hook 미확인 agent (`antigravity` / `openagent`):**
+install.py는 hook을 자동 등록하지 않는다. 실행 중인 agent가 `agent-specs/{agent}/spec.md` 의 hook 질의 절차에 따라
+지원 여부를 확인하고 설정한 뒤 spec.md를 갱신한다. (antigravity는 Gemini CLI 기준 기본값이 spec.md에 준비돼 있다.)
 
 **install.py 실행 전 안내:**
-- 어떤 파일이 어느 폴더에 설치되는지 사용자에게 요약하여 알린다
+- 어떤 파일이 어느 폴더에 설치되는지, hook이 어느 settings에 등록되는지 사용자에게 요약하여 알린다
 
 ---
 
@@ -149,10 +154,17 @@ python3 install.py --project <경로> --agents <agent> --upgrade
 │   ├── tasks/
 │   └── docs/
 ├── .claude/                    ← claude 포함 시
-│   └── agents/mpa_pacemaker.md ← native 폴더에 직접 배치
+│   ├── agents/mpa_pacemaker.md ← native 폴더에 직접 배치
+│   └── settings.json           ← hook 등록 (SessionStart / PreToolUse / Stop)
+├── .codex/                     ← codex 포함 시
+│   └── hooks.json              ← hook 등록
 └── .agents/                    ← codex 또는 antigravity 포함 시
     └── rules/mpa_pacemaker.md  ← native 폴더에 직접 배치
 ```
+
+> **hook 동작:** `.mpa-workspace/hooks/` 의 스크립트가 세션 시작 시 진행 태스크·라우팅 규칙을 주입하고,
+> 승인 마커(`workspace/tasks/active/<task>/.approved`) 없이 소스코드를 수정하면 차단한다.
+> 게이트 강도는 환경변수 `MPA_GATE`(block/warn/off)로 조절한다. 자세한 내용은 `.mpa-workspace/hooks/README.md`.
 
 업그레이드 시 추가 동작:
 - `.mpa-workspace/upgrade-candidates/` 파일을 harness로 이동 후 `.mpa-workspace/` 교체

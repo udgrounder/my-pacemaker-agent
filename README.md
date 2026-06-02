@@ -162,6 +162,7 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 │   │   ├── personas/                     ← agent 역할 정의 (WHO)
 │   │   ├── skills/                       ← agent 능력 정의 (WHAT IT KNOWS)
 │   │   ├── inject/                       ← 세션 패키지
+│   │   ├── hooks/                         ← agent 강제 메커니즘 (세션시작 주입·코드수정 게이트·종료 리마인드)
 │   │   ├── workflows/                    ← 작업 유형별 세션 시퀀스
 │   │   ├── templates/                    ← 파일 생성용 템플릿 (plan/changelog/shared 등)
 │   │   └── upgrade-candidates/           ← 방법론 개선 후보 수집
