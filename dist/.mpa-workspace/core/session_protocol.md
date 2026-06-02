@@ -1,27 +1,37 @@
 # 세션 프로토콜
 
-## 세션 유형 결정 트리
+> **이 파일의 용도:**  
+> `agent_rules.md`의 자동 판단 구조를 보완하는 레퍼런스.  
+> 에이전트는 대부분의 경우 `agent_rules.md`의 "세션 시작 루틴"으로 자동 처리한다.  
+> 이 파일은 수동 제어가 필요한 경우, 또는 전체 구조를 파악하고 싶을 때 참조한다.
+
+---
+
+## 수동 세션 진입 가이드
+
+에이전트의 자동 판단을 우회하거나, 특정 세션을 명시적으로 시작하고 싶을 때:
 
 ```
 새 프로젝트? 또는 기존 프로젝트에 하네스 처음 적용?
     │
-    ├── Yes → inject/layer0_init.md
+    ├── Yes (새 프로젝트)           → @inject/layer0_init.md (A. 신규 흐름)
+    ├── Yes (기존 프로젝트 첫 적용)  → @inject/layer0_init.md (B. 기존 흐름)
     │
     └── No (진행 중 프로젝트)
             │
-            ├── 어떤 작업 유형인가? → workflows/ 참조 (시퀀스 전체)
+            ├── 전체 워크플로우가 필요할 때 → workflows/ 참조
             │   ├── 새 기능 개발   → workflows/new_feature.md
             │   ├── 버그 수정      → workflows/bug_fix.md
             │   ├── 리팩토링       → workflows/refactoring.md
             │   ├── 코드 리뷰      → workflows/code_review.md
             │   └── 팀 협업        → workflows/team_collaboration.md
             │
-            └── 특정 단일 세션만 필요할 때 → inject/ 직접 사용
-                ├── 기능 설계 / 계획 수립          → inject/layer1_design.md
-                ├── 계획 독립 비평 (새 스레드 필수) → inject/layer1_critique.md
-                ├── 설계 완료된 태스크 구현         → inject/layer1_implement.md
-                ├── 구현 완료 후 코드 검토          → inject/layer1_review.md
-                └── 정합성 점검                    → inject/layer2_checkpoint.md
+            └── 단일 세션만 명시적으로 시작할 때 → inject/ 직접 사용
+                ├── 기능 설계 / 계획 수립          → @inject/layer1_design.md
+                ├── 계획 독립 비평 (새 스레드 필수) → @inject/layer1_critique.md
+                ├── 설계 완료된 태스크 구현         → @inject/layer1_implement.md
+                ├── 구현 완료 후 코드 검토          → @inject/layer1_review.md
+                └── 정합성 점검                    → @inject/layer2_checkpoint.md
 ```
 
 ---
@@ -30,9 +40,9 @@
 
 | 세션 | 페르소나 | 주입 컨텍스트 | 산출물 |
 |------|---------|-------------|--------|
-| layer0_init | Architect | 없음 (첫 세션) | memory 초안 전체 |
+| layer0_init | Architect | 없음 (첫 세션) | memory 초안 전체 + tasks/INDEX.md |
 | layer1_design | Task Designer | shared/ 전체 | 태스크 계획 (plan.md) |
-| layer1_critique | Plan Critic | shared/ + plan.md만 | 비평 결과 |
+| layer1_critique | Plan Critic | shared/ + plan.md만 | 비평 결과 (권장 기준 → layer1_critique.md 참조) |
 | layer1_implement | Implementer | shared/ + 도메인/ + 태스크 계획 | 구현 코드 + 결정 목록 |
 | layer1_review | Code Reviewer | shared/ + 태스크 계획 | 검토 리포트 |
 | layer2_checkpoint | Integration Auditor | memory 전체 | 충돌 목록 + memory 업데이트 |
@@ -53,21 +63,14 @@
 
 ## 세션 재개 (중단된 세션 이어가기)
 
-이전 세션이 중간에 끊겼거나, 구현이 완료되지 않은 상태로 종료된 경우:
+> 새 세션 시작 시 `agent_rules.md`의 세션 시작 루틴이 자동으로 진행 중 태스크를 감지하고 재개를 제안한다.  
+> 수동으로 이어가고 싶다면 "이어서 해줘" 또는 "[태스크명] 계속해줘"라고 말한다.
 
 ```
-tasks/active/[태스크명]/plan.md 열기
-    ↓
-"구현 단계" 체크리스트 확인
-    ├── 상태가 "구현 중" → changelog.md 읽기 → 첫 번째 미완료 단계부터 재개
-    └── 상태가 "설계 완료" → 구현 세션 새로 시작 (layer1_implement.md)
-
-changelog.md가 존재하면 → 완료된 부분 파악 후 이어가기
-changelog.md가 없으면 → 처음부터 시작
+plan.md 상태 확인
+    ├── "구현 중" → changelog.md 읽기 → 첫 미완료 단계부터 재개
+    └── "설계 완료" → @inject/layer1_implement.md 로 구현 세션 시작
 ```
-
-**재개 세션도 동일한 inject 파일(layer1_implement.md)을 사용한다.**  
-inject 파일 내 "구현 전 체크 1번"이 이전 진행 상태를 자동으로 처리한다.
 
 ---
 
