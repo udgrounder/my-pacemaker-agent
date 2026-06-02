@@ -17,10 +17,11 @@
             │   └── 팀 협업        → workflows/team_collaboration.md
             │
             └── 특정 단일 세션만 필요할 때 → inject/ 직접 사용
-                ├── 기능 설계 / 계획 수립    → inject/layer1_design.md
-                ├── 설계 완료된 태스크 구현  → inject/layer1_implement.md
-                ├── 구현 완료 후 코드 검토   → inject/layer1_review.md
-                └── 정합성 점검             → inject/layer2_checkpoint.md
+                ├── 기능 설계 / 계획 수립          → inject/layer1_design.md
+                ├── 계획 독립 비평 (새 스레드 필수) → inject/layer1_critique.md
+                ├── 설계 완료된 태스크 구현         → inject/layer1_implement.md
+                ├── 구현 완료 후 코드 검토          → inject/layer1_review.md
+                └── 정합성 점검                    → inject/layer2_checkpoint.md
 ```
 
 ---
@@ -30,7 +31,8 @@
 | 세션 | 페르소나 | 주입 컨텍스트 | 산출물 |
 |------|---------|-------------|--------|
 | layer0_init | Architect | 없음 (첫 세션) | memory 초안 전체 |
-| layer1_design | Plan Critic | shared/ 전체 | 태스크 계획 |
+| layer1_design | Task Designer | shared/ 전체 | 태스크 계획 (plan.md) |
+| layer1_critique | Plan Critic | shared/ + plan.md만 | 비평 결과 |
 | layer1_implement | Implementer | shared/ + 도메인/ + 태스크 계획 | 구현 코드 + 결정 목록 |
 | layer1_review | Code Reviewer | shared/ + 태스크 계획 | 검토 리포트 |
 | layer2_checkpoint | Integration Auditor | memory 전체 | 충돌 목록 + memory 업데이트 |

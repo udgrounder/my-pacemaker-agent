@@ -25,13 +25,15 @@
 3. 플레이스홀더를 `workspace/` 내용으로 채우기
 4. 완성된 텍스트를 새 AI 스레드 첫 메시지로 붙여넣기
 
-| 작업 | inject 파일 |
-|------|------------|
-| 새 프로젝트 초기화 | `inject/layer0_init.md` |
-| 기능 설계 | `inject/layer1_design.md` |
-| 구현 | `inject/layer1_implement.md` |
-| 코드 검토 | `inject/layer1_review.md` |
-| 정합성 점검 | `inject/layer2_checkpoint.md` |
+| 작업 | inject 파일 | 스레드 |
+|------|------------|--------|
+| 새 프로젝트 초기화 | `inject/layer0_init.md` | 새 스레드 |
+| 하네스 업데이트 | `inject/layer0_update.md` | 새 스레드 |
+| 기능 설계 / 계획 작성 | `inject/layer1_design.md` | 새 스레드 |
+| 계획 독립 비평 | `inject/layer1_critique.md` | **반드시 새 스레드** |
+| 구현 | `inject/layer1_implement.md` | 같은 스레드 |
+| 코드 검토 | `inject/layer1_review.md` | 새 스레드 |
+| 정합성 점검 | `inject/layer2_checkpoint.md` | 새 스레드 |
 
 ---
 

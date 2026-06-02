@@ -1,0 +1,66 @@
+# Layer 1 — 계획 비평 세션
+
+> **사용 시점:** 태스크 설계가 완료된 plan.md를 독립적으로 비평할 때  
+> **중요:** 반드시 **새 스레드**에서 시작한다. 설계 세션의 컨텍스트를 이어받지 않는다.
+
+---
+
+## 역할
+
+`.mpa-workspace/personas/plan_critic.md` 를 읽고 그 역할로 작업한다.
+
+---
+
+## 이 세션에서 읽을 것
+
+다음만 읽는다. 설계 과정 대화는 읽지 않는다.
+
+1. `workspace/memory/shared/project_identity.md`
+2. `workspace/memory/shared/architecture.md`
+3. `workspace/memory/shared/contracts.md` (존재하는 경우)
+4. 비평 대상 plan.md — 경로: `workspace/tasks/active/[태스크명]/plan.md`
+
+> **컨텍스트 격리 원칙:** 설계자가 왜 그 결정을 내렸는지 알면 비평의 객관성이 떨어진다.  
+> plan.md 결과물만 보고 판단한다. 설계 과정은 읽지 않는다.
+
+---
+
+## 스킬 참조
+
+필요 시 다음을 읽는다:
+- `.mpa-workspace/skills/analysis/counterexample_finding.md`
+- `.mpa-workspace/skills/analysis/silent_decision_extraction.md`
+
+---
+
+## 작업
+
+plan.md를 읽고 `personas/plan_critic.md`의 비평 체크리스트를 순서대로 수행한다.
+
+**비평 순서:**
+1. 실패 시나리오 탐색 — "이 계획대로 진행했을 때 어떤 조건에서 실패하는가?"
+2. 숨은 가정 발굴 — "이 계획이 당연하게 전제하고 있는 것은?"
+3. 비가시적 위임 탐지 — "plan.md에 결정이 필요한데 비어 있는 곳은?"
+4. 아키텍처 충돌 확인 — "architecture.md의 규칙을 위반하는 단계가 있는가?"
+5. 구조적 문제 — "단계 순서가 맞는가? 의존성 오류가 있는가?"
+
+---
+
+## 완료 기준
+
+- [ ] 실패 시나리오 최소 1개 이상 탐색됨 (없으면 "발견 없음"으로 명시)
+- [ ] 숨은 가정이 파급효과 높은 순으로 정리됨
+- [ ] 비가시적 위임 후보가 탐지됨
+- [ ] 아키텍처 충돌 여부가 확인됨
+- [ ] 산출물이 plan_critic.md의 형식으로 작성됨
+
+---
+
+## 세션 종료 시
+
+1. 비평 결과를 산출물 형식으로 사용자에게 제시
+2. **다음 작업 예측:**
+   - 🚨 즉시 수정 필요 항목이 있으면 → *"설계 세션으로 돌아가 plan.md를 수정할까요?"*
+   - ⚠️ 주의 항목만 있으면 → *"항목을 반영한 뒤 구현을 진행할까요?"*
+   - 문제 없으면 → *"구현 세션(layer1_implement)을 시작할까요?"*
+3. 하네스 개선 후보 발견 → `.mpa-workspace/upgrade-candidates/[내용].md`
