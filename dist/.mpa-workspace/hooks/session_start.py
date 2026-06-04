@@ -69,9 +69,11 @@ def build_message(cwd):
         return "\n".join(lines)
 
     if rows:
-        lines.append("진행 중인 태스크:")
-        lines.extend(rows)
-        lines.append("→ 이어서 진행할지, 새 작업을 시작할지 사용자에게 확인하세요.")
+        lines.append("진행 중인 태스크가 있습니다. 번호로 선택해 주세요:")
+        for i, row in enumerate(rows, 1):
+            lines.append(f"  {i}.{row.lstrip()}")
+        lines.append(f"  {len(rows) + 1}. 새 작업 시작")
+        lines.append("→ 번호를 말씀해 주시면 해당 태스크의 상태에 따라 진행합니다.")
     else:
         lines.append("진행 중인 태스크 없음.")
 

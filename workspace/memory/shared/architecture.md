@@ -3,9 +3,9 @@
 ## 디렉토리 구조 원칙
 
 ### dist/ 가 단일 배포 소스
-모든 시스템 파일 변경은 `dist/.mpa-workspace/` 안에서 한다.  
-`install.py`가 이 폴더를 대상 프로젝트로 복사한다.  
-`agent-configs/`는 구버전 호환 fallback이며 신규 개발 대상이 아니다.
+`install.py`가 `dist/.mpa-workspace/`를 대상 프로젝트로 복사한다.  
+`agent-configs/`는 구버전 호환 fallback이며 신규 개발 대상이 아니다.  
+> 이 프로젝트에서의 개발 워크플로우(수정 순서·동기화 방법)는 `workspace/project_rules.md` 참조.
 
 ### agent-specs/ 분리 이유
 에이전트마다 진입점 파일명과 주입 방식이 다르다 (CLAUDE.md / AGENTS.md / GEMINI.md).  

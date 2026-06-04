@@ -11,8 +11,10 @@
 다음 파일을 순서대로 읽는다:
 
 1. `workspace/project_rules.md` 확인 (존재하는 경우) — 프로젝트 고유 라우팅 힌트·행동 규칙 로드
-2. `workspace/tasks/active/` 폴더 확인
-3. `workspace/tasks/INDEX.md` 확인 (존재하는 경우)
+2. `workspace/tasks/active/` 폴더 확인 — **이 폴더가 진행 중 태스크의 primary source다**
+3. `workspace/tasks/INDEX.md` 확인 (존재하는 경우) — 요약·타입 참조용 cache. active/ 폴더와 불일치 시 폴더를 정답으로 삼는다
+
+> **INDEX.md 동기화 원칙:** 매 세션마다 전체 동기화하지 않는다. active/ 폴더에 있는데 INDEX에 없는 항목만 누락으로 처리한다. INDEX에 있는데 폴더가 없는 항목은 완료·이동된 것으로 간주한다. INDEX 업데이트는 태스크 생성·완료·Layer 2 체크포인트 시에만 수행한다.
 
 **진행 중 태스크가 있는 경우:**
 
@@ -57,10 +59,11 @@ workspace/가 없습니다. 프로젝트 초기화(Layer 0)가 필요합니다.
 | 사용자 발화 패턴 | 판단 유형 | 자동 로딩 |
 |---------------|---------|---------|
 | "~기능 만들어줘", "~추가해줘", "~구현해줘" | 새 기능 설계 | `inject/layer1_design.md` + `personas/task_designer.md` |
-| "~버그", "~안 돼", "~에러", "~오류" | 버그 수정 | `inject/layer1_review.md` + `personas/code_reviewer.md` |
+| "~버그", "~안 돼", "~에러", "~오류", "~작동 안 해" | 버그 수정 | `inject/layer1_review.md` + `personas/code_reviewer.md` |
 | "이어서 해줘", "계속해줘", "어디까지 했어" | 작업 재개 | → 아래 "작업 재개" 섹션 참조 |
 | "코드 봐줘", "검토해줘", "리뷰해줘" | 작업 결과 검토 | `inject/layer1_review.md` + `personas/code_reviewer.md` |
-| "리팩터링", "정리해줘", "개선해줘" | 리팩터링 | `inject/layer1_design.md` + `personas/task_designer.md` |
+| "리팩터링", "정리해줘", "개선해줘", "~더 낫게" | 리팩터링 | `inject/layer1_design.md` + `personas/task_designer.md` |
+| "느려", "성능", "느린데", "응답이 오래 걸려" | 케이스 α-성능 | → 아래 "판단 불가 시" 참조 |
 | "전체 확인", "정합성 점검", "Layer 2" | 통합 감사 | `inject/layer2_checkpoint.md` + `personas/integration_auditor.md` |
 | "초기화", "프로젝트 설정", "Layer 0" | 프로젝트 초기화 | `inject/layer0_init.md` + `personas/architect.md` |
 | "MPA 시스템 업데이트", "업그레이드", "새 버전 설치" | MPA 시스템 버전 업데이트 | `inject/layer0_update.md` + `personas/architect.md` |
@@ -95,12 +98,19 @@ workspace/가 없습니다. 프로젝트 초기화(Layer 0)가 필요합니다.
 
 발화 유형에 따라 다르게 처리한다.
 
-**케이스 α — 새 요청인데 유형 불명확** ("성능이 좀 느린데...", "뭔가 좀 이상해"):
+**케이스 α — 새 요청인데 유형 불명확** ("뭔가 좀 이상해", "이게 맞나"):
 ```
 → 어떤 작업인지 확인이 필요합니다:
   1. 현재 동작이 잘못됨 (버그 수정)
   2. 더 나은 방식으로 바꾸고 싶음 (리팩터링/개선)
   3. 새 기능 추가
+```
+
+**케이스 α-성능 — 성능·느림 언급** ("느려", "응답이 오래 걸려", "성능이 좀 느린데"):
+```
+→ 성능 문제 확인이 필요합니다:
+  1. 특정 조건에서만 느림 — 의도한 동작이 아님 (버그 수정)
+  2. 전반적으로 느림 — 구조 개선이 필요 (리팩터링)
 ```
 
 **케이스 β — 맥락 있는 짧은 발화** ("응", "그냥 해줘", "맞아", "계속해"):
