@@ -147,6 +147,29 @@
 
 ---
 
+## 두 영역의 소유권 안내
+
+> 초기화 완료 시 사용자에게 다음을 한 번 안내한다.
+
+```
+📌 파일 소유권 안내:
+
+· .mpa-workspace/  → MPA 시스템 소유
+  업그레이드 시 덮어씌워집니다. 직접 수정하지 마세요.
+
+· workspace/       → 이 프로젝트 소유
+  업그레이드해도 보존됩니다. 여기서 자유롭게 확장하세요.
+
+프로젝트 고유 규칙을 추가하려면:
+→ workspace/project_rules.md (라우팅 힌트, 금지 패턴, 행동 규칙)
+→ workspace/memory/domains/[도메인]/rules.md (도메인 규칙)
+→ workspace/memory/shared/architecture.md (아키텍처 결정)
+```
+
+`workspace/project_rules.md`를 템플릿(`dist/.mpa-workspace/templates/project_rules_template.md`)에서 복사해 생성한다.
+
+---
+
 ## 다음 단계
 
 Layer 0 완료 후 기능 작업은 `inject/layer1_design.md` 지시를 따른다.

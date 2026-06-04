@@ -14,15 +14,16 @@
 
 다음 파일을 순서대로 읽는다:
 
-1. `workspace/memory/shared/project_identity.md`
-2. `workspace/memory/shared/architecture.md`
-3. `workspace/memory/shared/contracts.md` (존재하는 경우)
-4. `workspace/memory/domains/[작업 도메인]/rules.md`
-5. `workspace/memory/domains/[작업 도메인]/registry.md` (존재하는 경우)
-6. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
-7. `workspace/memory/roles/implementer.md` (존재하는 경우) — 이 프로젝트에서 implementer 역할이 축적한 학습
-8. `workspace/tasks/INDEX.md` — 이번 작업의 원본 요청 확인
-9. 이번 태스크의 설계 계획 파일 (`workspace/tasks/active/yyyymmdd_[태스크명]/plan.md`)
+1. `workspace/project_rules.md` (존재하는 경우) — 프로젝트 고유 규칙·라우팅 힌트·금지 패턴
+2. `workspace/memory/shared/project_identity.md`
+3. `workspace/memory/shared/architecture.md`
+4. `workspace/memory/shared/contracts.md` (존재하는 경우)
+5. `workspace/memory/domains/[작업 도메인]/rules.md`
+6. `workspace/memory/domains/[작업 도메인]/registry.md` (존재하는 경우)
+7. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
+8. `workspace/memory/roles/implementer.md` (존재하는 경우) — 이 프로젝트에서 implementer 역할이 축적한 학습
+9. `workspace/tasks/INDEX.md` — 이번 작업의 원본 요청 확인
+10. 이번 태스크의 설계 계획 파일 (`workspace/tasks/active/yyyymmdd_[태스크명]/plan.md`)
 
 관련 기술 스킬이 있으면 `.mpa-workspace/skills/tech/` 에서 해당 파일을 읽는다.
 

@@ -48,6 +48,15 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 - `minor`만 5개 이상 → Layer 2 제안
 마커가 없으면 done 전체를 기준으로 한다. 타입 컬럼 없는 기존 태스크는 `minor`로 간주한다.
 
+### 프로젝트 확장 영역
+`.mpa-workspace/`는 MPA 시스템 소유 — 업그레이드 시 덮어씌워짐. 직접 수정 금지.  
+`workspace/`는 프로젝트 소유 — 업그레이드해도 보존됨. 여기서 자유롭게 확장.
+
+프로젝트 고유 확장 지점:
+- `workspace/project_rules.md` — 라우팅 힌트, 금지 패턴, 행동 규칙 (모든 세션에서 최우선 로드)
+- `workspace/memory/domains/[도메인]/rules.md` — 도메인 규칙
+- `workspace/memory/shared/architecture.md` — 아키텍처 결정
+
 ### MPA 시스템 파일 수정 거버넌스
 `.mpa-workspace/` 하위 파일 수정은 일반 소스 코드 수정과 다른 규칙을 따른다.
 - 페르소나: `personas/mpa_system_designer.md`

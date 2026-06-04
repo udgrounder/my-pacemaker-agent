@@ -12,11 +12,13 @@
 | 20260604_layer2_trigger_improve | `minor` | `done` | Layer 2 트리거를 타입 기반(major/minor)으로 교체, INDEX.md 타입 컬럼 추가 | 2026-06-04 |
 | 20260604_system_designer | `major` | `done` | MPA 시스템 파일 수정 거버넌스 — mpa_system_designer 페르소나 신규, 라우팅·규칙 섹션 추가, 용어 MPA 시스템으로 통일 | 2026-06-04 |
 | 20260604_term_replace_harness | `minor` | `done` | "하네스" → "MPA 시스템" 전면 교체 (dist/ 11개 파일) | 2026-06-04 |
+| 20260604_project_extension_point | `major` | `done` | 프로젝트 확장 지점 구축 — workspace/project_rules.md, 소유권 경계 명시, layer0 안내 추가 | 2026-06-04 |
 
 ---
 
 **상태값(생명주기):** `active` (진행 중) / `done` (완료) / `hold` (보류)
 > 세부 진행 단계(`설계 완료` / `구현 중` 등)는 각 태스크의 `plan.md` 상태에 둔다 — INDEX와 섞지 않는다.
 
+[Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-04

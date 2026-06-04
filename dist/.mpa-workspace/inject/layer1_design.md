@@ -14,13 +14,14 @@
 
 다음 파일을 순서대로 읽는다:
 
-1. `workspace/memory/shared/project_identity.md`
-2. `workspace/memory/shared/architecture.md`
-3. `workspace/memory/shared/contracts.md` (존재하는 경우)
-4. `workspace/memory/shared/direction.md` (존재하는 경우) — 결과 경험을 통해 발견된 제품/UX 방향
-5. `workspace/memory/roles/architect.md` (존재하는 경우) — 이 프로젝트에서 architect 역할이 축적한 학습
-6. `workspace/tasks/INDEX.md` — 진행 중인 요청 파악, **파생 출처 확인**
-7. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
+1. `workspace/project_rules.md` (존재하는 경우) — 프로젝트 고유 규칙·라우팅 힌트·금지 패턴
+2. `workspace/memory/shared/project_identity.md`
+3. `workspace/memory/shared/architecture.md`
+4. `workspace/memory/shared/contracts.md` (존재하는 경우)
+5. `workspace/memory/shared/direction.md` (존재하는 경우) — 결과 경험을 통해 발견된 제품/UX 방향
+6. `workspace/memory/roles/architect.md` (존재하는 경우) — 이 프로젝트에서 architect 역할이 축적한 학습
+7. `workspace/tasks/INDEX.md` — 진행 중인 요청 파악, **파생 출처 확인**
+8. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
 
 관련 기존 문서가 있으면 `workspace/docs/INDEX.md` 도 확인한다.
 

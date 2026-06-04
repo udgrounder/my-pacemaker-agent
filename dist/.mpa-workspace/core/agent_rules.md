@@ -10,8 +10,9 @@
 
 다음 파일을 순서대로 읽는다:
 
-1. `workspace/tasks/active/` 폴더 확인
-2. `workspace/tasks/INDEX.md` 확인 (존재하는 경우)
+1. `workspace/project_rules.md` 확인 (존재하는 경우) — 프로젝트 고유 라우팅 힌트·행동 규칙 로드
+2. `workspace/tasks/active/` 폴더 확인
+3. `workspace/tasks/INDEX.md` 확인 (존재하는 경우)
 
 **진행 중 태스크가 있는 경우:**
 
@@ -50,6 +51,8 @@ workspace/가 없습니다. 프로젝트 초기화(Layer 0)가 필요합니다.
 
 사용자 요청을 받으면 아래 패턴으로 유형을 판단하고,  
 **해당 inject 파일을 내부적으로 읽어 그 지시에 따라 행동한다.**
+
+> `workspace/project_rules.md`의 라우팅 힌트가 있으면 아래 테이블보다 **우선 적용**한다.
 
 | 사용자 발화 패턴 | 판단 유형 | 자동 로딩 |
 |---------------|---------|---------|
