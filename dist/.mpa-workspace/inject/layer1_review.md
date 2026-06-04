@@ -13,16 +13,18 @@
 
 ## 작업 시작 전 읽을 파일
 
-다음 파일을 순서대로 읽는다:
+> **Phase 1 완료:** `project_rules.md` + `INDEX.md`는 세션 시작 루틴에서 이미 읽었다. 재읽지 않는다.
 
-1. `workspace/project_rules.md` (존재하는 경우) — 프로젝트 고유 금지 패턴·행동 규칙
-2. `workspace/memory/shared/project_identity.md`
-3. `workspace/memory/shared/architecture.md`
-4. `workspace/memory/shared/contracts.md` (존재하는 경우)
-5. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
-6. `workspace/memory/roles/code_reviewer.md` (존재하는 경우)
-7. 이번 태스크의 설계 계획 파일 (`workspace/tasks/active/[태스크명]/plan.md`)
-8. 이번 태스크의 구현 내역서 (`workspace/tasks/active/[태스크명]/changelog.md`) — 존재하면 읽기
+**Phase 2 필수:**
+1. `workspace/memory/shared/architecture.md`
+2. `workspace/memory/shared/contracts.md` (존재하는 경우)
+3. 이번 태스크의 설계 계획 파일 (`workspace/tasks/active/[태스크명]/plan.md`)
+4. 이번 태스크의 구현 내역서 (`workspace/tasks/active/[태스크명]/changelog.md`) — 존재하면 읽기
+
+**Phase 2 선택 (검토 도메인에 따라 필요 시):**
+5. `workspace/memory/shared/project_identity.md` — 사용자 흐름·도메인 판단이 필요한 검토 시 읽는다
+6. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
+7. `workspace/memory/roles/code_reviewer.md` (존재하는 경우)
 
 ---
 
@@ -142,7 +144,7 @@
 1. 새 아키텍처 규칙 또는 안티패턴 발견 → `workspace/memory/shared/architecture.md`
 2. 역할 메모리 업데이트 → 자가 개선 필터 적용 후 `workspace/memory/roles/code_reviewer.md`에 기록 (기억할 것이 없으면 생략)
 3. **실패 비용 추정 사후 보정** — plan.md의 실패 비용 추정 결과와 실제 구현을 비교한다:
-   - 추정한 자율성 레벨이 실제 복잡도·위험도와 맞았는가?
+   - 추정한 실패 비용 등급(critical/major/minor)이 실제 복잡도·위험도와 맞았는가?
    - 어떤 이진 질문이 잘못 판단됐는가? (예: "즉시 확인 가능"이라 했는데 실제로는 숨어 있었음)
    - 틀린 추정이 있으면 `workspace/memory/roles/implementer.md`에 기록:
      ```

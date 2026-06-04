@@ -12,16 +12,17 @@
 
 ## 작업 시작 전 읽을 파일
 
-다음 파일을 순서대로 읽는다:
+> **Phase 1 완료:** `project_rules.md` + `INDEX.md`는 세션 시작 루틴에서 이미 읽었다. 재읽지 않는다.
 
-1. `workspace/project_rules.md` (존재하는 경우) — 프로젝트 고유 규칙·라우팅 힌트·금지 패턴
-2. `workspace/memory/shared/project_identity.md`
-3. `workspace/memory/shared/architecture.md`
-4. `workspace/memory/shared/contracts.md` (존재하는 경우)
-5. `workspace/memory/shared/direction.md` (존재하는 경우) — 결과 경험을 통해 발견된 제품/UX 방향
-6. `workspace/memory/roles/architect.md` (존재하는 경우) — 이 프로젝트에서 architect 역할이 축적한 학습
-7. `workspace/tasks/INDEX.md` — 진행 중인 요청 파악, **파생 출처 확인**
-8. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
+**Phase 2 필수:**
+1. `workspace/memory/shared/project_identity.md`
+2. `workspace/memory/shared/architecture.md`
+3. `workspace/memory/shared/contracts.md` (존재하는 경우)
+
+**Phase 2 선택 (설계 내용에 따라 필요 시):**
+4. `workspace/memory/shared/direction.md` (존재하는 경우) — 결과 경험을 통해 발견된 제품/UX 방향
+5. `workspace/memory/roles/architect.md` (존재하는 경우) — 이 프로젝트에서 architect 역할이 축적한 학습
+6. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
 
 관련 기존 문서가 있으면 `workspace/docs/INDEX.md` 도 확인한다.
 
@@ -74,13 +75,13 @@ INDEX.md에서 이 태스크의 **파생 출처**를 확인한다.
 | | 영구 저장(DB, 파일, 외부 서비스)이 없는가? | Yes → 높음 |
 | | → 하나라도 No | → 낮음 |
 
-**자율성 레벨 도출:**
+**실패 비용 등급 도출:**
 
-| 조건 | 레벨 |
+| 조건 | 등급 |
 |------|------|
-| 심각도 높음 OR 가역성 낮음 | 1 — 제안 (사용자가 결정) |
-| 발견 가능성 낮음 | 2 — 초안 (기본값) |
-| 셋 다 안전 방향 | 3 — 실행 후 보고 가능 |
+| 심각도 높음 OR 가역성 낮음 | `critical` — 구현 중 단계별 확인 필요 |
+| 발견 가능성 낮음 | `major` — 기본값, 완료 후 검토 |
+| 셋 다 안전 방향 | `minor` — 완료 후 간략 보고 |
 
 ### 가치 결정 vs 기술 결정 판별
 
@@ -111,6 +112,7 @@ INDEX.md에서 이 태스크의 **파생 출처**를 확인한다.
 ```
 ## 태스크: [이름]
 **목적:** 한 줄
+**실패 비용 등급:** critical / major / minor
 
 ### 사전 결정 필요 사항
 > 구현 전에 내가 결정해야 할 것들 (비가시적 위임 후보)
@@ -138,6 +140,15 @@ INDEX.md에서 이 태스크의 **파생 출처**를 확인한다.
 ### 반례 (이 계획이 실패할 수 있는 시나리오)
 - 시나리오 1:
 - 시나리오 2:
+
+### 결정 이력
+> 구현 중 내려진 결정을 시간순으로 누적 기록한다.  
+> 서브에이전트·다음 세션이 "왜 이 방향인가"를 이해하는 단일 소스다.  
+> 최초 설계 결정부터 구현 중 변경까지 모두 포함한다.
+
+| 시점 | 결정 내용 | 근거 |
+|------|---------|------|
+| 설계 | (초기 계획 핵심 결정 요약) | |
 ```
 
 ---

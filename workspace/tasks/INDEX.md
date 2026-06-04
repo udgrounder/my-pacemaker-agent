@@ -2,6 +2,10 @@
 
 | 태스크명 | 타입 | 상태 | 요약 | 생성일 |
 |---------|------|------|------|--------|
+| 20260604_failure_cost_grade | minor | done | 실패 비용 등급 critical/major/minor 도입 — plan.md 필드, 구현 단계별 행동, 결정 이력 섹션 | 2026-06-04 |
+| 20260604_critique_file_output | minor | done | 독립 비평 결과 파일 직접 저장 — 메인 에이전트 경유 차단으로 completion bias 제거 | 2026-06-04 |
+| 20260604_context_routing | minor | done | 태스크 맥락 기반 라우팅(B) + 2단계 진단 질문(C) — 발화 패턴 매칭 의존도 감소 | 2026-06-04 |
+| 20260604_context_loading | minor | done | 2단계 컨텍스트 선택 로딩 — 태스크 확정 후 필요 파일만 읽도록 I/O 최적화 | 2026-06-04 |
 | 20260604_mpa_improvements | major | done | MPA 비평 반영 — 게이트/규칙/비평 세션 8개 항목 개선 | 2026-06-04 |
 | 20260604_zone_differentiation | minor | done | 사용자 개입 등급 Zone 1/2/3 차별화 — 체크포인트 피로 감소 | 2026-06-04 |
 | 20260604_code_gate_scope | minor | done | 코드 게이트 태스크 범위 강화 — .approved 경로 명시 시 범위 이탈 경고 | 2026-06-04 |

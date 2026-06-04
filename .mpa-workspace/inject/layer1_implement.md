@@ -12,18 +12,19 @@
 
 ## 작업 시작 전 읽을 파일
 
-다음 파일을 순서대로 읽는다:
+> **Phase 1 완료:** `project_rules.md` + `INDEX.md`는 세션 시작 루틴에서 이미 읽었다. 재읽지 않는다.
 
-1. `workspace/project_rules.md` (존재하는 경우) — 프로젝트 고유 규칙·라우팅 힌트·금지 패턴
-2. `workspace/memory/shared/project_identity.md`
-3. `workspace/memory/shared/architecture.md`
-4. `workspace/memory/shared/contracts.md` (존재하는 경우)
+**Phase 2 필수:**
+1. `workspace/memory/shared/architecture.md`
+2. `workspace/memory/shared/contracts.md` (존재하는 경우)
+3. 이번 태스크의 설계 계획 파일 (`workspace/tasks/active/yyyymmdd_[태스크명]/plan.md`)
+
+**Phase 2 선택 (구현 도메인에 따라 필요 시):**
+4. `workspace/memory/shared/project_identity.md` — 도메인 판단이 필요한 구현 시 읽는다 (단순 리팩터링·기술적 변경은 생략 가능)
 5. `workspace/memory/domains/[작업 도메인]/rules.md`
 6. `workspace/memory/domains/[작업 도메인]/registry.md` (존재하는 경우)
 7. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
 8. `workspace/memory/roles/implementer.md` (존재하는 경우) — 이 프로젝트에서 implementer 역할이 축적한 학습
-9. `workspace/tasks/INDEX.md` — 이번 작업의 원본 요청 확인
-10. 이번 태스크의 설계 계획 파일 (`workspace/tasks/active/yyyymmdd_[태스크명]/plan.md`)
 
 관련 기술 스킬이 있으면 `.mpa-workspace/skills/tech/` 에서 해당 파일을 읽는다.
 
@@ -40,11 +41,18 @@
 
 구현 시작 전 다음을 확인한다:
 
-0. **관련 태스크 맥락 파악** — plan.md 상단의 다음 두 필드를 먼저 읽는다:
+0. **관련 태스크 맥락 파악** — plan.md 상단의 다음 필드를 먼저 읽는다:
+   - **실패 비용 등급**: `critical` / `major` / `minor` → 구현 중 행동 방식 결정
    - **파생 출처**: 이 태스크가 어떤 맥락에서 분리됐는가 → 작업 배경을 이해
    - **파생된 태스크** (구현 후 발견 섹션): 이미 다른 태스크로 넘어간 항목 → 이 항목들은 여기서 다시 검토하지 않는다
 
-   이 두 정보를 인식한 상태에서 구현을 시작한다.
+   **등급별 구현 행동:**
+
+   | 등급 | 구현 중 행동 |
+   |------|------------|
+   | `critical` | 각 구현 단계 완료 후 다음 단계 진행 전 사용자에게 결과 보고 후 확인 |
+   | `major` | 현행 유지 — 전체 완료 후 한 번에 검토 |
+   | `minor` | 완료 후 간략 보고만 (Zone 3) |
 
 1. **코드 탐색 및 계획 검증** — plan.md의 "수정 대상 파일"을 실제로 열어보고 확인한다:
    - 에이전트 가정(plan.md "에이전트 가정" 테이블)이 실제 코드와 맞는가?
@@ -65,6 +73,12 @@
 
 5. **범위 고정** — 태스크 계획의 scope를 넘어서는 변경 발견 시 구현 중단 후 보고
    → 범위 밖 변경은 다음 태스크로 분리
+
+6. **결정 실시간 기록** — 구현 중 아래 상황 발생 시 **즉시** plan.md `결정 이력` 테이블에 추가한다:
+   - 사용자가 방향을 결정하거나 변경한 경우
+   - 에이전트 가정이 틀려 계획을 수정한 경우
+   - 설계에 없던 구현 방식을 선택한 경우
+   > 서브에이전트·다음 세션은 이 기록으로 "왜 이렇게 됐는가"를 파악한다.
 
 ---
 
