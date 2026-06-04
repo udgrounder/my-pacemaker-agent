@@ -82,12 +82,18 @@
 
 작업 완료 후 다음을 확인하고 필요한 파일을 직접 업데이트한다:
 
-1. 구현 중 내린 결정 (태스크 계획에 없었던 것) → `workspace/memory/shared/architecture.md` 결정 이력
+1. 아키텍처 업데이트 → `workspace/memory/shared/architecture.md`
+   - **추가:** 구현 중 새로 내린 결정
+   - **수정:** 기존 결정이 바뀌었다면 기존 항목을 교체 (이전 내용을 남기지 않는다)
+   - **삭제:** 더 이상 유효하지 않은 규칙이나 패턴
 2. 아키텍처 충돌 발견 → 즉시 보고 후 다음 작업 전 해소
 3. 인터페이스 계약 변경 → `workspace/memory/shared/contracts.md`
 4. 재사용 가능한 요소 추출 → `workspace/memory/domains/[도메인명]/registry.md`
-5. 역할 메모리 업데이트 → 놀라움 필터 적용 후 `workspace/memory/roles/implementer.md`에 기록 (기억할 것이 없으면 생략)
-6. 기능 문서 업데이트 → 요청 문서의 "완료 시 문서 업데이트 대상" 확인 후 `workspace/docs/` 반영
-7. 요청 상태 → `workspace/tasks/` 해당 파일을 `done/`으로 이동
-8. 하네스 개선 후보 발견 → `.mpa-workspace/upgrade-candidates/[내용].md`
-9. **다음 작업 예측:** *"코드 검토를 진행할까요?"* 또는 *"다음 태스크를 계획할까요?"*
+5. **방향 증류** — 구현하면서 확인되거나 수정된 제품/UX 방향이 있으면 `workspace/memory/shared/direction.md`에 반영
+   - "이 구현 방식이 맞다는 것을 확인했다" / "이 방식은 아니다" / "이런 흐름이 자연스럽다"
+   - 기록할 것이 없으면 생략. 단, 없다고 판단한 것도 명시적으로 확인한다.
+6. 역할 메모리 업데이트 → 놀라움 필터 적용 후 `workspace/memory/roles/implementer.md`에 기록 (기억할 것이 없으면 생략)
+7. 기능 문서 업데이트 → 요청 문서의 "완료 시 문서 업데이트 대상" 확인 후 `workspace/docs/` 반영
+8. **plan.md 상태를 `구현 완료`로 업데이트한다**
+9. 하네스 개선 후보 발견 → `.mpa-workspace/upgrade-candidates/[내용].md`
+10. **다음 작업 예측:** *"작업 결과 검토를 진행할까요?"*

@@ -30,7 +30,7 @@
                 ├── 기능 설계 / 계획 수립                       → @inject/layer1_design.md
                 ├── 계획 독립 비평 (새 스레드 필수)             → @inject/layer1_critique.md
                 ├── 설계 완료된 태스크 구현                     → @inject/layer1_implement.md
-                ├── 구현 완료 후 코드 검토                      → @inject/layer1_review.md
+                ├── 구현 완료 후 작업 결과 검토                      → @inject/layer1_review.md
                 ├── 결과물을 보고 수정·추가 사항이 생겼을 때    → @inject/layer1_discovery.md
                 └── 정합성 점검                                 → @inject/layer2_checkpoint.md
 ```
@@ -45,7 +45,7 @@
 | layer1_design | Task Designer | shared/ 전체 | 태스크 계획 (plan.md) |
 | layer1_critique | Plan Critic | shared/ + plan.md만 | 비평 결과 (권장 기준 → layer1_critique.md 참조) |
 | layer1_implement | Implementer | shared/ + 도메인/ + 태스크 계획 | 구현 코드 + 결정 목록 |
-| layer1_review | Code Reviewer | shared/ + 태스크 계획 | 검토 리포트 |
+| layer1_review | Result Reviewer | shared/ + 태스크 계획 | 검토 리포트 |
 | layer1_discovery | Task Designer | shared/ + 태스크 계획 | plan.md 업데이트 + INDEX.md 등록 |
 | layer2_checkpoint | Integration Auditor | memory 전체 | 충돌 목록 + memory 업데이트 |
 

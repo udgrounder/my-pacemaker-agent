@@ -32,7 +32,7 @@
 | 기능 설계 / 계획 작성 | `inject/layer1_design.md` | 새 스레드 |
 | 계획 독립 비평 | `inject/layer1_critique.md` | **반드시 새 스레드** |
 | 구현 | `inject/layer1_implement.md` | 같은 스레드 |
-| 코드 검토 | `inject/layer1_review.md` | 새 스레드 |
+| 작업 결과 검토 | `inject/layer1_review.md` | 새 스레드 |
 | 정합성 점검 | `inject/layer2_checkpoint.md` | 새 스레드 |
 
 ---

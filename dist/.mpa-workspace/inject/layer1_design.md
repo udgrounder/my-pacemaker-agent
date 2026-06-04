@@ -17,9 +17,10 @@
 1. `workspace/memory/shared/project_identity.md`
 2. `workspace/memory/shared/architecture.md`
 3. `workspace/memory/shared/contracts.md` (존재하는 경우)
-4. `workspace/memory/roles/architect.md` (존재하는 경우) — 이 프로젝트에서 architect 역할이 축적한 학습
-5. `workspace/tasks/INDEX.md` — 진행 중인 요청 파악
-6. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
+4. `workspace/memory/shared/direction.md` (존재하는 경우) — 결과 경험을 통해 발견된 제품/UX 방향
+5. `workspace/memory/roles/architect.md` (존재하는 경우) — 이 프로젝트에서 architect 역할이 축적한 학습
+6. `workspace/tasks/INDEX.md` — 진행 중인 요청 파악, **파생 출처 확인**
+7. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
 
 관련 기존 문서가 있으면 `workspace/docs/INDEX.md` 도 확인한다.
 
@@ -99,7 +100,10 @@
 
 작업 완료 후 다음을 확인하고 필요한 파일을 직접 업데이트한다:
 
-1. 새로운 아키텍처 결정 → `workspace/memory/shared/architecture.md`
+1. 아키텍처 업데이트 → `workspace/memory/shared/architecture.md`
+   - **추가:** 설계 중 새로 확립된 결정
+   - **수정:** 기존 결정이 바뀌었다면 기존 항목을 교체 (이전 내용을 남기지 않는다)
+   - **삭제:** 더 이상 유효하지 않은 규칙
 2. 태스크 계획 파일 확정 → `workspace/tasks/active/yyyymmdd_[태스크명]/plan.md` (작업 중 이미 저장된 파일 — 미저장 상태면 지금 즉시 저장)
    - **상태를 `설계 완료`로 표시**
    - `에이전트 보고` 섹션을 채운다:
