@@ -25,7 +25,7 @@
 
 1. `workspace/memory/domains/`에 먼저 기록 (프로젝트 맥락 포함)
 2. 다른 프로젝트에도 유효하다 판단되면 → `.mpa-workspace/upgrade-candidates/`에 등록
-3. 하네스 관리자가 검토 후 하네스의 `dist/.mpa-workspace/knowledge/`에 반영
+3. MPA 시스템 관리자가 검토 후 MPA 시스템의 `dist/.mpa-workspace/knowledge/`에 반영
 4. 다음 업그레이드 시 모든 프로젝트에 배포
 
 ---

@@ -1,7 +1,7 @@
 # my pacemaker agent — Agents Workspace
 
 이 폴더는 AI agent 협업 방법론 파일들이다. **되도록 직접 수정하지 않는다.**  
-개선이 필요하면 `upgrade-candidates/` 에 후보를 기록하고, 하네스 업데이트로 반영한다.
+개선이 필요하면 `upgrade-candidates/` 에 후보를 기록하고, MPA 시스템 업데이트로 반영한다.
 
 ---
 
@@ -14,7 +14,7 @@
 | `skills/` | agent 분석·기술 스킬 |
 | `workflows/` | 작업 유형별 세션 흐름 |
 | `inject/` | 새 AI 스레드에 붙여넣는 세션 패키지 |
-| `upgrade-candidates/` | 하네스 개선 후보 적재 (작업 중 발견 시) |
+| `upgrade-candidates/` | MPA 시스템 개선 후보 적재 (작업 중 발견 시) |
 
 ---
 
@@ -28,7 +28,7 @@
 | 작업 | inject 파일 | 스레드 |
 |------|------------|--------|
 | 새 프로젝트 초기화 | `inject/layer0_init.md` | 새 스레드 |
-| 하네스 업데이트 | `inject/layer0_update.md` | 새 스레드 |
+| MPA 시스템 업데이트 | `inject/layer0_update.md` | 새 스레드 |
 | 기능 설계 / 계획 작성 | `inject/layer1_design.md` | 새 스레드 |
 | 계획 독립 비평 | `inject/layer1_critique.md` | **반드시 새 스레드** |
 | 구현 | `inject/layer1_implement.md` | 같은 스레드 |
@@ -50,8 +50,8 @@
 
 ---
 
-## 하네스 개선 후보 기록
+## MPA 시스템 개선 후보 기록
 
 작업 중 더 나은 방법을 발견하면 `upgrade-candidates/` 에 파일로 기록한다.  
 파일명은 발견 내용을 반영한다. (예: `better-review-checklist.md`)  
-하네스를 업데이트할 때 이 파일들이 하네스 프로젝트로 이전된다.
+MPA 시스템을 업데이트할 때 이 파일들이 MPA 시스템 프로젝트로 이전된다.

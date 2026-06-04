@@ -101,5 +101,5 @@
 6. 역할 메모리 업데이트 → 자가 개선 필터 적용 후 `workspace/memory/roles/implementer.md`에 기록 (기억할 것이 없으면 생략)
 7. 기능 문서 업데이트 → 요청 문서의 "완료 시 문서 업데이트 대상" 확인 후 `workspace/docs/` 반영
 8. **plan.md 상태를 `구현 완료`로 업데이트한다**
-9. 하네스 개선 후보 발견 → `.mpa-workspace/upgrade-candidates/[내용].md`
+9. MPA 시스템 개선 후보 발견 → `.mpa-workspace/upgrade-candidates/[내용].md`
 10. **다음 작업 예측:** *"작업 결과 검토를 진행할까요?"*

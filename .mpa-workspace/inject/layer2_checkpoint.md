@@ -110,4 +110,4 @@
 ## 세션 종료 시
 
 산출물에 따라 `workspace/` 파일을 직접 업데이트한다.
-하네스 개선 후보 발견 시 `.mpa-workspace/upgrade-candidates/[내용].md` 에 기록한다.
+MPA 시스템 개선 후보 발견 시 `.mpa-workspace/upgrade-candidates/[내용].md` 에 기록한다.

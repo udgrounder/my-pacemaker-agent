@@ -1,7 +1,7 @@
 # [도메인명] 지식
 
 > **사용법 — 작성 완료 후 이 블록을 삭제한다**
-> - 이 파일은 하네스 관리자가 `dist/.mpa-workspace/knowledge/`에 추가한다
+> - 이 파일은 MPA 시스템 관리자가 `dist/.mpa-workspace/knowledge/`에 추가한다
 > - 프로젝트에서 직접 작성하지 않는다 → upgrade-candidates/ 경로 이용
 > - 출처 프로젝트명을 반드시 명시한다
 
