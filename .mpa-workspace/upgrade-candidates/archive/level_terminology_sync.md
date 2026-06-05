@@ -1,3 +1,4 @@
+# [처리] 승인 — 2026-06-05
 # 자율성 레벨 용어 동기화
 **타입**: 방법론 개선
 **발견 상황**: failure_cost_grade 태스크 — Level 1/2/3 → major/normal/minor 변경 작업 중

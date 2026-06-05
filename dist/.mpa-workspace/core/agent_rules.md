@@ -293,13 +293,13 @@
 Zone 3(자동 처리)로 아래 순서만 실행한다:
 
 1. **plan.md `상태`를 `완료 승인`으로 업데이트** — GATE 2 우회가 아니라 자동 설정 (code_gate.py가 이 상태를 확인 후 mv 허용)
-2. `workspace/tasks/active/[작업명]/` → `workspace/tasks/done/[작업명]/` 이동
-3. **INDEX.md 업데이트** — 아래 컬럼 모두 채운다:
+2. **INDEX.md 업데이트** — mv 전에 먼저 처리한다 (누락 방지):
    - `타입`: minor
    - `상태`: done
    - `요약`: plan.md 목적 1줄
    - `생성일`: plan.md `생성일` 필드값
    - `점검`: `-`
+3. `workspace/tasks/active/[작업명]/` → `workspace/tasks/done/[작업명]/` 이동
 4. 완료 내용을 한 줄로 보고:
    ```
    완료: [무엇을 했는가]. done 처리했습니다.

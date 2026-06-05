@@ -17,6 +17,8 @@
 | 20260605_mpa-system-improvements | major | done | MPA 시스템 평가 기반 14개 항목 개선 — 게이트 강화, minor 경량 흐름, dist/ 자동화 등 | 2026-06-05 | ✅ |
 | 20260605_mpa-flow-hardening | major | done | 승인해시 복구 플로우, minor 단순화, 검증 결과 전달 대안 개선 | 2026-06-05 | - |
 | 20260605_minor-plan-format | minor | done | minor plan.md에 사용자 결정/에이전트 가정 섹션 추가, 필수 판단 질문 허용 | 2026-06-05 | - |
+| 20260605_minor-plan-request-section | minor | done | minor plan.md에 요청 사항·핵심 기능 섹션 추가, 구현 항목 개수 제한 제거 | 2026-06-05 | - |
+| 20260605_readme-update | minor | done | README.md 불일치 3개 수정 — approve 원자적 처리, .mpa-workspace 수정 정책, 빠른 참조 표 | 2026-06-05 | - |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05

@@ -85,8 +85,8 @@ agent가 진행하는 절차:
 
 Agent가 요청의 실패 비용을 먼저 판단한 뒤 작업 흐름을 고른다.
 
-- `minor`: 최소 `plan.md`를 만들고 `승인해시`를 자동 갱신한 뒤 바로 구현한다. 완료 후에도 GATE 2 없이 `done` 처리한다.
-- `major` 또는 `critical`: `plan.md`를 작성해 사용자 검토를 요청한다. 사용자가 승인하면 `plan.md` 상태를 `구현 중`으로 바꾸고 `plan_hash.py approve`로 `승인해시`를 갱신한 뒤 구현한다.
+- `minor`: 최소 `plan.md`를 만들고 `plan_hash.py approve`를 자동 실행한다. approve가 상태를 `구현 중`으로 전환하고 `승인해시`를 기록한다. 완료 후 GATE 2 없이 `done` 처리한다.
+- `major` 또는 `critical`: `plan.md`를 작성해 사용자 검토를 요청한다. 사용자가 승인하면 `plan_hash.py approve`를 실행한다 — 이 명령이 상태를 `설계 완료 → 구현 중`으로 원자적으로 전환하고 `승인해시`를 기록한다.
 
 소스 수정 게이트는 별도 승인 파일을 쓰지 않는다. `workspace/tasks/active/[작업명]/plan.md`의 YAML 프론트매터가 기준이다.
 
@@ -211,7 +211,7 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 
 | 폴더 | 역할 | 업데이트 방식 |
 |------|------|--------------|
-| `.mpa-workspace/` | 방법론 (HOW) — 직접 수정 금지 | 업그레이드로만 교체 |
+| `.mpa-workspace/` | 방법론 (HOW) | 업그레이드로 최신화 / `mpa_system_designer` 프로세스로 직접 수정 가능 |
 | `workspace/` | 프로젝트 데이터 (WHAT) — agent가 관리 | 작업할 때마다 자동 업데이트 |
 
 ---
@@ -254,13 +254,13 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 
 ## 빠른 참조
 
-| 상황 | inject 파일 | 스레드 |
-|------|------------|--------|
-| 새 프로젝트 초기화 | `.mpa-workspace/inject/layer0_init.md` | 새 스레드 |
-| 방법론 업데이트 / 재설치 | `.mpa-workspace/inject/layer0_update.md` | 새 스레드 |
-| 기능 설계 / 계획 작성 | `.mpa-workspace/inject/layer1_design.md` | 새 스레드 |
-| 계획 독립 비평 | `.mpa-workspace/inject/layer1_critique.md` | **반드시 새 스레드** |
-| 구현 | `.mpa-workspace/inject/layer1_implement.md` | 새 스레드 권장 |
-| 코드 검토 / 에이전트 검증 | `.mpa-workspace/inject/layer1_review.md` | 새 스레드 |
-| 구현 후 발견 정리 | `.mpa-workspace/inject/layer1_discovery.md` | 새 스레드 |
-| 정합성 점검 | `.mpa-workspace/inject/layer2_checkpoint.md` | 새 스레드 |
+| 상황 | inject 파일 | 비고 |
+|------|------------|------|
+| 새 프로젝트 초기화 | `.mpa-workspace/inject/layer0_init.md` | |
+| 방법론 업데이트 / 재설치 | `.mpa-workspace/inject/layer0_update.md` | |
+| 기능 설계 / 계획 작성 | `.mpa-workspace/inject/layer1_design.md` | |
+| 계획 독립 비평 | `.mpa-workspace/inject/layer1_critique.md` | 서브에이전트로 실행 (컨텍스트 격리) |
+| 구현 | `.mpa-workspace/inject/layer1_implement.md` | |
+| 코드 검토 / 에이전트 검증 | `.mpa-workspace/inject/layer1_review.md` | 서브에이전트로 실행 권장 |
+| 구현 후 발견 정리 | `.mpa-workspace/inject/layer1_discovery.md` | |
+| 정합성 점검 | `.mpa-workspace/inject/layer2_checkpoint.md` | |
