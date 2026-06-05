@@ -15,6 +15,7 @@
 | 20260605_install-replace-fix | minor | done | _replace_mpa_section 문자 단위 범위 교체로 재작성 — 섹션 외부 내용 보존 보장 | 2026-06-05 | - |
 | 20260605_install-config-verify | minor | done | install.py 업그레이드 시 CLAUDE.md MPA 섹션 내용 비교·자동 갱신 추가 | 2026-06-05 | - |
 | 20260605_mpa-system-improvements | major | done | MPA 시스템 평가 기반 14개 항목 개선 — 게이트 강화, minor 경량 흐름, dist/ 자동화 등 | 2026-06-05 | ✅ |
+| 20260605_mpa-flow-hardening | major | active | 승인해시 복구 플로우, minor 단순화, 검증 결과 전달 대안 개선 | 2026-06-05 | 미점검 |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05

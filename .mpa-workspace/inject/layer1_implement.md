@@ -119,7 +119,21 @@
 >
 > → 다음 세션은 이 정보를 읽고 중단된 지점부터 재개한다.
 
-작업 완료 후 다음을 자동으로 처리한다 (Zone 3 — 사용자 응답 불필요):
+**minor 태스크 fast-path:**
+
+plan.md YAML 프론트매터의 `실패비용`이 `minor`이면 아래만 처리하고 종료한다.
+
+1. 구현 항목 완료 여부를 최소 plan.md에 체크하거나 한 줄로 반영한다.
+2. plan.md 상태를 `완료 승인`으로 업데이트한다.
+3. `workspace/tasks/active/[작업명]/`을 `workspace/tasks/done/[작업명]/`으로 이동한다.
+4. `workspace/tasks/INDEX.md`의 해당 항목을 `done`으로 갱신하고 `점검`은 `-`로 둔다.
+5. 사용자에게 한 줄로 보고한다: `완료: [무엇을 했는가]. done 처리했습니다.`
+
+minor에서는 changelog.md, 에이전트 검증, 사용자 테스트 단계, 역할 메모리, docs 업데이트, Layer 2 제안을 생략한다. 구현 중 외부 동작·아키텍처·계약 변경이 발생하면 fast-path를 중단하고 major 전환 여부를 사용자에게 보고한다.
+
+---
+
+minor가 아닌 작업 완료 후 다음을 자동으로 처리한다 (Zone 3 — 사용자 응답 불필요):
 
 1. 아키텍처 업데이트 → `workspace/memory/shared/architecture.md`
    - **추가:** 구현 중 새로 내린 결정

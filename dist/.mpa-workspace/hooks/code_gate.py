@@ -27,7 +27,6 @@ import hashlib
 import json
 import os
 import re
-import subprocess
 import sys
 
 # 항상 허용하는 경로 접두사 (방법론·프로젝트 데이터·agent 설정)
@@ -150,21 +149,6 @@ def find_active_statuses(cwd):
     return results
 
 
-
-def set_approved_hash(plan_path):
-    """plan_hash.py approve를 호출해 승인해시를 갱신한다."""
-    hook_dir = os.path.dirname(os.path.abspath(__file__))
-    plan_hash_py = os.path.join(hook_dir, "plan_hash.py")
-    try:
-        result = subprocess.run(
-            [sys.executable, plan_hash_py, "approve", plan_path],
-            capture_output=True, text=True
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
-
-
 def check_hash_integrity(cwd, mode, agent):
     """GATE 1 재진입 — '구현 중' 상태 태스크의 plan.md 해시가 승인해시와 일치하는지 확인."""
     base = os.path.join(cwd, "workspace", "tasks", "active")
@@ -180,21 +164,22 @@ def check_hash_integrity(cwd, mode, agent):
             continue
         approved_hash = fields.get("승인해시")
         if not approved_hash:
-            # 승인해시 없음 — 현재 본문을 기준으로 자동 등록하고 신뢰
             current_hash = compute_plan_hash(body)
-            if set_approved_hash(plan_path):
-                emit_warn(
-                    agent,
-                    f"⚠️ '{name}' 승인해시가 없어 현재 상태({current_hash[:8]}…)를 기준으로 자동 등록했습니다. "
-                    "이후 plan.md가 변경되면 재승인이 필요합니다."
-                )
+            msg = (
+                f"⛔ GATE 1 복구 필요: '{name}' plan.md 상태는 '구현 중'이지만 승인해시가 없습니다.\n"
+                f"  현재해시: {current_hash}\n"
+                "자동 승인해시 등록은 하지 않습니다. 아래 중 하나로 명시적으로 복구하세요:\n"
+                "  1. 사용자 승인 이력이 불명확함 → 상태를 '설계 완료'로 되돌리고 plan.md 검토 후 재승인\n"
+                "  2. 직전 사용자 승인 후 기록만 누락됨 → 누락 사실과 현재 변경 내용을 사용자에게 확인받은 뒤 approve 실행\n"
+                "  3. minor 자동 승인 태스크임 → 최소 plan.md가 사용자 요청과 일치하는지 확인한 뒤 approve 실행\n"
+                "승인해시 갱신 명령:\n"
+                f"  python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/{name}/plan.md"
+            )
+            if mode == "warn":
+                emit_warn(agent, msg)
             else:
-                emit_warn(
-                    agent,
-                    f"⚠️ '{name}' 승인해시 자동 등록 실패. "
-                    "python3 .mpa-workspace/hooks/plan_hash.py approve [plan.md 경로]를 수동으로 실행하세요."
-                )
-            continue  # 다음 태스크도 검사
+                emit_block(msg)
+            return
         current_hash = compute_plan_hash(body)
         if current_hash != approved_hash:
             msg = (
