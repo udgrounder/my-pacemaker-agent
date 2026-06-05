@@ -4,7 +4,6 @@
 타입: major / minor
 실패비용: critical / major / minor
 상태: 설계 중
-점검: 미점검
 승인해시: ""
 ---
 

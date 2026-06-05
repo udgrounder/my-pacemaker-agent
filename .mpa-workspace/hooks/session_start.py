@@ -49,7 +49,7 @@ def read_status(plan_path):
     return "상태 미상"
 
 
-REQUIRED_FIELDS = ["태스크", "생성일", "타입", "실패비용", "상태", "점검", "승인해시"]
+REQUIRED_FIELDS = ["태스크", "생성일", "타입", "실패비용", "상태", "승인해시"]
 
 
 def _read_field(plan_path, key):

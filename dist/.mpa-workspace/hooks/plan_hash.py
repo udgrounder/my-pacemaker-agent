@@ -11,14 +11,11 @@ GATE 1 재진입 검증용. code_gate.py와 같은 알고리즘을 사용한다.
   plan_hash.py audit   <plan_path>      프론트매터 필드 검사 (누락 필드를 stdout JSON으로 출력)
   plan_hash.py init    <plan_path> --field key=value [--field ...]
                                         누락된 프론트매터를 주입 (에이전트 추론 후 호출용)
-  plan_hash.py sync-index <project_root>
-                                        INDEX.md `점검` 컬럼 vs 각 plan.md `점검` 필드 대조
-                                        불일치 항목을 JSON으로 출력 (일치: exit 0, 불일치: exit 1)
 
 에이전트 사용 시점:
   - 설계 완료 시점 (상태: '설계 완료' 또는 '구현 중'으로 전환 시): approve
   - 사용자 재승인 후: approve
-  - 점검만 필요할 때: check
+  - 해시만 확인할 때: check
   - 구버전 plan.md 발견 시: audit → 본문 읽고 추론 → 사용자 확인 → init
 """
 
@@ -27,7 +24,7 @@ import json
 import re
 import sys
 
-REQUIRED_FIELDS = ["태스크", "생성일", "타입", "실패비용", "상태", "점검", "승인해시"]
+REQUIRED_FIELDS = ["태스크", "생성일", "타입", "실패비용", "상태", "승인해시"]
 VALID_STATUS = {"설계 중", "설계 완료", "구현 중", "검증 중", "테스트 중", "검토 완료", "완료 승인"}
 VALID_TYPE = {"major", "minor"}
 VALID_COST = {"critical", "major", "minor"}
@@ -145,90 +142,6 @@ def init_frontmatter(plan_path, kv_pairs):
         f.write(new_content)
 
 
-def parse_index_inspections(index_path):
-    """INDEX.md를 파싱해 {태스크명: 점검값} 매핑 반환.
-    헤더 형식: | 태스크명 | 타입 | 상태 | 요약 | 생성일 | 점검 |
-    """
-    import os
-    result = {}
-    if not os.path.exists(index_path):
-        return result
-    try:
-        with open(index_path, encoding="utf-8") as f:
-            lines = f.readlines()
-    except Exception:
-        return result
-
-    header_idx = None
-    cols = []
-    for i, line in enumerate(lines):
-        if "|" in line and "태스크" in line and "점검" in line:
-            header_idx = i
-            cols = [c.strip() for c in line.split("|")]
-            break
-    if header_idx is None:
-        return result
-
-    try:
-        task_col = cols.index("태스크명")
-        inspect_col = cols.index("점검")
-    except ValueError:
-        return result
-
-    for line in lines[header_idx + 2:]:  # 헤더 + 구분선 다음부터
-        if not line.strip().startswith("|"):
-            continue
-        cells = [c.strip() for c in line.split("|")]
-        if len(cells) <= max(task_col, inspect_col):
-            continue
-        name = cells[task_col]
-        inspect = cells[inspect_col]
-        if name:
-            result[name] = inspect
-    return result
-
-
-def sync_index_check(project_root):
-    """INDEX.md vs plan.md 점검 컬럼 대조. 불일치 dict 리스트 반환."""
-    import os
-    index_path = os.path.join(project_root, "workspace", "tasks", "INDEX.md")
-    index_map = parse_index_inspections(index_path)
-
-    mismatches = []
-    for sub in ("active", "done"):
-        base = os.path.join(project_root, "workspace", "tasks", sub)
-        if not os.path.isdir(base):
-            continue
-        for name in sorted(os.listdir(base)):
-            task_dir = os.path.join(base, name)
-            plan_path = os.path.join(task_dir, "plan.md")
-            if not os.path.isdir(task_dir) or not os.path.exists(plan_path):
-                continue
-            front_matter, _, _ = parse(plan_path)
-            if front_matter is None:
-                continue  # 구형 plan.md (프론트매터 없음) — 비교 대상 아님
-            plan_inspect = get_field(front_matter, "점검") or ""
-            # 값 정규화: 미점검 ↔ - 는 동일 의미로 취급
-            def normalize(v):
-                return "-" if v in ("미점검", "-", "") else v
-            plan_inspect_n = normalize(plan_inspect)
-
-            # INDEX는 태스크명만 비교 — 폴더명에서 날짜 접두사 제거 가능성 고려
-            task_name_short = name.split("_", 1)[-1] if "_" in name else name
-            index_inspect = index_map.get(name) or index_map.get(task_name_short) or ""
-            index_inspect_n = normalize(index_inspect)
-
-            if plan_inspect_n != index_inspect_n:
-                mismatches.append({
-                    "folder": name,
-                    "location": sub,
-                    "plan_md": plan_inspect or "(빈값)",
-                    "index_md": index_inspect or "(없음)",
-                    "resolution": "plan.md 값을 정답으로 INDEX를 갱신"
-                })
-    return mismatches
-
-
 def parse_field_args(args):
     """--field key=value 쌍을 파싱한다."""
     pairs = {}
@@ -255,10 +168,22 @@ def main():
         _, body, _ = parse(plan_path)
         print(compute(body))
     elif cmd == "approve":
-        _, body, _ = parse(plan_path)
+        front_matter, body, _ = parse(plan_path)
+        status = get_field(front_matter, "상태") if front_matter else None
+        # minor 자동 승인: 상태가 없거나 '설계 중'/'메모'인 경우도 허용
+        ALLOWED_STATUSES = {"설계 완료", "설계 중", "메모", None}
+        if status not in ALLOWED_STATUSES:
+            sys.stderr.write(
+                f"⛔ approve 거부: 현재 상태가 '{status}'입니다.\n"
+                "approve는 '설계 완료' 상태에서만 실행할 수 있습니다.\n"
+                "이미 '구현 중'이라면 승인해시가 이미 기록된 상태입니다.\n"
+            )
+            sys.exit(2)
         h = compute(body)
+        # 상태를 '구현 중'으로 전환하고 해시를 원자적으로 기록
+        set_field(plan_path, "상태", "구현 중")
         set_field(plan_path, "승인해시", h)
-        print(f"승인해시 갱신: {h}")
+        print(f"GATE 1 통과: 상태 → 구현 중 / 승인해시: {h}")
     elif cmd == "check":
         front_matter, body, _ = parse(plan_path)
         approved = get_field(front_matter, "승인해시")
@@ -282,13 +207,6 @@ def main():
             sys.exit(2)
         init_frontmatter(plan_path, kv)
         print(f"프론트매터 주입 완료: {list(kv.keys())}")
-    elif cmd == "sync-index":
-        # plan_path 인자가 project_root로 사용됨
-        mismatches = sync_index_check(plan_path)
-        print(json.dumps(mismatches, ensure_ascii=False, indent=2))
-        if mismatches:
-            sys.exit(1)
-        sys.exit(0)
     else:
         sys.stderr.write(f"알 수 없는 명령: {cmd}\n")
         sys.exit(2)

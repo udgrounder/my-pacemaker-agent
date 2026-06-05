@@ -38,6 +38,12 @@ def main():
     if not file_path.startswith(mpa_src + os.sep):
         sys.exit(0)
 
+    # 프로젝트 로컬 피드백 폴더는 dist/ 배포본에 포함하지 않는다
+    SYNC_EXCLUDE = ("upgrade-candidates" + os.sep,)
+    rel_from_mpa = os.path.relpath(file_path, mpa_src)
+    if any(rel_from_mpa.startswith(ex) for ex in SYNC_EXCLUDE):
+        sys.exit(0)
+
     # dist/ 대상 경로 계산
     rel = os.path.relpath(file_path, cwd)
     dist_path = os.path.normpath(os.path.join(cwd, "dist", rel))

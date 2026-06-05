@@ -69,21 +69,18 @@
 - `tasks/active/`에 오래 방치된 요청이 있는가?
 - `docs/INDEX.md`에서 관련 요청이 없는 문서가 있는가?
 
-### 7. INDEX vs plan.md `점검` 컬럼 동기화
+### 7. INDEX vs 태스크 폴더 동기화
 
-INDEX.md `점검` 컬럼과 각 plan.md YAML `점검` 필드의 일치 여부를 확인한다.
+`active/` 및 `done/` 폴더의 태스크가 INDEX.md에 모두 등록됐는지 확인한다.
 
 ```bash
-python3 .mpa-workspace/hooks/plan_hash.py sync-index .
+ls workspace/tasks/active/ workspace/tasks/done/
 ```
 
-- exit 0 → 일치 (조치 불필요)
-- exit 1 → 불일치 항목 JSON 출력
+- 폴더에 있는데 INDEX에 없는 항목 → INDEX에 추가 (타입·상태·요약·생성일·점검 채움)
+- INDEX에 있는데 폴더에 없는 항목 → INDEX에서 제거 또는 경로 확인
 
-**불일치 발견 시:**
-- plan.md를 정답으로 INDEX.md를 갱신한다 (이중 기록 원칙: 백업이 정답)
-- INDEX 행 자체가 누락된 경우 → 추가
-- 수정 후 다시 `sync-index`를 실행해 일치 확인
+> **점검 상태는 INDEX.md가 단일 소스다.** plan.md에는 점검 필드가 없으므로 INDEX가 손상되면 점검 상태는 재확인이 필요하다.
 
 > 이 검사는 매 태스크마다 하지 않는다. Layer 2 시 일괄로 처리해 인지 부담을 분산한다.
 
@@ -141,7 +138,7 @@ upgrade-candidates 누적: [N]개
 - [ ] 안티패턴 누적 검토 완료
 - [ ] memory 업데이트 항목 도출됨
 - [ ] 요청/문서 동기화 점검 완료
-- [ ] INDEX vs plan.md `점검` 컬럼 동기화 확인 (`sync-index` exit 0)
+- [ ] INDEX vs 태스크 폴더 동기화 확인 (누락·불일치 없음)
 - [ ] 사용자 회고 제시 완료 (upgrade-candidates 요약 + 가정 오류 사례)
 - [ ] 지식 승격 후보 평가 완료 (`domains/` → `upgrade-candidates/`)
 - [ ] 발견 사항이 즉시 / 다음 스프린트 / 기록으로 분류됨
