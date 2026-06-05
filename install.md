@@ -163,7 +163,8 @@ python3 install.py --project <경로> --agents <agent> --upgrade
 ```
 
 > **hook 동작:** `.mpa-workspace/hooks/` 의 스크립트가 세션 시작 시 진행 태스크·라우팅 규칙을 주입하고,
-> 승인 마커(`workspace/tasks/active/<task>/.approved`) 없이 소스코드를 수정하면 차단한다.
+> `plan.md` 상태가 `구현 중`인 active 태스크 없이 소스코드를 수정하면 차단한다.
+> 구현 승인 후에는 `plan_hash.py approve`로 `승인해시`를 갱신하며, 이후 plan.md 본문이 바뀌면 재승인이 필요하다.
 > 게이트 강도는 환경변수 `MPA_GATE`(block/warn/off)로 조절한다. 자세한 내용은 `.mpa-workspace/hooks/README.md`.
 
 업그레이드 시 추가 동작:

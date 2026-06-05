@@ -12,29 +12,32 @@
 | 파일 | 이벤트 | 차단 | 하는 일 |
 |------|--------|------|--------|
 | `session_start.py` | SessionStart | ❌ | 진행 중 태스크 목록 + 라우팅 규칙을 컨텍스트에 주입 |
-| `code_gate.py` | PreToolUse(Edit\|Write) / BeforeTool | ✅ | 승인된 plan 없이 소스 수정 시 차단/경고 |
+| `code_gate.py` | PreToolUse(Edit\|Write) / BeforeTool | ✅ | `구현 중` plan 없이 소스 수정 시 차단/경고 |
 | `turn_end.py` | Stop / AfterAgent | ❌ | 진행 중 태스크가 있으면 changelog/memory 갱신 리마인드 |
 
 ---
 
 ## 코드 수정 게이트 (`code_gate.py`)
 
-소스코드를 수정하려면 **승인 마커**가 있어야 한다.
+소스코드를 수정하려면 active 태스크의 `plan.md`가 **구현 가능한 상태**여야 한다.
 
-- **승인 마커:** `workspace/tasks/active/<task>/.approved`
-  - 사용자가 plan 을 승인하면 agent 가 생성한다.
-  - 사용자가 직접 만들거나 지워도 된다 (파일이라 직접 제어 가능).
+- **GATE 1 — 소스 수정 허용 조건**
+  - `workspace/tasks/active/[작업명]/plan.md` YAML 프론트매터의 `상태`가 `구현 중`이어야 한다.
+  - `구현 중` 태스크의 `승인해시`가 현재 plan.md 본문 해시와 일치해야 한다.
+  - 승인 직후 또는 재승인 직후 agent가 `python3 .mpa-workspace/hooks/plan_hash.py approve [plan.md]`를 실행해 `승인해시`를 갱신한다.
+- **GATE 2 — 완료 이동 허용 조건**
+  - `workspace/tasks/active/[작업명]/`을 `workspace/tasks/done/[작업명]/`로 이동하려면 plan.md `상태`가 `완료 승인`이어야 한다.
 - **항상 허용(차단 대상 아님):**
   - `workspace/**`, `.mpa-workspace/**`, `.claude|.codex|.gemini|.agents/**`
   - 모든 `*.md` 파일 (plan·changelog·memory·문서)
   - → plan.md 조차 못 쓰는 교착을 방지한다.
-- **차단 대상:** 위에 해당하지 않는 프로젝트 소스코드. active 태스크에 `.approved` 마커가 하나도 없으면 차단한다.
+- **차단 대상:** 위에 해당하지 않는 프로젝트 소스코드. `구현 중` 상태인 active 태스크가 없거나, `승인해시`가 현재 plan.md와 다르면 차단한다.
 
 ### 강도 조절 — 환경변수 `MPA_GATE`
 
 | 값 | 동작 |
 |----|------|
-| `block` (기본) | 마커 없으면 소스 수정 차단 |
+| `block` (기본) | 조건 불충족 시 소스 수정 차단 |
 | `warn` | 차단하지 않고 경고만 주입 |
 | `off` | 게이트 비활성 |
 
@@ -48,8 +51,8 @@ MPA_GATE=off claude     # 또는 codex / gemini
 
 - **Bash 우회:** matcher 가 `Edit|Write` 라서 `bash -c 'sed ... > file'` 같은 셸 파일 수정은 걸리지 않는다.
   (이 프로젝트엔 "shell 로 파일 내용 수정 금지" 규칙이 이미 있어 정상 워크플로우에선 Edit/Write 를 쓴다.)
-- **거친 판정:** active 에 `.approved` 가 하나라도 있으면 무관한 파일 수정도 통과한다. 에어타이트 봉쇄가 아니라 가드레일이다.
-- **마커 생성은 agent 가 한다:** 완전한 강제는 아니다. 다만 코드 수정이 *파일의 물리적 존재*에 묶이므로 산문 규칙보다 건너뛰기 어렵고, 감사 추적이 남고, 사용자가 직접 끌 수 있다.
+- **태스크 범위 판정 한계:** `구현 중` 태스크가 있으면 수정 대상 파일이 그 태스크 범위 안인지까지 완전히 증명하지는 못한다. 에어타이트 봉쇄가 아니라 가드레일이다.
+- **승인해시 갱신은 agent가 한다:** 완전한 강제는 아니다. 다만 구현 진입과 plan.md 변경이 해시로 연결되므로 산문 규칙보다 건너뛰기 어렵고, 감사 추적이 남는다.
 
 ---
 

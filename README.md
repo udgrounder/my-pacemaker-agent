@@ -83,7 +83,19 @@ agent가 진행하는 절차:
 [하고싶은 작업] 태스크 생성해줘
 ```
 
-Agent가 계획서를 작성하고 검토를 요청한다. 승인하면 구현을 진행한다.
+Agent가 요청의 실패 비용을 먼저 판단한 뒤 작업 흐름을 고른다.
+
+- `minor`: 최소 `plan.md`를 만들고 `승인해시`를 자동 갱신한 뒤 바로 구현한다. 완료 후에도 GATE 2 없이 `done` 처리한다.
+- `major` 또는 `critical`: `plan.md`를 작성해 사용자 검토를 요청한다. 사용자가 승인하면 `plan.md` 상태를 `구현 중`으로 바꾸고 `plan_hash.py approve`로 `승인해시`를 갱신한 뒤 구현한다.
+
+소스 수정 게이트는 별도 승인 파일을 쓰지 않는다. `workspace/tasks/active/[작업명]/plan.md`의 YAML 프론트매터가 기준이다.
+
+```
+상태: 설계 완료 → 구현 중 → 검증 중 → 테스트 중 → 검토 완료 → 완료 승인
+승인해시: [plan.md 본문 해시]
+```
+
+`구현 중` 상태인 active 태스크가 있어야 소스 수정이 허용되고, `완료 승인` 상태가 되어야 `active/`에서 `done/`으로 이동할 수 있다.
 
 **예시:**
 ```
@@ -163,6 +175,7 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 │   │   ├── skills/                       ← agent 능력 정의 (WHAT IT KNOWS)
 │   │   ├── inject/                       ← 세션 패키지
 │   │   ├── hooks/                         ← agent 강제 메커니즘 (세션시작 주입·코드수정 게이트·종료 리마인드)
+│   │   ├── knowledge/                     ← 검증된 범용 도메인 지식
 │   │   ├── workflows/                    ← 작업 유형별 세션 시퀀스
 │   │   ├── templates/                    ← 파일 생성용 템플릿 (plan/changelog/shared 등)
 │   │   └── upgrade-candidates/           ← 방법론 개선 후보 수집
@@ -187,6 +200,7 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 [project]/
 ├── .mpa-workspace/    ← 방법론 (업그레이드로 최신화, 직접 수정 금지)
 │   ├── core/, personas/, skills/, workflows/, inject/
+│   ├── hooks/, templates/, knowledge/
 │   └── upgrade-candidates/   ← 작업 중 발견된 방법론 개선 후보
 │
 └── workspace/            ← 프로젝트 데이터 (agent가 직접 관리)
@@ -246,6 +260,7 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 | 방법론 업데이트 / 재설치 | `.mpa-workspace/inject/layer0_update.md` | 새 스레드 |
 | 기능 설계 / 계획 작성 | `.mpa-workspace/inject/layer1_design.md` | 새 스레드 |
 | 계획 독립 비평 | `.mpa-workspace/inject/layer1_critique.md` | **반드시 새 스레드** |
-| 구현 | `.mpa-workspace/inject/layer1_implement.md` | 같은 스레드 |
-| 코드 검토 | `.mpa-workspace/inject/layer1_review.md` | 새 스레드 |
+| 구현 | `.mpa-workspace/inject/layer1_implement.md` | 새 스레드 권장 |
+| 코드 검토 / 에이전트 검증 | `.mpa-workspace/inject/layer1_review.md` | 새 스레드 |
+| 구현 후 발견 정리 | `.mpa-workspace/inject/layer1_discovery.md` | 새 스레드 |
 | 정합성 점검 | `.mpa-workspace/inject/layer2_checkpoint.md` | 새 스레드 |
