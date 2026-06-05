@@ -7,13 +7,20 @@
 
 ## 이 폴더에 올라오는 기준
 
-- 한 프로젝트에서 발견했지만 같은 도메인을 다루는 다른 프로젝트에도 유효한 지식
-- 업종·도메인의 일반적인 제약, 규칙, 주의사항
-- 프로젝트 맥락이 없어도 이해 가능한 내용
+여기에 도달하기까지의 단방향 흐름:
+
+```
+1. 발견 시       → workspace/memory/domains/[도메인]/rules.md  (항상)
+2. Layer 2 시    → .mpa-workspace/upgrade-candidates/          (후보 평가)
+3. 사용자 승인   → .mpa-workspace/knowledge/[도메인].md         (이 폴더)
+```
+
+**이 폴더에 있다는 것 = 검증된 범용 도메인 지식이다.** 다른 프로젝트에서 import 가능한 신뢰 등급.
 
 **올라오지 않는 것:**
 - 이 프로젝트 코드베이스에만 해당하는 규칙 → `workspace/memory/domains/`
 - 기술 스택 관련 지식 → `skills/tech/`
+- 미검증 후보 → `.mpa-workspace/upgrade-candidates/` 단계에 머무름
 
 ---
 
@@ -21,12 +28,12 @@
 
 `.mpa-workspace/`는 업그레이드 시 전체 교체된다. 이 폴더에 직접 파일을 추가하거나 수정하면 다음 업그레이드 때 사라진다.
 
-**프로젝트에서 도메인 지식을 발견했을 때:**
+**승격 흐름:**
 
-1. `workspace/memory/domains/`에 먼저 기록 (프로젝트 맥락 포함)
-2. 다른 프로젝트에도 유효하다 판단되면 → `.mpa-workspace/upgrade-candidates/`에 등록
-3. MPA 시스템 관리자가 검토 후 MPA 시스템의 `dist/.mpa-workspace/knowledge/`에 반영
-4. 다음 업그레이드 시 모든 프로젝트에 배포
+1. **발견 시:** 경계 판단 없이 `workspace/memory/domains/[도메인]/rules.md`에 기록
+2. **Layer 2 체크포인트:** `domains/` 항목 중 "다른 프로젝트의 의사결정도 바꾸는가?" 통과 항목을 `.mpa-workspace/upgrade-candidates/`에 export
+3. **사용자 검토 + 승인:** MPA 시스템 관리자가 검토 후 MPA 시스템의 `dist/.mpa-workspace/knowledge/`에 반영
+4. **배포:** 다음 업그레이드 시 모든 프로젝트에 배포
 
 ---
 

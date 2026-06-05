@@ -69,6 +69,36 @@
 - `tasks/active/`에 오래 방치된 요청이 있는가?
 - `docs/INDEX.md`에서 관련 요청이 없는 문서가 있는가?
 
+### 7. INDEX vs plan.md `점검` 컬럼 동기화
+
+INDEX.md `점검` 컬럼과 각 plan.md YAML `점검` 필드의 일치 여부를 확인한다.
+
+```bash
+python3 .mpa-workspace/hooks/plan_hash.py sync-index .
+```
+
+- exit 0 → 일치 (조치 불필요)
+- exit 1 → 불일치 항목 JSON 출력
+
+**불일치 발견 시:**
+- plan.md를 정답으로 INDEX.md를 갱신한다 (이중 기록 원칙: 백업이 정답)
+- INDEX 행 자체가 누락된 경우 → 추가
+- 수정 후 다시 `sync-index`를 실행해 일치 확인
+
+> 이 검사는 매 태스크마다 하지 않는다. Layer 2 시 일괄로 처리해 인지 부담을 분산한다.
+
+### 8. 지식 승격 후보 평가
+
+`workspace/memory/domains/*/rules.md`에 누적된 지식 중 다음 질문을 통과하는 항목을 식별한다:
+
+> **"이 지식이 다른 프로젝트의 의사결정도 바꾸는가?"**
+
+통과 항목은 `.mpa-workspace/upgrade-candidates/[내용].md`에 도메인 지식 형식(타입 B)으로 export한다.
+형식: `core/agent_rules_detail.md` "upgrade-candidates 형식" 섹션 참조.
+
+> 매 태스크마다 경계를 판단하지 않는다. Layer 2에서 한꺼번에 평가하는 것이 단방향 흐름 원칙이다.
+> 사용자가 upgrade-candidates를 승인하면 `.mpa-workspace/knowledge/[도메인].md`로 승격된다.
+
 ---
 
 ## 완료 기준
@@ -78,6 +108,8 @@
 - [ ] 안티패턴 누적 검토 완료
 - [ ] memory 업데이트 항목 도출됨
 - [ ] 요청/문서 동기화 점검 완료
+- [ ] INDEX vs plan.md `점검` 컬럼 동기화 확인 (`sync-index` exit 0)
+- [ ] 지식 승격 후보 평가 완료 (`domains/` → `upgrade-candidates/`)
 - [ ] 발견 사항이 즉시 / 다음 스프린트 / 기록으로 분류됨
 
 ---

@@ -29,14 +29,54 @@ def read_cwd_from_stdin():
 
 
 def read_status(plan_path):
+    """plan.md YAML 프론트매터에서 '상태' 필드를 읽는다. 구형 포맷 폴백 포함."""
+    import re
     try:
         with open(plan_path, encoding="utf-8") as f:
-            for line in f:
-                if "상태" in line and (":" in line or "：" in line):
-                    return line.strip().lstrip("#").strip()
+            content = f.read()
+        # YAML 프론트매터 우선
+        match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
+        if match:
+            for line in match.group(1).splitlines():
+                if line.startswith("상태:"):
+                    return line.split(":", 1)[1].strip()
+        # 폴백: 구형 **상태:** 형식
+        for line in content.splitlines():
+            if "상태" in line and (":" in line or "：" in line):
+                return line.strip().lstrip("#").strip()
     except Exception:
         pass
     return "상태 미상"
+
+
+REQUIRED_FIELDS = ["태스크", "생성일", "타입", "실패비용", "상태", "점검", "승인해시"]
+
+
+def audit_frontmatter(plan_path):
+    """plan.md 프론트매터 필드 검사. (missing 리스트, has_frontmatter bool) 반환."""
+    import re
+    try:
+        with open(plan_path, encoding="utf-8") as f:
+            content = f.read()
+        match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
+        if not match:
+            return REQUIRED_FIELDS[:], False
+        front = match.group(1)
+        existing = {}
+        for line in front.splitlines():
+            if ":" in line:
+                k, v = line.split(":", 1)
+                existing[k.strip()] = v.strip()
+        missing = []
+        for key in REQUIRED_FIELDS:
+            val = existing.get(key)
+            if val is None:
+                missing.append(key)
+            elif not val and key != "승인해시":
+                missing.append(key)
+        return missing, True
+    except Exception:
+        return [], False
 
 
 def active_tasks(cwd):
@@ -51,10 +91,17 @@ def active_tasks(cwd):
         if not os.path.isdir(task_dir):
             continue
         plan = os.path.join(task_dir, "plan.md")
-        approved = os.path.exists(os.path.join(task_dir, ".approved"))
-        status = read_status(plan) if os.path.exists(plan) else "plan.md 없음"
-        mark = "✅승인" if approved else "⏳미승인"
-        rows.append(f"  - {name} — {status} [{mark}]")
+        if not os.path.exists(plan):
+            rows.append(f"  - {name} — plan.md 없음")
+            continue
+        status = read_status(plan)
+        missing, has_front = audit_frontmatter(plan)
+        if not has_front:
+            rows.append(f"  - {name} — {status}  ⚠️ 프론트매터 없음 (구버전 plan.md)")
+        elif missing:
+            rows.append(f"  - {name} — {status}  ⚠️ 누락 필드: {', '.join(missing)}")
+        else:
+            rows.append(f"  - {name} — {status}")
     return rows
 
 
@@ -74,6 +121,15 @@ def build_message(cwd):
             lines.append(f"  {i}.{row.lstrip()}")
         lines.append(f"  {len(rows) + 1}. 새 작업 시작")
         lines.append("→ 번호를 말씀해 주시면 해당 태스크의 상태에 따라 진행합니다.")
+        # 프론트매터 누락 항목이 있으면 처리 지시 추가
+        if any("⚠️" in row for row in rows):
+            lines.append("")
+            lines.append("⚠️ 일부 plan.md의 프론트매터가 누락됐습니다.")
+            lines.append("해당 태스크 작업 진입 시 다음 절차를 따르세요:")
+            lines.append("  1. plan.md 본문을 읽고 누락 필드를 추론 (`plan_hash.py audit <path>`로 정확한 누락 목록 확인)")
+            lines.append("  2. 추론한 값과 근거를 사용자에게 짧게 보여주고 확인")
+            lines.append("  3. 확인 후 `plan_hash.py init <path> --field key=value ...` 로 주입")
+            lines.append("  4. 추론 기준은 agent_rules.md '프론트매터 누락 처리' 섹션 참조")
     else:
         lines.append("진행 중인 태스크 없음.")
 

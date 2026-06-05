@@ -62,12 +62,18 @@
 **조정:**
 - 현재 plan.md의 해당 구현 단계 수정
 - plan.md 상태를 `구현 중`으로 변경
+- **승인해시 갱신** (plan.md 본문이 바뀌었으므로):
+  ```bash
+  python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/[작업명]/plan.md
+  ```
+  > 사용자에게 변경 사항을 보여주고 확인받은 후 갱신한다. 에이전트 단독 갱신 금지.
 - → 다음 단계: `layer1_implement.md`로 재구현
 
 **계획 확장:**
 - plan.md에 "구현 후 발견 추가 범위" 섹션 추가
-- 추가된 요구사항에 대해 검토 후 사용자 승인
+- 추가된 요구사항에 대해 검토 후 사용자 승인 (GATE 1 재통과)
 - plan.md 상태를 `구현 중`으로 변경
+- **승인해시 갱신** (사용자 승인 + 위 명령 실행)
 - → 다음 단계: 확장 범위 포함하여 `layer1_implement.md`로 재구현
 
 **신규 태스크:**

@@ -28,9 +28,9 @@
             │
             └── 단일 세션만 명시적으로 시작할 때 → inject/ 직접 사용
                 ├── 기능 설계 / 계획 수립                       → @inject/layer1_design.md
-                ├── 계획 독립 비평 (새 스레드 필수)             → @inject/layer1_critique.md
+                ├── 계획 독립 비평 (서브에이전트로 실행)         → @inject/layer1_critique.md
                 ├── 설계 완료된 태스크 구현                     → @inject/layer1_implement.md
-                ├── 구현 완료 후 작업 결과 검토                      → @inject/layer1_review.md
+                ├── 에이전트 검증 (`검증 중` 단계, 서브에이전트)     → @inject/layer1_review.md
                 ├── 결과물을 보고 수정·추가 사항이 생겼을 때    → @inject/layer1_discovery.md
                 └── 정합성 점검                                 → @inject/layer2_checkpoint.md
 ```
