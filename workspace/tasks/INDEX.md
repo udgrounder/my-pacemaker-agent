@@ -12,6 +12,8 @@
 | 20260604_critique_isolation | minor | done | 독립 비평 기술적 격리 — 서브에이전트 기본 경로로 격상 | 2026-06-04 | ✅ |
 | 20260604_value_decision_criteria | minor | done | 가치 결정 판별 기준 추가 — 2개 판별 질문 + 패턴 예시 | 2026-06-04 | ✅ |
 | 20260605_approval-gate-redesign | major | done | .approved 마커 → YAML 프론트매터 + 해시 기반 7단계 게이트 모델로 교체 | 2026-06-05 | ✅ |
+| 20260605_install-replace-fix | minor | done | _replace_mpa_section 문자 단위 범위 교체로 재작성 — 섹션 외부 내용 보존 보장 | 2026-06-05 | - |
+| 20260605_install-config-verify | minor | done | install.py 업그레이드 시 CLAUDE.md MPA 섹션 내용 비교·자동 갱신 추가 | 2026-06-05 | - |
 | 20260605_mpa-system-improvements | major | done | MPA 시스템 평가 기반 14개 항목 개선 — 게이트 강화, minor 경량 흐름, dist/ 자동화 등 | 2026-06-05 | ✅ |
 
 [Layer 2 완료] 2026-06-04

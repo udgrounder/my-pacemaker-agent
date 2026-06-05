@@ -214,6 +214,40 @@ def _merge_dir(src: Path, dst: Path, base: Path, label: str = "", upgrade: bool 
     return added
 
 
+def _extract_mpa_section(text: str) -> Optional[str]:
+    """CLAUDE.md 등에서 '## Agents Workspace' 섹션만 추출한다."""
+    lines = text.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if line.strip() == "## Agents Workspace":
+            start = i
+            break
+    if start is None:
+        return None
+    # 다음 ## 섹션 또는 파일 끝까지
+    for j in range(start + 1, len(lines)):
+        if lines[j].startswith("## "):
+            return "\n".join(lines[start:j]).strip()
+    return "\n".join(lines[start:]).strip()
+
+
+def _replace_mpa_section(text: str, new_section: str) -> str:
+    """MPA 섹션만 교체한다. 섹션 외부는 문자 단위로 일절 변경하지 않는다."""
+    import re
+    marker = "## Agents Workspace"
+    start = text.find(marker)
+    if start == -1:
+        sep = "\n\n" if text.strip() else ""
+        return text.rstrip("\n") + sep + new_section + "\n"
+    after_marker = text[start + len(marker):]
+    next_sep = re.search(r'\n\n(## )', after_marker)
+    if next_sep:
+        section_end = start + len(marker) + next_sep.start()
+        return text[:start] + new_section + text[section_end:]
+    else:
+        return text[:start] + new_section + "\n"
+
+
 def append_agent_config(agent: str, project_path: Path):
     """진입점 파일(CLAUDE.md 등)에 Agents Workspace 섹션을 추가한다."""
     filename = AGENT_CONFIG_MAP.get(agent)
@@ -231,7 +265,13 @@ def append_agent_config(agent: str, project_path: Path):
     if config_dst.exists():
         existing = config_dst.read_text(encoding="utf-8")
         if "Agents Workspace" in existing:
-            print(f"  [건너뜀] {filename} — Agents Workspace 섹션 이미 존재")
+            existing_section = _extract_mpa_section(existing)
+            if existing_section and existing_section.strip() != content.strip():
+                updated = _replace_mpa_section(existing, content)
+                config_dst.write_text(updated, encoding="utf-8")
+                print(f"  [업데이트] {filename} — Agents Workspace 섹션 갱신")
+            else:
+                print(f"  [확인] {filename} — Agents Workspace 섹션 최신")
             return
         with open(config_dst, "a", encoding="utf-8") as f:
             f.write("\n\n" + content + "\n")
