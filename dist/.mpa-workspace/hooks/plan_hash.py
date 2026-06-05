@@ -205,13 +205,20 @@ def sync_index_check(project_root):
             if not os.path.isdir(task_dir) or not os.path.exists(plan_path):
                 continue
             front_matter, _, _ = parse(plan_path)
+            if front_matter is None:
+                continue  # 구형 plan.md (프론트매터 없음) — 비교 대상 아님
             plan_inspect = get_field(front_matter, "점검") or ""
+            # 값 정규화: 미점검 ↔ - 는 동일 의미로 취급
+            def normalize(v):
+                return "-" if v in ("미점검", "-", "") else v
+            plan_inspect_n = normalize(plan_inspect)
 
             # INDEX는 태스크명만 비교 — 폴더명에서 날짜 접두사 제거 가능성 고려
             task_name_short = name.split("_", 1)[-1] if "_" in name else name
             index_inspect = index_map.get(name) or index_map.get(task_name_short) or ""
+            index_inspect_n = normalize(index_inspect)
 
-            if plan_inspect != index_inspect:
+            if plan_inspect_n != index_inspect_n:
                 mismatches.append({
                     "folder": name,
                     "location": sub,

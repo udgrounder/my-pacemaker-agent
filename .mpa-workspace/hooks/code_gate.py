@@ -27,6 +27,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 
 # 항상 허용하는 경로 접두사 (방법론·프로젝트 데이터·agent 설정)
@@ -90,8 +91,6 @@ def is_always_allowed(rel):
     if rel is None:
         return True  # 경로 미상 — 막지 않는다
     norm = rel.replace(os.sep, "/")
-    if norm.endswith(".md"):
-        return True  # 문서·계획·메모리류는 통과
     return any(norm.startswith(pfx) for pfx in ALLOW_PREFIXES)
 
 
@@ -107,7 +106,7 @@ def parse_plan_fields(plan_path):
             for line in match.group(1).splitlines():
                 if ":" in line:
                     k, v = line.split(":", 1)
-                    fields[k.strip()] = v.strip()
+                    fields[k.strip()] = v.strip().strip('"').strip("'")
             body = match.group(2)
         else:
             # 폴백: 프론트매터 없는 구형 plan.md
@@ -151,17 +150,19 @@ def find_active_statuses(cwd):
     return results
 
 
-def find_task_dir_by_status(cwd, target_status):
-    """특정 상태의 첫 active 태스크 폴더 경로를 반환."""
-    base = os.path.join(cwd, "workspace", "tasks", "active")
-    if not os.path.isdir(base):
-        return None
-    for name in sorted(os.listdir(base)):
-        task_dir = os.path.join(base, name)
-        plan_path = os.path.join(task_dir, "plan.md")
-        if os.path.exists(plan_path) and parse_plan_status(plan_path) == target_status:
-            return task_dir
-    return None
+
+def set_approved_hash(plan_path):
+    """plan_hash.py approve를 호출해 승인해시를 갱신한다."""
+    hook_dir = os.path.dirname(os.path.abspath(__file__))
+    plan_hash_py = os.path.join(hook_dir, "plan_hash.py")
+    try:
+        result = subprocess.run(
+            [sys.executable, plan_hash_py, "approve", plan_path],
+            capture_output=True, text=True
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
 
 
 def check_hash_integrity(cwd, mode, agent):
@@ -179,13 +180,21 @@ def check_hash_integrity(cwd, mode, agent):
             continue
         approved_hash = fields.get("승인해시")
         if not approved_hash:
-            # 승인해시 없음 — 구버전 호환 또는 미설정. 경고만.
-            emit_warn(
-                agent,
-                f"⚠️ '{name}' plan.md에 '승인해시'가 없습니다. "
-                "설계 완료 시 승인해시를 기록해야 GATE 1 재진입 검증이 가능합니다."
-            )
-            return
+            # 승인해시 없음 — 현재 본문을 기준으로 자동 등록하고 신뢰
+            current_hash = compute_plan_hash(body)
+            if set_approved_hash(plan_path):
+                emit_warn(
+                    agent,
+                    f"⚠️ '{name}' 승인해시가 없어 현재 상태({current_hash[:8]}…)를 기준으로 자동 등록했습니다. "
+                    "이후 plan.md가 변경되면 재승인이 필요합니다."
+                )
+            else:
+                emit_warn(
+                    agent,
+                    f"⚠️ '{name}' 승인해시 자동 등록 실패. "
+                    "python3 .mpa-workspace/hooks/plan_hash.py approve [plan.md 경로]를 수동으로 실행하세요."
+                )
+            continue  # 다음 태스크도 검사
         current_hash = compute_plan_hash(body)
         if current_hash != approved_hash:
             msg = (
@@ -200,7 +209,7 @@ def check_hash_integrity(cwd, mode, agent):
                 emit_warn(agent, msg)
             else:
                 emit_block(msg)
-            return
+            return  # 차단은 즉시 — 이후 태스크 검사 불필요
 
 
 def check_bash_mv(data, cwd, mode, agent):
@@ -221,7 +230,8 @@ def check_bash_mv(data, cwd, mode, agent):
         msg = (
             f"⛔ 완료 처리 차단: '{task_name}' plan.md 상태가 '완료 승인'이 아닙니다"
             f" (현재: {status or '미상'}).\n"
-            "사용자의 명시적 완료 승인 후 plan.md 상태를 '완료 승인'으로 업데이트하세요."
+            "사용자의 명시적 완료 승인 후 plan.md 상태를 '완료 승인'으로 업데이트하세요.\n"
+            "※ mv 이외의 방법(shutil, Python 파일 조작 등)으로 이동해도 동일 규칙이 적용됩니다."
         )
         if mode == "warn":
             emit_warn(agent, msg)

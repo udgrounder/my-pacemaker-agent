@@ -52,6 +52,22 @@ def read_status(plan_path):
 REQUIRED_FIELDS = ["태스크", "생성일", "타입", "실패비용", "상태", "점검", "승인해시"]
 
 
+def _read_field(plan_path, key):
+    """plan.md 프론트매터에서 특정 필드값을 반환한다."""
+    import re
+    try:
+        with open(plan_path, encoding="utf-8") as f:
+            content = f.read()
+        match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
+        if match:
+            for line in match.group(1).splitlines():
+                if line.startswith(f"{key}:"):
+                    return line.split(":", 1)[1].strip().strip('"').strip("'")
+    except Exception:
+        pass
+    return ""
+
+
 def audit_frontmatter(plan_path):
     """plan.md 프론트매터 필드 검사. (missing 리스트, has_frontmatter bool) 반환."""
     import re
@@ -96,12 +112,14 @@ def active_tasks(cwd):
             continue
         status = read_status(plan)
         missing, has_front = audit_frontmatter(plan)
+        task_type = _read_field(plan, "타입") if has_front else ""
+        type_tag = f" [{task_type}]" if task_type else ""
         if not has_front:
             rows.append(f"  - {name} — {status}  ⚠️ 프론트매터 없음 (구버전 plan.md)")
         elif missing:
-            rows.append(f"  - {name} — {status}  ⚠️ 누락 필드: {', '.join(missing)}")
+            rows.append(f"  - {name} — {status}{type_tag}  ⚠️ 누락 필드: {', '.join(missing)}")
         else:
-            rows.append(f"  - {name} — {status}")
+            rows.append(f"  - {name} — {status}{type_tag}")
     return rows
 
 
@@ -138,8 +156,8 @@ def build_message(cwd):
         "해당 inject 파일을 로드해 작업하세요."
     )
     lines.append(
-        f"코드 수정 게이트: MPA_GATE={mode}. 승인된 plan(.approved 마커) 없이 소스를 "
-        "수정하면 차단/경고됩니다 — 구현 전 plan 승인과 마커 생성을 잊지 마세요."
+        f"코드 수정 게이트: MPA_GATE={mode}. '구현 중' 상태인 태스크 없이 소스를 "
+        "수정하면 차단/경고됩니다 — 구현 전 plan.md 상태를 '구현 중'으로 설정하세요."
     )
     return "\n".join(lines)
 
