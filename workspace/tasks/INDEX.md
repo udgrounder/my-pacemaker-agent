@@ -19,6 +19,7 @@
 | 20260605_minor-plan-format | minor | done | minor plan.md에 사용자 결정/에이전트 가정 섹션 추가, 필수 판단 질문 허용 | 2026-06-05 | - |
 | 20260605_minor-plan-request-section | minor | done | minor plan.md에 요청 사항·핵심 기능 섹션 추가, 구현 항목 개수 제한 제거 | 2026-06-05 | - |
 | 20260605_readme-update | minor | done | README.md 불일치 3개 수정 — approve 원자적 처리, .mpa-workspace 수정 정책, 빠른 참조 표 | 2026-06-05 | - |
+| 20260608_guidebook-revision | major | done | guidebook.md 오류 4개 수정·개선 5개 반영 + layer1_critique 고위험 기준 2개 추가 + .approved 파일 삭제 | 2026-06-08 | - |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05
