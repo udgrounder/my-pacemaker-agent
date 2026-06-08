@@ -28,9 +28,11 @@
   - `승인해시`가 비어 있으면 자동 등록하지 않고 차단한다. 사용자 승인 이력을 확인한 뒤 명시적으로 복구해야 한다.
 - **GATE 2 — 완료 이동 허용 조건**
   - `workspace/tasks/active/[작업명]/`을 `workspace/tasks/done/[작업명]/`로 이동하려면 plan.md `상태`가 `완료 승인`이어야 한다.
+  - 감지 경로 ①: Bash `mv workspace/tasks/active/[작업명] ...` 명령 → **차단**
+  - 감지 경로 ②: Write/Edit 도구로 `workspace/tasks/done/[작업명]/` 직접 쓰기 → **경고만** (교착 방지 — 차단하지 않음)
+  - 단, `workspace/tasks/active/[작업명]/`이 없는 경우(이미 이동 완료됐거나 done/ 원본 파일)는 경고 없이 통과.
 - **항상 허용(차단 대상 아님):**
   - `workspace/**`, `.mpa-workspace/**`, `.claude|.codex|.gemini|.agents/**`
-  - 모든 `*.md` 파일 (plan·changelog·memory·문서)
   - → plan.md 조차 못 쓰는 교착을 방지한다.
 - **차단 대상:** 위에 해당하지 않는 프로젝트 소스코드. `구현 중` 상태인 active 태스크가 없거나, `승인해시`가 현재 plan.md와 다르면 차단한다.
 

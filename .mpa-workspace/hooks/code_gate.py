@@ -200,6 +200,38 @@ def check_hash_integrity(cwd, mode, agent):
             return  # 차단은 즉시 — 이후 태스크 검사 불필요
 
 
+def check_done_write(rel, cwd, agent):
+    """GATE 2 절차 확인 — Write/Edit로 workspace/tasks/done/ 직접 쓰기 시 경고 주입.
+
+    하드 블록하지 않는다 (교착 방지). 에이전트에게 상태를 알려 절차를 따르도록 유도한다.
+    active/에 같은 이름 태스크가 없으면(이미 이동 완료) 경고 없이 통과.
+    """
+    if rel is None:
+        return
+    norm = rel.replace(os.sep, "/")
+    if not norm.startswith("workspace/tasks/done/"):
+        return
+
+    parts = norm.split("/")
+    if len(parts) < 4:
+        return
+    task_name = parts[3]
+
+    active_plan = os.path.join("workspace", "tasks", "active", task_name, "plan.md")
+    if not os.path.exists(active_plan):
+        return  # 이미 이동됐거나 done/ 원본 파일 — 통과
+
+    status = parse_plan_status(active_plan)
+    if status != "완료 승인":
+        msg = (
+            f"⚠️ 완료 절차 확인: '{task_name}' plan.md 상태가 '완료 승인'이 아닙니다"
+            f" (현재: {status or '미상'}).\n"
+            "done/ 경로 직접 쓰기 전에 사용자 완료 승인 → plan.md 상태 업데이트 순서를 확인하세요.\n"
+            "※ 이 경고는 차단이 아닙니다 — 절차 확인 목적입니다."
+        )
+        emit_warn(agent, msg)
+
+
 def check_bash_mv(data, cwd, mode, agent):
     """GATE 2 — Bash mv tasks/active → tasks/done 차단."""
     tool_input = get(data, "tool_input", "toolInput", "input") or {}
@@ -264,6 +296,7 @@ def main():
         sys.exit(0)
 
     rel = relativize(extract_path(data), cwd)
+    check_done_write(rel, cwd, args.agent)  # GATE 2 절차 확인: done/ 직접 쓰기 경고
     if is_always_allowed(rel):
         sys.exit(0)
 
