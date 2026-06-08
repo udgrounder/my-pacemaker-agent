@@ -36,5 +36,7 @@
 | 20260608_plan-review-surface | minor | done | 계획서 제시 형식에 조용한 결정·반례 항목 추가 — GATE 1 전 사용자 명시적 검토 | 2026-06-08 | - |
 | 20260608_counterarg-solution-routing | minor | done | 반례 해결책 유무 구분 — 있으면 구현 항목 추가·고지, 없으면 사용자 논의 | 2026-06-08 | - |
 
+| 20260608_agent-rules-refinement | major | done | 실패 비용 추정 단일 소스화 + Layer 2 트리거 명확화 + agent_rules.md detail 이동 경량화 | 2026-06-08 | - |
+
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05

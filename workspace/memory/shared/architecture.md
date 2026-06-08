@@ -45,8 +45,8 @@ append 누적은 모순을 만든다.
 ### Layer 2 주기 추적
 Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-MM-DD` 한 줄을 추가한다.  
 에이전트는 태스크 완료 시 마커 이후 done 태스크를 타입별로 세어 트리거 조건을 확인한다:
-- `major` 1개 이상 → 즉시 Layer 2 제안
-- `minor`만 5개 이상 → Layer 2 제안
+- 마커 이후 done 태스크 중 `major`가 1개 이상 포함된 완료 작업이 있을 때 → Layer 2 제안
+- 마커 이후 done 태스크가 `minor`만 5개 이상 → Layer 2 제안
 마커가 없으면 done 전체를 기준으로 한다. 타입 컬럼 없는 기존 태스크는 `minor`로 간주한다.
 
 ### 프로젝트 확장 영역
