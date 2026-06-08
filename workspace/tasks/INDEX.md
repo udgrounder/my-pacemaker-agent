@@ -31,6 +31,10 @@
 | 20260608_changelog-template-link | minor | done | layer1_implement.md 세션 종료 시 changelog_template.md Read 지시 추가 — 템플릿 단일 소스 원칙 적용 | 2026-06-08 | - |
 | 20260608_minor-plan-filepath | minor | done | minor 계획서 제시 형식에 plan.md 파일 경로 추가, 제시 단계 생략 불가 명시 | 2026-06-08 | - |
 | 20260608_taskfolder-date-prefix | minor | done | approve·done 이동 경로 예시 yyyymmdd_ 접두사 누락 6곳 일괄 수정 | 2026-06-08 | - |
+| 20260608_minor-flow-reorder | minor | done | minor 경량 흐름 순서 수정 — 채팅 계획 제시·승인 후 plan.md 작성으로 변경 | 2026-06-08 | - |
+| 20260608_minor-completion-gate | minor | done | minor 자동 완료 제거 — 구현 보고 후 사용자 확인 받아 done 처리로 변경 | 2026-06-08 | - |
+| 20260608_plan-review-surface | minor | done | 계획서 제시 형식에 조용한 결정·반례 항목 추가 — GATE 1 전 사용자 명시적 검토 | 2026-06-08 | - |
+| 20260608_counterarg-solution-routing | minor | done | 반례 해결책 유무 구분 — 있으면 구현 항목 추가·고지, 없으면 사용자 논의 | 2026-06-08 | - |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05

@@ -127,13 +127,18 @@
 
 **minor 태스크 fast-path:**
 
-plan.md YAML 프론트매터의 `실패비용`이 `minor`이면 아래만 처리하고 종료한다.
+plan.md YAML 프론트매터의 `실패비용`이 `minor`이면 아래만 처리하고 사용자 확인을 기다린다.
 
 1. 구현 항목 완료 여부를 최소 plan.md에 체크하거나 한 줄로 반영한다.
-2. plan.md 상태를 `완료 승인`으로 업데이트한다.
-3. `workspace/tasks/active/yyyymmdd_[작업명]/`을 `workspace/tasks/done/yyyymmdd_[작업명]/`으로 이동한다.
-4. `workspace/tasks/INDEX.md`의 해당 항목을 `done`으로 갱신하고 `점검`은 `-`로 둔다.
-5. 사용자에게 한 줄로 보고한다: `완료: [무엇을 했는가]. done 처리했습니다.`
+2. 사용자에게 보고하고 완료 확인을 기다린다:
+   ```
+   완료: [무엇을 했는가].
+   → 확인 후 완료 처리해 주세요. 수정이 필요하면 말씀해 주세요.
+   ```
+3. 사용자(또는 위임 에이전트)가 완료를 확인하면:
+   - plan.md 상태를 `완료 승인`으로 업데이트한다.
+   - `workspace/tasks/INDEX.md`의 해당 항목을 `done`으로 갱신하고 `점검`은 `-`로 둔다.
+   - `workspace/tasks/active/yyyymmdd_[작업명]/`을 `workspace/tasks/done/yyyymmdd_[작업명]/`으로 이동한다.
 
 minor에서는 changelog.md, 에이전트 검증, 사용자 테스트 단계, 역할 메모리, docs 업데이트, Layer 2 제안을 생략한다. 구현 중 외부 동작·아키텍처·계약 변경이 발생하면 fast-path를 중단하고 major 전환 여부를 사용자에게 보고한다.
 

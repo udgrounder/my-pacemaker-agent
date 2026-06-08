@@ -40,7 +40,7 @@ workspace/tasks/
 ```
 
 - **GATE 1**: 계획서 제시 후 `plan_hash.py approve` 자동 실행 (사용자 명시 승인 불필요)
-- **GATE 2**: 구현 완료 후 바로 `done/` 이동 (사용자 완료 요청 불필요)
+- **GATE 2**: 구현 완료 후 보고 → 사용자(또는 위임 에이전트) 확인 후 `done/` 이동
 - `changelog.md` 생략
 
 ---
