@@ -242,18 +242,19 @@
 
 `실패비용: minor` 판단 시 전체 plan.md 형식 대신 아래 경량 흐름만 처리한다. 목적은 게이트 감사 기록을 남기되, 작업 운영 비용을 최소화하는 것이다.
 
-1. **최소 plan.md 작성** — `templates/minor_plan_template.md` 형식 사용. 목적·요청·핵심 기능·구현 항목만 기록한다. 반례·검증 체크리스트·문서 업데이트 대상은 쓰지 않는다.
-2. **계획서 제시 + 검토 요청** (Zone 3 — 명시적 승인 불필요):
+1. **최소 plan.md 작성** — `templates/plan_template.md` 형식 사용. minor 태스크는 에이전트 보고(사용자 결정·암묵적 결정·에이전트 가정·minor 판단 근거)·핵심 기능·구현 항목을 기록한다. 반례·검증 체크리스트·문서 업데이트 대상·구현 후 발견은 생략한다.
+2. **계획서 제시** — 자동 진행 여부와 무관하게 **반드시** 아래 형식으로 출력한다. 생략 불가.
    - 필수 판단 질문(언어, 기능 범위 등)이 있으면 **2개 이내**로 먼저 확인한다.
-   - 아래 형식으로 계획서를 제시한다. 거부나 방향 변경이 아닌 응답이면 구현을 시작한다:
+   - 거부나 방향 변경이 아닌 응답이면 구현을 시작한다 (Zone 3 — 명시적 승인 불필요):
    ```
    minor 태스크: [목적].
    [계획 핵심 1-2줄]
-   → 이대로 진행할까요? 다른 방향이면 말씀해 주세요.
+   계획서: workspace/tasks/active/yyyymmdd_[작업명]/plan.md
+   → 바로 진행합니다. 다른 방향이면 말씀해 주세요.
    ```
 3. **`approve` 실행** — 검토 요청 직후 또는 사용자 응답 반영 후:
    ```bash
-   python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/[작업명]/plan.md
+   python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/yyyymmdd_[작업명]/plan.md
    ```
 4. 구현 완료 후 **GATE 2 없이 바로 done 처리** (아래 "작업 완료" 섹션 참조)
 5. minor에서는 changelog.md, review_phase*.md, 역할 메모리, docs 업데이트, Layer 2 현황 표시는 기본 생략한다. 외부 동작·아키텍처·계약이 바뀐 경우에만 해당 문서를 갱신하고, 그 순간 major 전환 여부를 재판단한다.
@@ -268,7 +269,7 @@
 **승인 시 처리:**
 1. **approve 명령 실행** — 상태 전환과 해시 기록을 원자적으로 처리:
    ```bash
-   python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/[작업명]/plan.md
+   python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/yyyymmdd_[작업명]/plan.md
    ```
    - plan.md 상태가 `설계 완료`(또는 minor의 `설계 중`)일 때만 실행된다.
    - 자동으로 상태를 `구현 중`으로 전환하고 승인해시를 기록한다.
@@ -302,7 +303,7 @@ Zone 3(자동 처리)로 아래 순서만 실행한다:
    - `요약`: plan.md 목적 1줄
    - `생성일`: plan.md `생성일` 필드값
    - `점검`: `-`
-3. `workspace/tasks/active/[작업명]/` → `workspace/tasks/done/[작업명]/` 이동
+3. `workspace/tasks/active/yyyymmdd_[작업명]/` → `workspace/tasks/done/yyyymmdd_[작업명]/` 이동
 4. 완료 내용을 한 줄로 보고:
    ```
    완료: [무엇을 했는가]. done 처리했습니다.
@@ -321,7 +322,7 @@ Zone 3(자동 처리)로 아래 순서만 실행한다:
 
 사용자가 완료를 요청하면:
 1. **plan.md `상태`를 `완료 승인`으로 업데이트** (GATE 2 통과 기록)
-2. `workspace/tasks/active/[작업명]/` → `workspace/tasks/done/[작업명]/` 이동
+2. `workspace/tasks/active/yyyymmdd_[작업명]/` → `workspace/tasks/done/yyyymmdd_[작업명]/` 이동
 3. **INDEX.md 업데이트** — 다음 컬럼 기록:
    ```
    | 태스크명 | 타입 | 상태 | 요약 | 생성일 | 점검 |

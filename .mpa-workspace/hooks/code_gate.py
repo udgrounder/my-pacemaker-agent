@@ -37,6 +37,9 @@ ALLOW_PREFIXES = (
     ".codex/",
     ".gemini/",
     ".agents/",
+    "CLAUDE.md",
+    "AGENTS.md",
+    "GEMINI.md",
 )
 
 # 소스 수정 도구 (agent별 명칭 차이 흡수)

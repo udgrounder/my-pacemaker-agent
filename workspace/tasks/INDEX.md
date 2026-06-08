@@ -26,6 +26,11 @@
 | 20260608_routing-notice-improvement | minor | done | 라우팅 고지 형식 개선 — 로드한 파일 전체 명시로 사용자 확인 가능 | 2026-06-08 | - |
 | 20260608_codegate-team-limit-doc | minor | done | 가이드북 11.5 추가 — code_gate 팀 협업 한계 및 PR 리뷰가 실제 방어선임을 명시 | 2026-06-08 | - |
 | 20260608_team-approval-guideline | minor | done | 가이드북 11.6 추가 — 팀 환경 GATE 1 승인 가이드라인 (major는 타인 검토 권장) | 2026-06-08 | - |
+| 20260608_template-readme-update | minor | done | plan_template.md 암묵적 결정 섹션 추가·필수화, minor_plan_template.md 통합, README.md 현행화 | 2026-06-08 | - |
+| 20260608_layer1design-template-link | minor | done | layer1_design.md 인라인 계획 형식 제거 → plan_template.md Read 지시로 교체, 에이전트 보고 섹션 신규 필드 반영 | 2026-06-08 | - |
+| 20260608_changelog-template-link | minor | done | layer1_implement.md 세션 종료 시 changelog_template.md Read 지시 추가 — 템플릿 단일 소스 원칙 적용 | 2026-06-08 | - |
+| 20260608_minor-plan-filepath | minor | done | minor 계획서 제시 형식에 plan.md 파일 경로 추가, 제시 단계 생략 불가 명시 | 2026-06-08 | - |
+| 20260608_taskfolder-date-prefix | minor | done | approve·done 이동 경로 예시 yyyymmdd_ 접두사 누락 6곳 일괄 수정 | 2026-06-08 | - |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05

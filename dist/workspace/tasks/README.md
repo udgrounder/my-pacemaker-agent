@@ -8,45 +8,63 @@
 
 ```
 workspace/tasks/
-├── README.md                    ← 이 파일
-├── INDEX.md                     ← 전체 작업 색인 (agent가 최초 세션에 생성)
-├── _template/
-│   ├── plan_template.md         ← 계획서 템플릿
-│   └── changelog_template.md   ← 내역서 템플릿
-├── active/                      ← 진행 중인 작업
+├── README.md                        ← 이 파일
+├── INDEX.md                         ← 전체 작업 색인
+├── active/                          ← 진행 중인 작업
 │   └── yyyymmdd_[작업명]/
 │       ├── plan.md
-│       └── changelog.md
-└── done/                        ← 완료된 작업
+│       └── changelog.md             ← major만 작성
+└── done/                            ← 완료된 작업
     └── yyyymmdd_[작업명]/
 ```
+
+> 템플릿 파일: `.mpa-workspace/templates/plan_template.md`
 
 ---
 
 ## 작업 라이프사이클
 
+### major (7단계)
+
 ```
-작업 생성 → active/yyyymmdd_[작업명]/plan.md 작성 → 사용자 검토
-         → 작업 진행 → changelog.md 작성 → 사용자 검토
-         → 완료 → done/yyyymmdd_[작업명]/으로 이동
+설계 중 → 설계 완료 ⛔G1 → 구현 중 → 검증 중 → 테스트 중 → 검토 완료 ⛔G2 → 완료 승인 → done
 ```
+
+- **GATE 1**: 사용자 명시 승인 후 `plan_hash.py approve` 실행 → 상태 `구현 중` 전환
+- **GATE 2**: 사용자 명시 완료 요청 후 상태 `완료 승인` 전환 → `done/` 이동
+
+### minor (3단계, GATE 생략)
+
+```
+메모 [자동 승인] → 구현 중 → done
+```
+
+- **GATE 1**: 계획서 제시 후 `plan_hash.py approve` 자동 실행 (사용자 명시 승인 불필요)
+- **GATE 2**: 구현 완료 후 바로 `done/` 이동 (사용자 완료 요청 불필요)
+- `changelog.md` 생략
 
 ---
 
 ## 파일 역할
 
-| 파일 | 작성 시점 | 용도 |
-|------|---------|------|
-| `plan.md` | 작업 시작 전 | 요청 원문 + 계획. 사용자 검토 후 승인 |
-| `changelog.md` | 작업 완료 후 | 변경 파일/메소드/내역. 검증 agent가 plan.md와 비교 |
+| 파일 | 작성 시점 | 대상 | 용도 |
+|------|---------|------|------|
+| `plan.md` | 작업 시작 전 | major·minor | 요청 원문 + 계획. 사용자 검토 후 승인 |
+| `changelog.md` | 작업 완료 후 | major만 | 변경 파일/메소드/내역. 검증 에이전트가 plan.md와 비교 |
 
 ---
 
 ## 새 작업 추가 절차
 
 1. `.mpa-workspace/templates/plan_template.md`를 복사해서 `active/yyyymmdd_[작업명]/plan.md`로 저장
-2. 내용 채우기
+2. 내용 채우기 (minor는 에이전트 보고·핵심 기능·구현 항목만, 나머지 섹션 생략)
 3. `INDEX.md`에 한 줄 추가
+4. GATE 1 통과:
+   ```bash
+   # major: 사용자 승인 후
+   # minor: 계획서 제시 직후
+   python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/yyyymmdd_[작업명]/plan.md
+   ```
 
 ---
 
@@ -54,7 +72,9 @@ workspace/tasks/
 
 | 컬럼 | 내용 |
 |------|------|
-| 작업명 | 폴더명과 동일 |
-| 상태 | active / done |
+| 태스크명 | 폴더명과 동일 |
+| 타입 | major / minor |
+| 상태 | done |
 | 요약 | 한 줄 설명 |
-| 날짜 | 생성일 |
+| 생성일 | plan.md 생성일 필드값 |
+| 점검 | `-` (미점검) / `✅` (전체 정합성 점검 완료) |

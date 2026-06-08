@@ -112,6 +112,12 @@
 
 ## 세션 종료 시
 
+> **changelog.md를 처음 작성할 때는 반드시 템플릿을 Read한 뒤 형식에 맞춰 작성한다:**
+> ```
+> Read .mpa-workspace/templates/changelog_template.md
+> ```
+> 템플릿을 기억에서 꺼내 쓰지 않는다 — 파일을 직접 읽어 최신 형식을 확인한 뒤 작성한다.
+
 > **구현이 완료되지 않은 채 세션을 끝내야 하는 경우:**
 > 1. `plan.md` 상태를 `구현 중`으로 업데이트
 > 2. 구현 단계 체크리스트에서 완료된 항목은 체크, 건너뛴 항목은 ~~취소선~~ 후 이유 메모
@@ -125,7 +131,7 @@ plan.md YAML 프론트매터의 `실패비용`이 `minor`이면 아래만 처리
 
 1. 구현 항목 완료 여부를 최소 plan.md에 체크하거나 한 줄로 반영한다.
 2. plan.md 상태를 `완료 승인`으로 업데이트한다.
-3. `workspace/tasks/active/[작업명]/`을 `workspace/tasks/done/[작업명]/`으로 이동한다.
+3. `workspace/tasks/active/yyyymmdd_[작업명]/`을 `workspace/tasks/done/yyyymmdd_[작업명]/`으로 이동한다.
 4. `workspace/tasks/INDEX.md`의 해당 항목을 `done`으로 갱신하고 `점검`은 `-`로 둔다.
 5. 사용자에게 한 줄로 보고한다: `완료: [무엇을 했는가]. done 처리했습니다.`
 
