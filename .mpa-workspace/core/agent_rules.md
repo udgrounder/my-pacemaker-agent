@@ -138,11 +138,11 @@
 
 | 발화 패턴 (힌트) | 판단 유형 | 자동 로딩 |
 |---------------|---------|---------|
-| "~기능 만들어줘", "~추가해줘", "~구현해줘" | 새 기능 설계 | `layer1_design.md` + `personas/task_designer.md` |
-| "~버그", "~안 돼", "~에러", "~오류", "~이상해", "~이상하게", "예상이랑 달라", "안 맞아", "틀린 것 같아" | 버그 수정 | `layer1_review.md` + `personas/code_reviewer.md` |
+| "~기능 만들어줘", "~추가해줘", "~구현해줘" | 새 기능 설계 | `workflows/new_feature.md` + `layer1_design.md` + `personas/task_designer.md` |
+| "~버그", "~안 돼", "~에러", "~오류", "~이상해", "~이상하게", "예상이랑 달라", "안 맞아", "틀린 것 같아" | 버그 수정 | `workflows/bug_fix.md` + `layer1_review.md` + `personas/code_reviewer.md` |
 | "이어서 해줘", "계속해줘", "어디까지 했어" | 작업 재개 | → "작업 재개" 섹션(`agent_rules_detail.md`) |
-| "코드 봐줘", "검토해줘", "리뷰해줘" | 작업 결과 검토 | `layer1_review.md` + `personas/code_reviewer.md` |
-| "리팩터링", "정리해줘", "개선해줘", "느려", "무거워", "복잡해" | 리팩터링 | `layer1_design.md` + `personas/task_designer.md` |
+| "코드 봐줘", "검토해줘", "리뷰해줘" | 작업 결과 검토 | `workflows/code_review.md` + `layer1_review.md` + `personas/code_reviewer.md` |
+| "리팩터링", "정리해줘", "개선해줘", "느려", "무거워", "복잡해" | 리팩터링 | `workflows/refactoring.md` + `layer1_design.md` + `personas/task_designer.md` |
 | "전체 확인", "정합성 점검", "전체 점검", "충돌 확인" | 전체 정합성 점검 | `layer2_checkpoint.md` + `personas/integration_auditor.md` |
 | "초기화", "프로젝트 설정", "Layer 0" | 프로젝트 초기화 | `layer0_init.md` + `personas/architect.md` |
 | "MPA 시스템 업데이트", "업그레이드" | MPA 버전 업데이트 | `layer0_update.md` + `personas/architect.md` |
@@ -151,11 +151,13 @@
 **판단 후 반드시 고지 — 라우팅 결과 + 정정 옵션:**
 
 ```
-→ [버그 수정] | 로드: layer1_review.md · code_reviewer.md
+→ [버그 수정]
+   로드: workflows/bug_fix.md · layer1_review.md · personas/code_reviewer.md
   ↪ 다른 유형이면: 새 기능 / 개선 / 단순 질문
 ```
 
-- 라우팅 결과는 한 줄로 명시한다 (어떤 유형으로 분류했고 어떤 파일을 로드했는지).
+- 로드한 파일 전체를 명시한다 — 사용자가 에이전트가 무엇을 읽었는지 확인할 수 있어야 한다.
+- workflows 파일이 없는 유형(전체 정합성 점검, 초기화 등)은 로드 파일만 나열한다.
 - 두 번째 줄은 가능한 다른 유형을 짧게 보여 사용자가 한 단어로 정정할 수 있게 한다.
 - 정정 옵션은 발화 맥락에 맞는 유형 2~3개만 보여준다 (가능한 전체 유형을 다 나열하지 않는다).
 
@@ -230,27 +232,28 @@
 
 **minor 태스크 경량 처리 (GATE 1·2 생략):**
 
-> **minor 판단 기준 — 셋 다 Yes여야 minor:**
-> - 변경이 한 파일 또는 단일 관심사에 국한된다
-> - 구현 전 설계 결정이 필요 없다 (방법이 자명함)
-> - git reset으로 즉시 복구된다 (비가역 저장 없음)
+> **minor 판단 기준 — 셋 다 명확히 Yes여야 minor:**
+> - 변경이 한 파일 또는 단일 관심사에 국한된다 — 코드를 열어보지 않아 불확실하면 No
+> - 구현 전 설계 결정이 필요 없다 — 방법이 자명하지 않으면 No
+> - git reset으로 즉시 복구된다 — 외부 상태(DB·파일시스템·외부 API) 변경이 있으면 No
 >
-> 하나라도 No면 major. 보안·외부 연동·공개 API 변경이 있으면 critical.  
+> 하나라도 No이거나 **불확실하면 major**. 보안·외부 연동·공개 API 변경이 있으면 critical.  
 > 프로젝트가 라이브러리인지 서비스인지에 따라 기준이 달라지지 않는다.
 
 `실패비용: minor` 판단 시 전체 plan.md 형식 대신 아래 경량 흐름만 처리한다. 목적은 게이트 감사 기록을 남기되, 작업 운영 비용을 최소화하는 것이다.
 
 1. **최소 plan.md 작성** — `templates/minor_plan_template.md` 형식 사용. 목적·요청·핵심 기능·구현 항목만 기록한다. 반례·검증 체크리스트·문서 업데이트 대상은 쓰지 않는다.
-2. **즉시 `approve` 실행** — GATE 1 없이 자동 승인
+2. **계획서 제시 + 검토 요청** (Zone 3 — 명시적 승인 불필요):
+   - 필수 판단 질문(언어, 기능 범위 등)이 있으면 **2개 이내**로 먼저 확인한다.
+   - 아래 형식으로 계획서를 제시한다. 거부나 방향 변경이 아닌 응답이면 구현을 시작한다:
+   ```
+   minor 태스크: [목적].
+   [계획 핵심 1-2줄]
+   → 이대로 진행할까요? 다른 방향이면 말씀해 주세요.
+   ```
+3. **`approve` 실행** — 검토 요청 직후 또는 사용자 응답 반영 후:
    ```bash
    python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/[작업명]/plan.md
-   ```
-3. **필수 판단 질문 후 구현 진행** (사용자 명시적 승인 불필요):
-   - 구현 방향을 결정하는 필수 판단 질문(언어, 기능 범위 등)은 **2개 이내**로 먼저 확인한다.
-   - 세부 구현(UI 스타일, 파일명 등)은 에이전트가 가정하고 plan.md에 기록한다.
-   - 질문 후 또는 질문이 필요 없는 경우:
-   ```
-   minor 태스크: [목적]. 바로 구현합니다 — 다른 방향이면 알려주세요.
    ```
 4. 구현 완료 후 **GATE 2 없이 바로 done 처리** (아래 "작업 완료" 섹션 참조)
 5. minor에서는 changelog.md, review_phase*.md, 역할 메모리, docs 업데이트, Layer 2 현황 표시는 기본 생략한다. 외부 동작·아키텍처·계약이 바뀐 경우에만 해당 문서를 갱신하고, 그 순간 major 전환 여부를 재판단한다.

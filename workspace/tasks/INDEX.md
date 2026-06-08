@@ -20,6 +20,12 @@
 | 20260605_minor-plan-request-section | minor | done | minor plan.md에 요청 사항·핵심 기능 섹션 추가, 구현 항목 개수 제한 제거 | 2026-06-05 | - |
 | 20260605_readme-update | minor | done | README.md 불일치 3개 수정 — approve 원자적 처리, .mpa-workspace 수정 정책, 빠른 참조 표 | 2026-06-05 | - |
 | 20260608_guidebook-revision | major | done | guidebook.md 오류 4개 수정·개선 5개 반영 + layer1_critique 고위험 기준 2개 추가 + .approved 파일 삭제 | 2026-06-08 | - |
+| 20260608_team-collab-improvements | major | done | inject 우선순위 공통 파일 생성 + .codex hooks 버그 수정 + 가이드북 팀 협업 11장 추가 | 2026-06-08 | - |
+| 20260608_workflow-and-planmd-cleanup | major | done | workflows/ 에이전트 라우팅 통합 + 구형 plan.md 20개 YAML 프론트매터 마이그레이션 | 2026-06-08 | - |
+| 20260608_minor-major-calibration | major | done | minor 판단 기준 강화(불확실하면 major) + minor 계획서 검토 요청 단계 추가 | 2026-06-08 | - |
+| 20260608_routing-notice-improvement | minor | done | 라우팅 고지 형식 개선 — 로드한 파일 전체 명시로 사용자 확인 가능 | 2026-06-08 | - |
+| 20260608_codegate-team-limit-doc | minor | done | 가이드북 11.5 추가 — code_gate 팀 협업 한계 및 PR 리뷰가 실제 방어선임을 명시 | 2026-06-08 | - |
+| 20260608_team-approval-guideline | minor | done | 가이드북 11.6 추가 — 팀 환경 GATE 1 승인 가이드라인 (major는 타인 검토 권장) | 2026-06-08 | - |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05

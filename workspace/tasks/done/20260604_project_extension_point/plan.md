@@ -1,3 +1,11 @@
+---
+태스크: project_extension_point
+생성일: 2026-06-04
+타입: minor
+실패비용: minor
+상태: 완료 승인
+승인해시: ""
+---
 # 태스크: 프로젝트 확장 지점 구축
 **상태:** 구현 완료  
 **목적:** `.mpa-workspace/`를 건드리지 않고 `workspace/memory/`에서 MPA 동작을 확장할 수 있는 공식 메커니즘을 만든다
