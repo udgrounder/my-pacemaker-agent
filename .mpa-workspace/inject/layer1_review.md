@@ -344,7 +344,7 @@ review_summary.md 형식:
    - 단, 사용자의 명시적 승인 없이 완료 처리하지 않는다 (⛔ GATE 2)
    - 사용자가 완료 요청 시 → agent_rules.md "작업 완료" 섹션에 따라 처리
 
-   **추가 작업 있음 → discovery로 넘긴다:**
-   - `@.mpa-workspace/inject/layer1_discovery.md` 세션을 시작한다
-   - 이 세션(layer1_review)에서는 태스크 종료 처리를 하지 않는다
-   - 종료 처리는 layer1_discovery 세션이 전담한다
+   **추가 작업 있음 → 신규 태스크로 분리한다:**
+   - 추가 작업을 새 태스크로 등록하고 현재 태스크는 완료 처리한다
+   - 새 태스크는 다음 세션에서 `agent_rules.md` 라우팅에 따라 진입한다
+   > inject 파일은 직접 다른 inject 파일을 시작하지 않는다. 세션 전환은 상태 업데이트 후 라우팅이 결정한다.

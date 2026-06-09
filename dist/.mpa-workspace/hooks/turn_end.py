@@ -53,9 +53,9 @@ def main():
         "[my-pacemaker-agent] 진행 중 태스크가 있습니다. 코드를 변경했다면 "
         "해당 태스크의 changelog.md 와 관련 memory(roles/shared)를 갱신했는지 확인하세요."
     )
-    event = "AfterAgent" if args.agent == "gemini" else "Stop"
-    out = {"hookSpecificOutput": {"hookEventName": event, "additionalContext": message}}
-    print(json.dumps(out, ensure_ascii=False))
+    # additionalContext 대신 stderr 출력 사용:
+    # additionalContext를 Stop 훅에서 반환하면 Claude Code가 Claude를 재실행해 무한루프 발생.
+    sys.stderr.write(message + "\n")
     sys.exit(0)
 
 
