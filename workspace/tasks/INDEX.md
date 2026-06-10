@@ -53,6 +53,14 @@
 | 20260609_minor-explicit-confirm | minor | done | minor 계획 제시 Zone 3 → Zone 2 변경 — minor 근거 노출 + 명시적 확인 후 진행 | 2026-06-09 | - |
 | 20260609_selfcheck-strengthen | minor | done | 자기 점검 실질화(실패 시나리오 항목 추가) + 점검 후 한계 고지 출력 | 2026-06-09 | - |
 | 20260609_inject-chain-decouple | minor | done | inject 파일 간 직접 호출 체인 제거 — 상태 전환 후 라우팅 위임으로 교체 | 2026-06-09 | - |
+| 20260609_guidebook-purpose-v3 | major | done | 가이드북 4.0 신설 — 체계 목적을 "의도 보정 나선" 모델로 재정립(전달·보정/빈칸 규율/준수 지속가능성) | 2026-06-09 | ✅ |
+| 20260609_guidebook-discovery-convergence | major | done | 6.3 구현 후 발견에 수렴/발산 구분 정합화 + 3장 4.0 연결 (B 범위) | 2026-06-09 | ✅ |
+| 20260609_guidebook-limits-coherence | major | done | 14장에 준수 지속가능성·나선 발산을 구조적 한계로 명문화 (C 범위) | 2026-06-09 | ✅ |
+| 20260609_layer2-coherence-fixes | minor | done | Layer 2 정합화 수정 — guidebook 용어 통일·부록C 용어 등록 + principles T12 | 2026-06-09 | ✅ |
+| 20260609_readme-coherence-fixes | minor | done | README 정합성 수정 — minor GATE2 오류·상태모델·보정나선 단락 3건 | 2026-06-09 | - |
+| 20260609_guidebook-system-sync | minor | done | 가이드북↔시스템 정합화 — 5.2 트리(hooks 등)·6.4 트리거·8.2 페르소나·6.3 검증/테스트 단계 | 2026-06-09 | - |
+| 20260609_readme-remove-discussion-ref | minor | done | README에서 논의(discussion) 폴더 링크 제거 | 2026-06-09 | - |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05
+[Layer 2 완료] 2026-06-09
