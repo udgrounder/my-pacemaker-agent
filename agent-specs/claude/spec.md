@@ -39,7 +39,7 @@ tool: Claude Code (Anthropic)
 
 - 차단: `code_gate.py` 가 exit 2 + stderr 로 도구 호출을 막는다.
 - 컨텍스트 주입: `hookSpecificOutput.additionalContext` 사용.
-- 게이트 강도는 환경변수 `MPA_GATE` (block/warn/off) 로 조절한다. 자세한 내용은 `.mpa-workspace/hooks/README.md`.
+- 게이트 강도는 환경변수 `MPA_GATE` (block/warn/off) 로 조절한다.
 
 ## 파일 참조 문법
 

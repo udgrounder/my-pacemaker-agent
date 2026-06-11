@@ -175,16 +175,17 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 │   │   ├── personas/                     ← agent 역할 정의 (WHO)
 │   │   ├── skills/                       ← agent 능력 정의 (WHAT IT KNOWS)
 │   │   ├── inject/                       ← 세션 패키지
-│   │   ├── hooks/                         ← agent 강제 메커니즘 (세션시작 주입·코드수정 게이트·종료 리마인드)
+│   │   ├── hooks/                         ← agent 가드레일 (세션시작 주입·종료 리마인드 + 코드수정 게이트 — 하드 차단은 게이트뿐)
 │   │   ├── knowledge/                     ← 검증된 범용 도메인 지식
 │   │   ├── workflows/                    ← 작업 유형별 세션 시퀀스
 │   │   ├── templates/                    ← 파일 생성용 템플릿 (plan/changelog/shared 등)
 │   │   └── upgrade-candidates/           ← 방법론 개선 후보 수집
 │   │
 │   └── workspace/                    ← workspace/ 초기화 템플릿 (복사 소스, 골격만)
-│       ├── memory/   (README + shared/ domains/ roles/ 빈 골격)
-│       ├── tasks/    (README, INDEX.md, active/ done/)
-│       └── docs/     (README, INDEX.md)
+│       ├── README.md  (workspace·.mpa-workspace 사용 안내 — 설치본 사용자용)
+│       ├── memory/   (shared/ domains/ roles/ 빈 골격)
+│       ├── tasks/    (INDEX.md, active/ done/)
+│       └── docs/     (INDEX.md)
 │
 ├── agent-specs/                      ← agent별 설치 스펙 (claude/codex/antigravity/openagent)
 ├── guidebook/                        ← 실용 안내서 (guidebook.md)
@@ -205,6 +206,7 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 │   └── upgrade-candidates/   ← 작업 중 발견된 방법론 개선 후보
 │
 └── workspace/            ← 프로젝트 데이터 (agent가 직접 관리)
+    ├── README.md         ← 설치본 사용자용 안내 (workspace·.mpa-workspace 소개)
     ├── memory/
     ├── tasks/
     └── docs/
@@ -214,6 +216,51 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 |------|------|--------------|
 | `.mpa-workspace/` | 방법론 (HOW) | 업그레이드로 최신화 / `mpa_system_designer` 프로세스로 직접 수정 가능 |
 | `workspace/` | 프로젝트 데이터 (WHAT) — agent가 관리 | 작업할 때마다 자동 업데이트 |
+
+---
+
+## Hook (가드레일)
+
+`.mpa-workspace/hooks/`의 python 스크립트가 세션 시작 시 컨텍스트를 주입하고, 소스 수정 시 게이트로 작동한다. 외부 의존성(jq 등) 없이 `python3`로만 동작하며 실행 디렉터리는 프로젝트 루트를 가정한다.
+
+| 스크립트 | 이벤트 | 차단 | 하는 일 |
+|---------|--------|------|--------|
+| `session_start.py` | SessionStart | ❌ | 진행 태스크 + 라우팅 규칙 주입 |
+| `code_gate.py` | PreToolUse(편집 도구) | ✅ | `구현 중` plan 없이 소스 수정 시 차단 |
+| `turn_end.py` | Stop | ❌ | changelog/memory 갱신 리마인드 |
+
+하드 차단(실제로 작업을 막는 것)은 `code_gate.py` 하나뿐이고, 나머지는 컨텍스트 주입·리마인드(보조)다.
+
+### 게이트 강도 — 환경변수 `MPA_GATE`
+
+| 값 | 동작 |
+|----|------|
+| `block` (기본) | 조건 불충족 시 소스 수정 차단 |
+| `warn` | 차단하지 않고 경고만 주입 |
+| `off` | 게이트 비활성 |
+
+```bash
+MPA_GATE=off claude     # 또는 codex / gemini — 잠시 끄기
+```
+또는 agent 설정 파일의 `env`에 `MPA_GATE`를 지정한다.
+
+### agent별 설정 위치
+
+| agent | 설정 파일 | 이벤트 명칭 |
+|-------|----------|-----------|
+| claude | `.claude/settings.json` | SessionStart / PreToolUse / Stop |
+| codex | `.codex/hooks.json` | SessionStart / PreToolUse / Stop |
+| gemini(antigravity) | `.gemini/settings.json` | SessionStart / BeforeTool / AfterAgent |
+
+스크립트는 `--agent` 플래그로 이벤트 명칭 등 출력 형식을 맞춘다. 차단은 exit 2 + stderr로 3개 agent 공통이다.
+
+### 알려진 한계 (정직하게)
+
+- **Bash 우회:** matcher가 편집 도구(Edit/Write 등)에만 걸리므로 `bash -c 'sed ... > file'` 같은 셸 파일 수정은 걸리지 않는다. (이 프로젝트엔 "shell로 파일 내용 수정 금지" 규칙이 있어 정상 워크플로우에선 Edit/Write를 쓴다.)
+- **태스크 범위 판정 한계:** `구현 중` 태스크가 있으면 수정 대상 파일이 그 태스크 범위 안인지까지 완전히 증명하지는 못한다. 에어타이트 봉쇄가 아니라 가드레일이다.
+- **승인해시 갱신은 agent가 한다:** 완전한 강제는 아니다. 다만 승인해시가 비어 있으면 자동 복구하지 않고 차단하므로, 사용자 승인 없이 사후 승인하는 우회를 줄인다.
+
+> 게이트 조건(GATE 1·2)·승인해시 복구 절차의 상세는 `.mpa-workspace/core/agent_rules.md`·`agent_rules_detail.md`를 따른다.
 
 ---
 

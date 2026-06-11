@@ -309,6 +309,8 @@ review_summary.md 형식:
 
 리포트 작성 후 다음 순서로 진행한다:
 
+> **먼저 기억 여부를 판단한다 — "다음 AI 세션이 이걸 모르면 다른 결정을 내리는가?"** 판단 기준은 `core/agent_rules_detail.md`의 "기억 여부 판단" 섹션을 참조한다.
+
 1. 새 아키텍처 규칙 또는 안티패턴 발견 → `workspace/memory/shared/architecture.md`
 2. 역할 메모리 업데이트 → 자가 개선 필터 적용 후 `workspace/memory/roles/code_reviewer.md`에 기록 (기억할 것이 없으면 생략)
 3. **실패 비용 추정 사후 보정** — plan.md의 실패 비용 추정 결과와 실제 구현을 비교한다:

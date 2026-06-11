@@ -44,13 +44,16 @@ def _hook_cmd(script: str, agent: str) -> str:
 
 
 def build_hook_block(agent: str) -> dict:
-    """claude/codex 공통 settings 구조의 hooks 블록을 만든다."""
+    """agent별 settings 구조의 hooks 블록을 만든다."""
+    matcher = "Edit|Write"
+    if agent == "codex":
+        matcher = "Edit|Write|MultiEdit|apply_patch|write_file|replace|edit"
     return {
         "SessionStart": [
             {"hooks": [{"type": "command", "command": _hook_cmd("session_start.py", agent)}]}
         ],
         "PreToolUse": [
-            {"matcher": "Edit|Write",
+            {"matcher": matcher,
              "hooks": [{"type": "command", "command": _hook_cmd("code_gate.py", agent)}]}
         ],
         "Stop": [
@@ -124,7 +127,8 @@ def migrate_upgrade_candidates(agents_workspace_dst: Path) -> int:
 
     moved = 0
     for f in sorted(candidates_src.iterdir()):
-        if f.name == ".gitkeep":
+        # .gitkeep, archive/(처리 완료 후보 이력)는 dist로 이동하지 않는다.
+        if f.name in (".gitkeep", "archive"):
             continue
 
         dest = candidates_dst / f.name
@@ -159,21 +163,58 @@ def clear_upgrade_candidates(agents_workspace_dst: Path):
 _IGNORE = shutil.ignore_patterns(".DS_Store", ".gitkeep")
 
 
-def write_version(agents_workspace_dst: Path, mode: str):
-    """설치/업그레이드 날짜를 .mpa-version에 기록한다."""
-    version_src = agents_workspace_dst / ".mpa-version"
-    if not version_src.exists():
-        return
-    harness_date = ""
-    for line in version_src.read_text(encoding="utf-8").splitlines():
-        if line.startswith("harness_date:"):
-            harness_date = line
-            break
+def read_legacy_installed(agents_workspace_dst: Path) -> str:
+    """업그레이드 시 .mpa-workspace 교체 전에 호출한다.
+    구버전 .mpa-workspace/.mpa-version에서 설치일(installed_at 또는 레거시
+    harness_date)을 읽어 마이그레이션용으로 반환한다. 없으면 빈 문자열.
+    (방법론 버전은 이제 current_version으로 분리되며 install.py가 다루지 않는다.)
+    """
+    legacy = agents_workspace_dst / ".mpa-version"
+    if not legacy.exists():
+        return ""
+    installed = harness = ""
+    for line in legacy.read_text(encoding="utf-8").splitlines():
+        if line.startswith("installed_at:"):
+            installed = line.split(":", 1)[1].strip()
+        elif line.startswith("harness_date:"):
+            harness = line.split(":", 1)[1].strip()
+    return installed or harness
+
+
+def write_version(workspace_dst: Path, mode: str, legacy_installed: str = ""):
+    """프로젝트 설치 이력을 workspace/.mpa-version-info에 기록한다.
+
+    방법론 버전(current_version)은 .mpa-workspace/.mpa-version에 있고 통째 교체로
+    갱신되므로 여기서 다루지 않는다. 이력은 workspace에 있어 업그레이드 시 보존된다.
+
+    - installed_at: 기존 history 값 보존 > 레거시 승계(마이그레이션) > 설치 당일
+    - upgraded_at: 업그레이드할 때마다 갱신
+    """
+    vf = workspace_dst / ".mpa-version-info"
+
+    installed_at = ""
+    upgraded_at = ""
+    if vf.exists():
+        for line in vf.read_text(encoding="utf-8").splitlines():
+            if line.startswith("installed_at:"):
+                installed_at = line.split(":", 1)[1].strip()
+            elif line.startswith("upgraded_at:"):
+                upgraded_at = line.split(":", 1)[1].strip()
+
     today = datetime.date.today().isoformat()
-    version_src.write_text(
-        f"{harness_date}\n{mode}_at: {today}\n",
-        encoding="utf-8"
-    )
+
+    # 최초 설치일 확정: 기존 history > 레거시 승계 > 설치 당일
+    if not installed_at:
+        installed_at = legacy_installed or today
+
+    if mode == "upgraded":
+        upgraded_at = today
+
+    lines = [f"installed_at: {installed_at}"]
+    if upgraded_at:
+        lines.append(f"upgraded_at: {upgraded_at}")
+    workspace_dst.mkdir(parents=True, exist_ok=True)
+    vf.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def copy_agents_workspace(dst: Path):
@@ -291,8 +332,30 @@ def copy_agent_spec_files(agent: str, project_path: Path):
         print(f"  [확인] {agent} spec 파일 추가할 항목 없음")
 
 
+# workspace/README.md 단일본으로 통합되면서 폐기된 폴더별 README.
+# 업그레이드 시 기존 설치본에서 제거한다. _merge_dir 은 추가/교체만 하므로
+# 삭제는 이 고정 경로 목록으로만 수행한다 — 사용자 생성 README 는 건드리지 않는다.
+_OBSOLETE_WORKSPACE_README = (
+    "tasks/README.md",
+    "memory/README.md",
+    "docs/README.md",
+)
+
+
+def remove_obsolete_readmes(dst: Path):
+    """과거 버전의 폴더별 README 를 제거한다 (workspace/README.md 로 통합됨).
+    명시된 고정 경로만 삭제하며, 그 외 파일은 일절 건드리지 않는다."""
+    for rel in _OBSOLETE_WORKSPACE_README:
+        target = dst / rel
+        if target.exists():
+            target.unlink()
+            print(f"  [정리] workspace/{rel} 제거 (workspace/README.md 로 통합)")
+
+
 def copy_workspace_template(dst: Path, upgrade: bool = False):
     added = _merge_dir(WORKSPACE_TEMPLATE_SRC, dst, dst, label="workspace", upgrade=upgrade)
+    if upgrade:
+        remove_obsolete_readmes(dst)
     if added == 0:
         print("  [확인] workspace/ 추가할 항목 없음")
 
@@ -371,22 +434,25 @@ def run_install(project_path: Path, agents: list, upgrade: bool):
         print("\n[1단계] upgrade-candidates 이동")
         migrate_upgrade_candidates(agents_workspace_dst)
 
+        # .mpa-workspace 교체 전에 레거시 설치일을 읽어둔다 (마이그레이션).
+        legacy_installed = read_legacy_installed(agents_workspace_dst)
+
         print("\n[2단계] .mpa-workspace 교체")
         shutil.rmtree(agents_workspace_dst)
         copy_agents_workspace(agents_workspace_dst)
         clear_upgrade_candidates(agents_workspace_dst)
-        write_version(agents_workspace_dst, "upgraded")
 
         print("\n[3단계] workspace 템플릿 업데이트 및 누락 항목 추가")
         copy_workspace_template(workspace_dst, upgrade=True)
+        write_version(workspace_dst, "upgraded", legacy_installed)
     else:
         print("\n[1단계] .mpa-workspace 설치")
         copy_agents_workspace(agents_workspace_dst)
         clear_upgrade_candidates(agents_workspace_dst)
-        write_version(agents_workspace_dst, "installed")
 
         print("\n[2단계] workspace 초기화")
         copy_workspace_template(workspace_dst)
+        write_version(workspace_dst, "installed")
 
     print("\n[hook] 스크립트 실행 권한 부여")
     make_hooks_executable(project_path)
@@ -412,7 +478,7 @@ def detect_agents(project_path: Path) -> list:
     detected = []
     if (project_path / "CLAUDE.md").exists() or (project_path / ".claude").exists():
         detected.append("claude")
-    if (project_path / "AGENTS.md").exists():
+    if (project_path / "AGENTS.md").exists() or (project_path / ".codex").exists():
         detected.append("codex")
     if (project_path / "GEMINI.md").exists() or (project_path / ".gemini").exists():
         detected.append("antigravity")
@@ -459,7 +525,12 @@ def prompt_project_path() -> Path:
 def parse_args():
     parser = argparse.ArgumentParser(description="my-pacemaker-agent 설치 스크립트")
     parser.add_argument("--project", help="설치 대상 프로젝트 경로")
-    parser.add_argument("--agents", help="사용 중인 agent (claude, codex, antigravity, openagent 또는 조합)")
+    parser.add_argument(
+        "--agents",
+        nargs="+",
+        help="사용 중인 agent (claude, codex, antigravity, openagent). "
+        "공백 또는 콤마로 여러 개 지정: --agents claude codex 또는 --agents claude,codex",
+    )
     parser.add_argument("--upgrade", action="store_true", help="업그레이드 모드로 실행")
     return parser.parse_args()
 
@@ -490,7 +561,10 @@ def main():
 
     # 3. agent 선택
     if cli.agents:
-        agents = [a.strip().lower() for a in cli.agents.split(",") if a.strip()]
+        # --agents는 공백·콤마 구분을 모두 허용한다.
+        # nargs='+'로 받은 토큰 리스트의 각 항목을 콤마로 한 번 더 분리한다.
+        raw = ",".join(cli.agents)
+        agents = [a.strip().lower() for a in raw.split(",") if a.strip()]
         invalid = [a for a in agents if a not in AGENT_CONFIG_MAP]
         if invalid:
             print(f"오류: 지원하지 않는 agent: {', '.join(invalid)}")

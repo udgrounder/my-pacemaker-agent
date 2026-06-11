@@ -57,10 +57,21 @@
 | 20260609_guidebook-discovery-convergence | major | done | 6.3 구현 후 발견에 수렴/발산 구분 정합화 + 3장 4.0 연결 (B 범위) | 2026-06-09 | ✅ |
 | 20260609_guidebook-limits-coherence | major | done | 14장에 준수 지속가능성·나선 발산을 구조적 한계로 명문화 (C 범위) | 2026-06-09 | ✅ |
 | 20260609_layer2-coherence-fixes | minor | done | Layer 2 정합화 수정 — guidebook 용어 통일·부록C 용어 등록 + principles T12 | 2026-06-09 | ✅ |
-| 20260609_readme-coherence-fixes | minor | done | README 정합성 수정 — minor GATE2 오류·상태모델·보정나선 단락 3건 | 2026-06-09 | - |
-| 20260609_guidebook-system-sync | minor | done | 가이드북↔시스템 정합화 — 5.2 트리(hooks 등)·6.4 트리거·8.2 페르소나·6.3 검증/테스트 단계 | 2026-06-09 | - |
-| 20260609_readme-remove-discussion-ref | minor | done | README에서 논의(discussion) 폴더 링크 제거 | 2026-06-09 | - |
+| 20260609_readme-coherence-fixes | minor | done | README 정합성 수정 — minor GATE2 오류·상태모델·보정나선 단락 3건 | 2026-06-09 | ✅ |
+| 20260609_guidebook-system-sync | minor | done | 가이드북↔시스템 정합화 — 5.2 트리(hooks 등)·6.4 트리거·8.2 페르소나·6.3 검증/테스트 단계 | 2026-06-09 | ✅ |
+| 20260609_readme-remove-discussion-ref | minor | done | README에서 논의(discussion) 폴더 링크 제거 | 2026-06-09 | ✅ |
+| 20260610_guidebook-wording | minor | done | guidebook.md 문서 성격 선언 "사람" → "사용자" | 2026-06-10 | ✅ |
+| 20260610_critique-improvements | major | done | 비평 기반 개선 — SSOT 참조 정본 통일·강제/가드레일 톤 정밀화·삭제역설 14.2 보강·guidebook 첫머리 보완 | 2026-06-10 | ✅ |
+| 20260611_cost-notation-fix | minor | done | principles.md 실패비용 표기 곱셈기호(×) → 나열, guidebook 본문 정의와 통일 | 2026-06-11 | - |
+| 20260611_agents-arg-input-ux | minor | done | install.py --agents 공백·콤마 구분 모두 허용(nargs='+') + install.md 결합 형식 명시 | 2026-06-11 | - |
+| 20260611_codex-install-runtime-fix | minor | done | Codex 설치 산출물을 실제 runtime 구성과 일치시키고 hook matcher 보강 | 2026-06-11 | - |
+| 20260611_readme-consolidation | major | done | README 6개 통합·삭제 + 고립된 기억판단 규칙을 agent_rules_detail/inject로 이전 + hook 운영정보 루트 README·workspace/README.md 신설 + install.py 삭제전파 | 2026-06-11 | - |
+| 20260611_mpa-version-dates | minor | done | .mpa-version을 installed_at(보존)+upgraded_at(갱신) 구조로 변경, 죽은 harness_date 제거 + 레거시 자동 승계 | 2026-06-11 | - |
+| 20260611_classification-bias-warning | minor | done | upgrade-candidate 2건 통합 채택 — mpa_system_designer/layer2_checkpoint에 "대상 층위 분류 + 기준 일관 적용" 편향 경고 반영 | 2026-06-11 | - |
+| 20260611_migrate-exclude-archive | minor | done | migrate_upgrade_candidates가 archive/를 dist 이동에서 제외 | 2026-06-11 | - |
+| 20260611_version-history-split | minor | done | .mpa-version을 방법론 버전(current_version,.mpa-workspace)/설치이력(.mpa-version-info,workspace)으로 분리 — 업그레이드 시 이력 보존, installed_at 리셋 회귀 해결 | 2026-06-11 | - |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05
 [Layer 2 완료] 2026-06-09
+[Layer 2 완료] 2026-06-11
