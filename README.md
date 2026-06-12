@@ -130,7 +130,7 @@ Agent가 `workspace/tasks/active/`에서 해당 태스크의 `plan.md`와 `chang
 
 ```
 레벨 0: 왜 (Why)        ← AI 협업의 기본 원칙
-  원칙                     출처(설계 사고): think-more/
+  원칙                     출처(설계 사고): workspace/exploration/ (이 레포의 탐구 공간)
   ↓ 근거 제공              요약(운용): .mpa-workspace/core/principles.md
                            변경: 협업 방식의 근본이 바뀔 때
 
@@ -157,7 +157,7 @@ Agent가 `workspace/tasks/active/`에서 해당 태스크의 `plan.md`와 `chang
 |--|---------------------|------------------|---------------------|
 | 질문 | 왜 이렇게 일하는가 | 어떻게 일하는가 | 이 프로젝트는 무엇인가 |
 | 내용 | 기본 원칙, 판단 기준 | 방법, 절차, 템플릿 | 프로젝트 데이터 |
-| 위치 | `think-more/` · `core/principles.md` | `.mpa-workspace/` | `workspace/` |
+| 위치 | `workspace/exploration/` · `core/principles.md` | `.mpa-workspace/` | `workspace/` |
 | 변경 주체 | 팀 논의 | 방법론 설계자 | 프로젝트 팀(agent) |
 | 재사용 | 모든 방법론의 근거 | 모든 프로젝트 공통 | 프로젝트마다 별도 |
 
@@ -189,7 +189,8 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 │
 ├── agent-specs/                      ← agent별 설치 스펙 (claude/codex/antigravity/openagent)
 ├── guidebook/                        ← 실용 안내서 (guidebook.md)
-├── think-more/                       ← 설계 사고·탐구 공간 (설치되지 않음)
+├── workspace/                        ← 이 레포 자체의 작업 데이터 (memory·tasks·docs)
+│   └── exploration/                  ← 설계 사고·탐구 공간 (토론 모드 기록 위치)
 ├── install.py                        ← 설치 스크립트 (agent가 실행)
 └── install.md                        ← 설치 가이드 (agent가 참조하는 진입점)
 ```

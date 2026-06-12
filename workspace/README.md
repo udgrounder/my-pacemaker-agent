@@ -10,9 +10,13 @@
 
 ```
 workspace/
-├── memory/     ← 프로젝트 기억 (세션이 바뀌어도 유지돼야 하는 사실)
-├── tasks/      ← 작업 단위 — 계획서·진행 상태·완료 이력
-└── docs/       ← 완료된 기능·설계의 결과 문서
+├── memory/        ← 프로젝트 기억 (세션이 바뀌어도 유지돼야 하는 사실)
+├── tasks/         ← 작업 단위 — 계획서·진행 상태·완료 이력
+├── docs/          ← 완료된 기능·설계의 결과 문서
+└── exploration/   ← 작업하며 도출되는 사고·연구 공간 (토론 모드 기록 위치)
+    ├── discussion/   ← 철학·자세 논의 + 토론 모드 산출물
+    ├── research/     ← 기술 동향 리서치
+    └── use_cases/    ← 실전 활용 사례
 ```
 
 | 폴더 | 무엇을 담나 | 누가 쓰나 |
@@ -20,9 +24,22 @@ workspace/
 | `memory/` | `shared/`(아키텍처·계약·정체성), `domains/`(도메인 규칙), `roles/`(역할별 학습) | agent가 결정·발견 시 기록 |
 | `tasks/` | `active/`(진행 중), `done/`(완료), `INDEX.md`(색인) — 각 작업은 `plan.md`로 시작 | agent가 작업마다 생성·갱신 |
 | `docs/` | 구현이 끝난 기능·설계가 "어떻게 동작하는가" | 요청 완료 시 agent가 반영 |
+| `exploration/` | `discussion/`(논의·토론 기록), `research/`(기술 조사), `use_cases/`(사례) | 토론 모드 등 자유 탐구 시 (Task 면제) |
 
 - **tasks vs docs:** `tasks/`는 "무엇을 만들까"(구현 전), `docs/`는 "만든 것이 어떻게 동작하나"(구현 후).
 - **작업 흐름:** 새 작업은 `tasks/active/yyyymmdd_[작업명]/plan.md`로 시작해, 완료되면 `tasks/done/`으로 이동한다. 상태는 `plan.md`의 YAML 프론트매터로 추적된다.
+
+---
+
+## exploration/ — 사고·탐구 공간
+
+이 프로젝트·작업을 진행하면서 도출되는 사고와 연구가 쌓이는 공간이다 — 자세 논의, 설계 원칙, 기술 동향, 사례 연구 등.
+
+- **토론 모드(discussion mode)의 기록 위치**다. 주제를 심도 있게 논의하며 의견을 주고받고, 그 과정·결과를 `discussion/`에 living document로 남긴다 (개발 트랙이 아니므로 plan.md·게이트를 적용하지 않는다).
+- **Task 면제:** `exploration/` 안에서만 이뤄지는 작업은 다중 파일 변경이라도 Task를 만들지 않고 바로 처리한다 (`.mpa-workspace/core/agent_rules.md` §4).
+- 하위 `discussion/`·`research/`·`use_cases/`는 용도별 칸이다 — 무엇을 어디에 쓸지는 위 표를 참고한다.
+
+> 이 레포 한정 이력: 원래 레포 루트의 `think-more/`였으나 2026-06-12 `workspace/exploration/`으로 통합됨.
 
 ---
 
@@ -47,6 +64,7 @@ workspace/
 ```
 [하고 싶은 작업] 태스크 생성해줘
 [작업명] 이어서 진행해줘
+[주제] 논의하자              ← 토론 모드 (만들지 않고 깊이 논의·기록)
 ```
 
 agent가 작업의 실패 비용을 판단해 흐름(minor/major)을 고르고, 게이트를 거쳐 진행한다. 자세한 운영 방식은 마스터 레포의 가이드북(`guidebook/guidebook.md`)을 참고한다.

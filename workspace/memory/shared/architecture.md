@@ -74,7 +74,7 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 |------|------|
 | `core/agent_rules.md` | 에이전트 행동 규칙 전체. 세션 시작 루틴, 게이트, 상태 전이 |
 | `core/session_protocol.md` | inject 파일 선택 가이드 (사용자용) |
-| `inject/layer*.md` | 세션 레시피. 새 스레드 시작 시 에이전트에게 전달 |
+| `inject/*.md` | 세션 레시피. 새 스레드 시작 시 에이전트에게 전달 (`layer*` + `discussion_mode`·`_agent_execution_priority` 등) |
 | `personas/*.md` | 역할 정의. 에이전트가 읽고 해당 역할로 작동 |
 | `skills/analysis/*.md` | 분석 방법론. 페르소나가 참조 |
 | `templates/*.md` | 파일 생성 시 복사해 쓰는 골격 |
@@ -83,6 +83,6 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 
 ## 안티패턴
 
-- `dist/` 외부에서 시스템 파일을 직접 수정하지 않는다 (agent-configs/ 포함)
+- 시스템 파일 수정은 설치본 `.mpa-workspace/`에서 하고 `dist/`에 동기화한다 (project_rules.md). `dist/`·`agent-configs/`(동기화·생성 대상)를 직접 손대지 않는다 — 직접 편집하면 미러·재생성 시 어긋나거나 덮인다
 - shared/ 파일에 결정 로그를 누적하지 않는다. 현재 상태만 유지한다
 - 에이전트가 사용자 확인 없이 태스크 상태를 완료로 전환하지 않는다

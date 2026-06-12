@@ -84,7 +84,9 @@
 | 검토 완료 | "검토가 완료됐습니다. 완료 처리를 승인해주세요." | 완료 처리 (GATE 2) |
 | 완료 승인 | "완료 승인됐습니다. done으로 이동할까요?" | 태스크 완료 처리 |
 
-**진행 중 태스크가 없는 경우:** 상태 보고 없이 사용자 요청을 기다린다.
+**진행 중 태스크가 없는 경우:** 세션 시작 시 두 경로를 한 줄로 안내한 뒤 요청을 기다린다 — **작업**("○○ 만들어줘/고쳐줘") 또는 **논의**("○○ 논의하자" — 토론 모드).
+
+**진행 중 토론 확인 (토론 모드 안전망):** 토론은 `tasks/active/`에 등록되지 않으므로 별도로 확인한다. `workspace/exploration/discussion/`에 상태 마커가 `진행 중`인 문서가 있으면, 진행 중 태스크 현황과 함께 짧게 표시한다 — "진행 중 토론: [주제] (이어서 논의하려면 말씀해 주세요)". 폴더가 없거나 진행 중 문서가 없으면 침묵한다.
 
 **upgrade-candidates 확인:** 세션 시작 시에는 확인하지 않는다. 작업 완료 후(아래 "작업 완료" 섹션)에만 안내한다.
 
@@ -123,7 +125,8 @@
 
 **판단 우선순위 (순서대로 적용):**
 
-1. **명시적 유형 선언** — "버그야", "새 기능", "리팩터링" 등 사용자가 유형을 직접 말함 → 즉시 해당 유형으로 라우팅
+1. **명시적 유형 선언** — "버그야", "새 기능", "리팩터링", "논의하자/토론하자" 등 사용자가 유형을 직접 말함 → 즉시 해당 유형으로 라우팅
+   - **토론 모드 우선 판정:** "논의/토론/discussion 모드/의견 나누자" 명시 발화는 **2단계(동작 서술 분류)보다 먼저** 토론 모드로 라우팅한다. "이거 개선 논의하자"처럼 개발 동사가 섞여 있어도 토론 모드다 (개발 동사를 보고 리팩터링/새 기능으로 선점하지 않는다).
 2. **동작 서술 vs 추가 요청** — "~하면 ~가 돼" / "~이 이상해" 형태 → 버그 수정 / "~해줘" / "~만들어줘" 형태 → 새 기능 또는 리팩터링
 3. **키워드 힌트** — 아래 테이블 참조 (힌트일 뿐, 결정적 기준이 아님)
 4. **불명확** → 2단계 진단
@@ -135,6 +138,7 @@
 | "이어서 해줘", "계속해줘", "어디까지 했어" | 작업 재개 | → "작업 재개" 섹션(`agent_rules_detail.md`) |
 | "코드 봐줘", "검토해줘", "리뷰해줘" | 작업 결과 검토 | `workflows/code_review.md` + `layer1_review.md` + `personas/code_reviewer.md` |
 | "리팩터링", "정리해줘", "개선해줘", "느려", "무거워", "복잡해" | 리팩터링 | `workflows/refactoring.md` + `layer1_design.md` + `personas/task_designer.md` |
+| "논의하자", "토론하자", "~에 대해 의견 나누자", "discussion 모드" | 토론 모드 | `inject/discussion_mode.md` + `personas/discussion_partner.md` |
 | "전체 확인", "정합성 점검", "전체 점검", "충돌 확인" | 전체 정합성 점검 | `layer2_checkpoint.md` + `personas/integration_auditor.md` |
 | "초기화", "프로젝트 설정", "Layer 0" | 프로젝트 초기화 | `layer0_init.md` + `personas/architect.md` |
 | "MPA 시스템 업데이트", "업그레이드" | MPA 버전 업데이트 | `layer0_update.md` + `personas/architect.md` |
@@ -172,6 +176,7 @@
 | 기존 태스크: 검증 중·테스트 중 | plan.md, changelog.md, architecture.md, contracts.md | project_identity.md, roles/code_reviewer.md |
 | 새 태스크: 설계/리팩터링 | project_identity.md, architecture.md, contracts.md | direction.md, knowledge/*, roles/architect.md |
 | 새 태스크: 버그 수정 | architecture.md, contracts.md | roles/code_reviewer.md |
+| 토론 모드 | inject/discussion_mode.md, personas/discussion_partner.md | 주제 관련 기존 `workspace/exploration/discussion/` 문서 |
 | 단순 질문/탐색 | 없음 | on-demand |
 
 ---
@@ -180,6 +185,8 @@
 
 **Task 없이 바로 처리:** 단순 질문·탐색 / 단일 파일·비가역적 변경 없음
 **Task 만들어 진행:** 새 기능·다중 파일 변경 / 가치 결정 포함 / 비가역적 변경 / 사용자 검토 필요
+
+> **예외 — `workspace/exploration/` 폴더:** 이 프로젝트·작업을 진행하며 도출되는 사고·연구를 자유롭게 기록하는 공간이다(토론 모드 기록 위치 포함). **`workspace/exploration/` 안에서만** 이뤄지는 작업(문서 작성·정리·논의 기록 등)은 다중 파일 변경이라도 Task를 만들지 않고 바로 처리한다. 단, 이 폴더 밖의 파일을 함께 변경하면 일반 판단 기준을 적용한다. (폴더는 첫 사용 시 생성될 수 있다 — 폴더가 아직 없어도 이 규칙은 유효하다.)
 
 판단 후 고지하고 기본 경로로 진행. 사용자가 정정 가능:
 ```

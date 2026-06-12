@@ -150,6 +150,10 @@ def build_message(cwd):
             lines.append("  4. 추론 기준은 agent_rules.md '프론트매터 누락 처리' 섹션 참조")
     else:
         lines.append("진행 중인 태스크 없음.")
+        lines.append(
+            "→ 진행 중 작업이 없으니, 사용자에게 두 경로를 한 줄로 안내하세요: "
+            "**작업**(\"○○ 만들어줘/고쳐줘\") 또는 **논의**(\"○○ 논의하자\" — 토론 모드)."
+        )
 
     lines.append(
         "요청을 받으면 .mpa-workspace/core/agent_rules.md 의 라우팅 표로 유형을 판단하고 "

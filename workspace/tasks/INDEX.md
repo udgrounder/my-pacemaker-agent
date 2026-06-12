@@ -70,8 +70,16 @@
 | 20260611_classification-bias-warning | minor | done | upgrade-candidate 2건 통합 채택 — mpa_system_designer/layer2_checkpoint에 "대상 층위 분류 + 기준 일관 적용" 편향 경고 반영 | 2026-06-11 | - |
 | 20260611_migrate-exclude-archive | minor | done | migrate_upgrade_candidates가 archive/를 dist 이동에서 제외 | 2026-06-11 | - |
 | 20260611_version-history-split | minor | done | .mpa-version을 방법론 버전(current_version,.mpa-workspace)/설치이력(.mpa-version-info,workspace)으로 분리 — 업그레이드 시 이력 보존, installed_at 리셋 회귀 해결 | 2026-06-11 | - |
+| 20260612_think-more-task-exemption | minor | done | think-more/ 폴더 Task 면제 — discussion-mode에 흡수(룰을 workspace/exploration/로 재작성) | 2026-06-12 | ✅ |
+| 20260610_discussion-record | minor | done | 토론·사고 과정 기록 보존 — 회의록 exploration/discussion/로 이관, 토론 모드 신설에 따라 정리 | 2026-06-10 | ✅ |
+| 20260612_multi-agent-utility-discussion | minor | done | 멀티에이전트 효용성 토론(미스라우팅 사례, discussion-mode 후보 발단) — 회의록 이관 후 정리 | 2026-06-12 | ✅ |
+| 20260612_discussion-mode | major | done | 토론 모드(비개발 트랙) 신설 — 라우팅·persona·inject·세션시작 스캔 + think-more/→workspace/exploration/ 통합 + 엮인 태스크 3개 정리 | 2026-06-12 | ✅ |
+| 20260608_settings-write-permission | minor | done | workspace/·.mpa-workspace/ 하위 Write 사전 허용 (plan.md 생성 시 권한 확인 제거) | 2026-06-08 | - |
+| 20260612_version-instruction-fix | minor | done | current_version 갱신 지시 정정 — dist 직접 편집 → 설치본 편집+자동 미러 (버전 역전 근본 원인 제거) | 2026-06-12 | - |
+| 20260612_session-start-hint | minor | done | idle 세션 시작 시 두 경로(작업/논의) 1회 안내 — session_start.py + agent_rules §1 + README 시작하기 | 2026-06-12 | - |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05
 [Layer 2 완료] 2026-06-09
 [Layer 2 완료] 2026-06-11
+[Layer 2 완료] 2026-06-12
