@@ -77,6 +77,7 @@
 | 20260608_settings-write-permission | minor | done | workspace/·.mpa-workspace/ 하위 Write 사전 허용 (plan.md 생성 시 권한 확인 제거) | 2026-06-08 | - |
 | 20260612_version-instruction-fix | minor | done | current_version 갱신 지시 정정 — dist 직접 편집 → 설치본 편집+자동 미러 (버전 역전 근본 원인 제거) | 2026-06-12 | - |
 | 20260612_session-start-hint | minor | done | idle 세션 시작 시 두 경로(작업/논의) 1회 안내 — session_start.py + agent_rules §1 + README 시작하기 | 2026-06-12 | - |
+| 20260615_multi-agent-principles-v3 | minor | done | 멀티에이전트 활용 원칙 문서 v2→v3 — 독립 검토 3관점 반영(토대 명제 가정 강등, 충돌·이음매·전제 정리) | 2026-06-15 | - |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05
