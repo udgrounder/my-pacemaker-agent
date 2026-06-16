@@ -168,6 +168,9 @@
 ### 3. 컨텍스트 선택 로딩
 
 > **Phase 1 (항상):** `project_rules.md` + `INDEX.md` — 이미 읽었다. 재읽지 않는다.
+>
+> **Phase 1.5 (도메인·역할 메모리가 필요한 유형일 때):** `memory/INDEX.md`를 먼저 읽어 현재 작업에 **매치되는** `domains/`·`roles/` 파일만 아래 Phase 2 선택 목록에서 고른다. 매치가 없으면 로드하지 않는다. (`shared/`의 architecture·contracts·direction·project_identity는 고정 이름으로 직접 로드 — INDEX를 거치지 않는다. 단순 질문·토론 모드 등 메모리 불필요 유형은 이 단계를 건너뛴다.)
+> **INDEX가 없으면** `templates/memory_index_template.md`를 `workspace/memory/INDEX.md`로 복사해 생성한 뒤 진행한다 — 이 방법론 도입 이전에 초기화된 프로젝트엔 파일이 없을 수 있다. 생성 직후에는 `domains/`·`roles/` 폴더의 기존 파일을 INDEX에 채운다.
 
 | 상황 | Phase 2 필수 | Phase 2 선택 (필요 시) |
 |------|------------|---------------------|

@@ -78,6 +78,8 @@
 | 20260612_version-instruction-fix | minor | done | current_version 갱신 지시 정정 — dist 직접 편집 → 설치본 편집+자동 미러 (버전 역전 근본 원인 제거) | 2026-06-12 | - |
 | 20260612_session-start-hint | minor | done | idle 세션 시작 시 두 경로(작업/논의) 1회 안내 — session_start.py + agent_rules §1 + README 시작하기 | 2026-06-12 | - |
 | 20260615_multi-agent-principles-v3 | minor | done | 멀티에이전트 활용 원칙 문서 v2→v3 — 독립 검토 3관점 반영(토대 명제 가정 강등, 충돌·이음매·전제 정리) | 2026-06-15 | - |
+| 20260616_memory_index | major | done | memory/INDEX.md 선별 인덱스 도입 — Phase 1.5 읽기 전 선별 + 기록 시 등록(write-side) + 부재 시 템플릿 자동 생성 + layer0 전파 | 2026-06-16 | - |
+| 20260616_discussion-bias-warnings | minor | done | discussion_partner 편향 경고에 "이분법 조기 폐쇄"·"본주제 고도 이탈" 2개 항목 추가 (upgrade-candidate 채택) | 2026-06-16 | - |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05

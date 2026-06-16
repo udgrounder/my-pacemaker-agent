@@ -58,6 +58,7 @@
 | 검증된 아키텍처 패턴 + 안티패턴 | `shared/architecture.md` | 검증된 것만, 추정 제외 |
 | 도메인 간 API 계약, 공유 타입/스키마 | `shared/contracts.md` | 지금 알 수 있는 것만 |
 | 도메인별 규칙 | `domains/[도메인명]/rules.md` | 검증된 것만 |
+| 도메인·역할 메모리 선별 인덱스 | `memory/INDEX.md` | `templates/memory_index_template.md` 복사 (도메인 초안 작성 시 행 등록) |
 
 ### 3단계 — 작업 분해
 
@@ -117,6 +118,7 @@
 | 현재 규칙 + 목표 규칙 + 절대 금지 + 안티패턴 | `shared/architecture.md` |
 | 도메인 간 인터페이스 계약 (현재 실제 사용 중인 것) | `shared/contracts.md` |
 | 도메인별 규칙 | `domains/[도메인명]/rules.md` |
+| 도메인·역할 메모리 선별 인덱스 | `memory/INDEX.md` (`templates/memory_index_template.md` 복사, 도메인 초안 작성 시 행 등록) |
 
 ### 5단계 — 작업 분해
 
