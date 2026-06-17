@@ -26,7 +26,7 @@
 7. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
 8. `workspace/memory/roles/implementer.md` (존재하는 경우) — 이 프로젝트에서 implementer 역할이 축적한 학습
 
-관련 기술 스킬이 있으면 `.mpa-workspace/skills/tech/` 에서 해당 파일을 읽는다.
+관련 기술(프로그래밍) 스킬이 있으면 `.mpa-workspace/skills/programming/` 에서 해당 파일을 읽는다.
 
 ---
 

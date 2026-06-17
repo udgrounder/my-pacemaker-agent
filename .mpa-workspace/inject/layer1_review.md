@@ -156,7 +156,7 @@ review_summary.md 형식:
 - `.mpa-workspace/skills/analysis/counterexample_finding.md`
 - `.mpa-workspace/skills/analysis/path_tracing.md`
 
-관련 기술 스킬이 있으면 `.mpa-workspace/skills/tech/` 에서 해당 파일을 읽는다.
+관련 기술(프로그래밍) 스킬이 있으면 `.mpa-workspace/skills/programming/` 에서 해당 파일을 읽는다.
 
 ---
 

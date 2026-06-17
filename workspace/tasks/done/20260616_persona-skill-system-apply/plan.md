@@ -3,8 +3,8 @@
 생성일: 2026-06-16
 타입: major
 실패비용: major
-상태: 설계 완료
-승인해시: ""
+상태: 완료 승인
+승인해시: e8a7d003bfbdce77
 ---
 
 # 작업 계획서: 페르소나·스킬 원칙의 MPA 시스템 적용
@@ -101,6 +101,8 @@
 
 **후속 프로그램(별도 태스크로 등록 예정):**
 1. 작업 도메인 팩 계약 정의 → 2. 리서치 도메인 팩 구축(일반성 실증) → 3. (선택) 일반 코어 물리 분리.
+
+> **스킬/지식 분리 안 함 (확정):** 기법(스킬)과 지식은 *기능상 합성되는 한 쌍*(역량 = 역할 ⊗ 기법 ⊗ 지식)이라 별도 저장소로 쪼개지 않는다. `skills/`는 "도메인 자원(기법+지식)" 우산으로 유지. programming→knowledge 물리 재배치는 **불필요**(앞서 검토했던 후속 #4 철회).
 
 ---
 
@@ -272,6 +274,19 @@
 - [ ] `workspace/memory/shared/architecture.md` — Phase 1에서 반영
 - [ ] `guidebook/guidebook.md` — 5.2 트리(tech→programming·plan_interview 이동·inject 분류) + 용어정의 C(구성 층위/Layer 구분·합성·도메인 3저장소·주입=메커니즘) [Phase 7]
 - [ ] `guidebook/persona_skill_principles.md` — **전면 개정**(M8~M11·주입 정정·knowledge 포함 도메인 3저장소·F1·용어). 부록 미결(분석 재배치·tech 개명·도메인 위치)도 해소 표기 [Phase 7]
+
+---
+
+## 구현 완료 기록 (2026-06-17)
+
+- **Phase 1** — `architecture.md`에 "구성 층위 모델"(용어 구분·워크플로우 3수준·합성·도메인 3저장소·저장≠소유)·"실행 모델"·"파일별 역할(구성 층위 기준)" 명문화.
+- **Phase 2** — `plan_interview` → `inject/`로 이동(mv), `layer1_design` 참조 2곳 갱신. analysis 4렌즈+discovery_classification은 방법 도메인으로 architecture.md 분류(D4=A: discovery 방법은 스킬 유지).
+- **Phase 3** — `skills/tech` → `skills/programming` 개명(mv), 참조 3곳(layer1_implement·review·new_feature) 갱신. `_template.md`에 역할-면 가이드 추가(기본 단일 면). `layer1_design`에 프로그래밍 참조 추가(F1 설계 단계 바인딩). D1 축소(폴더 신설 없음).
+- **Phase 4** — 평가 페르소나 4종(code_reviewer·plan_critic·architect·integration_auditor)에 "요구 도메인(구성적)" 선언 추가(가산).
+- **Phase 6** — 가용 도메인 선언 위치 규칙(project_identity) architecture.md 명시.
+- **Phase 7** — `guidebook.md` 5.2 트리·용어정의 C(구성 층위/Layer·합성·도메인·주입·메타 워크플로우·작업 도메인) 갱신. `persona_skill_principles.md` v2 전면 개정.
+- **마무리** — grep 일관성 점검(skills/tech 잔존 0, plan_interview 구참조 0). dist 전체 미러(rsync --delete)로 구조 변경 반영. `.mpa-version` current_version 2026-06-17 갱신.
+- **Phase 5(배선 정본화)** — D2=B로 제외, 후속 태스크.
 
 ---
 

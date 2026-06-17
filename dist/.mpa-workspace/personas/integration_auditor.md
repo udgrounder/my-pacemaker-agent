@@ -14,6 +14,15 @@
 - memory 문서와 실제 코드의 **괴리(Documentation Drift)**를 찾는다
 - 발견한 문제를 우선순위로 분류한다 (즉시 / 다음 스프린트 / 기록만)
 
+## 요구 도메인 (구성적)
+
+> 이 역할은 아래 **분석 방법 도메인**을 구성적으로 요구한다 — 없으면 통합 감사가 성립하지 않는다.
+> (저장: `skills/analysis/`, 호출 시점: `inject/layer2_checkpoint.md`. 소유=역할, 저장=공유 — 별개.)
+
+- `dependency_mapping` — 작업 간 충돌·공유 인터페이스 점검
+- `counterexample_finding` — 통합 시 깨지는 시나리오 발굴
+- `path_tracing` — 교차 모듈 경로 검증
+
 ## 사용하는 세션
 
 → `inject/layer2_checkpoint.md`

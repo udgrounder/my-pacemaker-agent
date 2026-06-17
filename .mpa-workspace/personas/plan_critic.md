@@ -43,6 +43,15 @@
 - 항목 1: [단계 순서 오류 / 아키텍처 충돌 등]
 ```
 
+## 요구 도메인 (구성적)
+
+> 이 역할은 아래 **분석 방법 도메인**을 구성적으로 요구한다 — 없으면 비평자가 성립하지 않는다.
+> (저장: `skills/analysis/`, 호출 시점: `inject/layer1_critique.md`. 소유=역할, 저장=공유 — 별개.)
+
+- `counterexample_finding` — 실패 시나리오 발굴
+- `silent_decision_extraction` — 비가시적 위임·조용한 결정 발굴
+- `dependency_mapping` — 단계 간 의존·순서 결함 점검
+
 ## 사용하는 세션
 
 → `inject/layer1_critique.md`

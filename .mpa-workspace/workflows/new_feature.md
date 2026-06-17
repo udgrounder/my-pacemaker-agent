@@ -22,7 +22,7 @@
 | 분석 스킬 | `skills/analysis/silent_decision_extraction.md` |
 | 분석 스킬 | `skills/analysis/counterexample_finding.md` |
 | 분석 스킬 | `skills/analysis/path_tracing.md` |
-| 기술 스킬 | `skills/tech/[사용 기술].md` |
+| 기술(프로그래밍) 스킬 | `skills/programming/[사용 기술].md` |
 
 ---
 

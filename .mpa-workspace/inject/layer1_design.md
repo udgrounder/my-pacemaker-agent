@@ -31,9 +31,12 @@
 ## 스킬 참조
 
 필요 시 다음을 읽는다:
-- `.mpa-workspace/skills/analysis/silent_decision_extraction.md`
-- `.mpa-workspace/skills/analysis/counterexample_finding.md`
-- `.mpa-workspace/skills/analysis/plan_interview.md` ← 사용자가 검토 도움을 요청할 때
+- `.mpa-workspace/skills/analysis/silent_decision_extraction.md` (분석 방법 도메인)
+- `.mpa-workspace/skills/analysis/counterexample_finding.md` (분석 방법 도메인)
+- 관련 기술(프로그래밍) 스킬이 있으면 `.mpa-workspace/skills/programming/` 에서 해당 파일을 읽는다 — 설계도 해당 스택의 제약을 알아야 한다(역할-면: 설계자 면).
+- `.mpa-workspace/inject/plan_interview.md` ← 사용자가 검토 도움을 요청할 때 (절차이므로 inject에 위치)
+
+> 위 분석 스킬은 task_designer/architect가 **구성적으로 요구**하는 방법 도메인이다. 프로그래밍 스킬은 역할 무관 주제 도메인으로, 설계 단계도 합성한다(구현·검토와 동일).
 
 ---
 
@@ -168,7 +171,7 @@ INDEX.md에서 이 태스크의 **파생 출처**를 확인한다.
    ```
 
    - **가치 결정 답변 / 가정 확인 완료 시** → 내용을 plan.md에 반영하고 구현으로 이동
-   - **인터뷰 요청 시** → `.mpa-workspace/skills/analysis/plan_interview.md` 지시에 따라 진행
+   - **인터뷰 요청 시** → `.mpa-workspace/inject/plan_interview.md` 지시에 따라 진행
    - **"승인" / "구현해줘" 등 명시적 진행 의사 시** → 구현으로 이동
    - **명시적 승인 없이 구현을 시작하지 않는다**
 
