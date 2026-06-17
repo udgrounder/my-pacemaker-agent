@@ -80,6 +80,8 @@
 | 20260615_multi-agent-principles-v3 | minor | done | 멀티에이전트 활용 원칙 문서 v2→v3 — 독립 검토 3관점 반영(토대 명제 가정 강등, 충돌·이음매·전제 정리) | 2026-06-15 | - |
 | 20260616_memory_index | major | done | memory/INDEX.md 선별 인덱스 도입 — Phase 1.5 읽기 전 선별 + 기록 시 등록(write-side) + 부재 시 템플릿 자동 생성 + layer0 전파 | 2026-06-16 | - |
 | 20260616_discussion-bias-warnings | minor | done | discussion_partner 편향 경고에 "이분법 조기 폐쇄"·"본주제 고도 이탈" 2개 항목 추가 (upgrade-candidate 채택) | 2026-06-16 | - |
+| 20260616_persona-skill-guidebook | minor | done | 페르소나·스킬 관계/주입/관리 토론(R1~14) 결론을 guidebook/persona_skill_principles.md 신규 원칙 문서로 정리 | 2026-06-16 | - |
+| 20260616_persona-skill-system-apply | major | active | persona_skill_principles 원칙을 실제 .mpa-workspace 구조·규칙에 적용 (skills 역할구분·역할면·페르소나 기법선언·주입배선) | 2026-06-16 | - |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05
