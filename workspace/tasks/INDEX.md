@@ -82,6 +82,7 @@
 | 20260616_discussion-bias-warnings | minor | done | discussion_partner 편향 경고에 "이분법 조기 폐쇄"·"본주제 고도 이탈" 2개 항목 추가 (upgrade-candidate 채택) | 2026-06-16 | - |
 | 20260616_persona-skill-guidebook | minor | done | 페르소나·스킬 관계/주입/관리 토론(R1~14) 결론을 guidebook/persona_skill_principles.md 신규 원칙 문서로 정리 | 2026-06-16 | - |
 | 20260616_persona-skill-system-apply | major | done | persona_skill_principles 원칙을 .mpa-workspace 구조·규칙에 적용 (구성 층위 모델·skills/programming 개명·plan_interview→inject·페르소나 요구도메인 선언·가이드북 정합). Phase 5(배선 정본화)·리서치 도메인 팩은 후속 | 2026-06-16 | - |
+| 20260625_tools_guide_system | major | active | 외부 도구 운영 가이드 체계(tools/) — README가 뺀 운영자 관점 정보를 2단 구조로 정리. 템플릿 + graphify·serena 사례. 토론 external_tools_curation 파생 | 2026-06-25 | - |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05
