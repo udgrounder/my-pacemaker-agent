@@ -3,7 +3,7 @@
 생성일: 2026-06-25
 타입: major
 실패비용: major
-상태: 테스트 중
+상태: 완료 승인
 승인해시: c6d64e201452cb9f
 ---
 
@@ -115,8 +115,8 @@ README가 구조적으로 빠뜨리는 **운영자 관점 정보**를 일정한 
 
 ## 완료 시 문서 업데이트 대상
 
-- [ ] workspace/exploration/discussion/external_tools_curation.md — "개발 핸드오프" 섹션에 완료 표시 + 실행 중 해결된 열린 질문(사상 어휘 등) 반영
-- [ ] (해당 시) workspace/memory/shared/architecture.md — tools/ 디렉토리가 repo 구조의 일부가 됨을 기록
+- [x] workspace/exploration/discussion/external_tools_curation.md — "개발 핸드오프" 완료 표시 + 열린 질문 3건 해소 결과 반영 + 문서 상태 마커 "완료"로 갱신
+- [x] workspace/memory/shared/architecture.md — "디렉토리 구조 원칙"에 tools/ 절 추가
 
 ---
 

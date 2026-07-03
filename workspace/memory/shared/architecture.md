@@ -17,6 +17,12 @@
 `.mpa-workspace/` — 에이전트 행동 규칙 (모든 프로젝트 공통, 체계 버전과 함께 변경)  
 `workspace/` — 이 프로젝트 고유 데이터 (업그레이드 시 보존)
 
+### tools/ — 외부 도구 운영 가이드
+`guidebook/`과 형제 위치, repo 최상위. README가 구조적으로 빠뜨리는 **운영자 관점 정보**(설치·연결·프로젝트별·팀공유·유지보수·비용주의·되돌리기·산출물위치·생명주기)를 도구별로 정리한다.  
+`_template.md` 틀을 따르며, 채움 원칙은 검증 가능한 출처(공식 docs·소스) 기반 — 불확실한 칸은 추측 대신 "미확인"으로 표기한다.  
+git 추적 대상(이 repo의 자산)이며 `dist/`에는 동기화하지 않는다(guidebook과 동일하게 배포 대상 아님).  
+설계 출처: `workspace/exploration/discussion/external_tools_curation.md`.
+
 ---
 
 ## 핵심 설계 결정

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .mpa-workspace/hooks/code_gate.py --agent codex"
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\" && python3 .mpa-workspace/hooks/code_gate.py --agent codex'"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .mpa-workspace/hooks/dist_sync.py"
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\" && python3 .mpa-workspace/hooks/dist_sync.py'"
           }
         ]
       }
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .mpa-workspace/hooks/session_start.py --agent codex"
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\" && python3 .mpa-workspace/hooks/session_start.py --agent codex'"
           }
         ]
       }
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .mpa-workspace/hooks/turn_end.py --agent codex"
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\" && python3 .mpa-workspace/hooks/turn_end.py --agent codex'"
           }
         ]
       }

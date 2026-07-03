@@ -1,3 +1,5 @@
+# [처리] 승인 — 2026-07-03 / 적용: install.py(_hook_cmd), .claude/settings.json, .codex/hooks.json, dist/.claude/settings.json (옵션 2 대신 옵션 1 계열 채택: agent별 cwd-독립 커맨드 — claude는 ${CLAUDE_PROJECT_DIR}, codex는 git rev-parse --show-toplevel)
+
 # 훅 상대경로 견고성 — cwd 변경 시 훅 실패
 
 > 타입: A (방법론/시스템 개선)

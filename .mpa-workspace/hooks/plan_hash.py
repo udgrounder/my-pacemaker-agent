@@ -25,7 +25,7 @@ import re
 import sys
 
 REQUIRED_FIELDS = ["태스크", "생성일", "타입", "실패비용", "상태", "승인해시"]
-VALID_STATUS = {"설계 중", "설계 완료", "구현 중", "검증 중", "테스트 중", "검토 완료", "완료 승인"}
+VALID_STATUS = {"작성 중", "설계 중", "설계 완료", "구현 중", "검증 중", "테스트 중", "검토 완료", "완료 승인"}
 VALID_TYPE = {"major", "minor"}
 VALID_COST = {"critical", "major", "minor"}
 
@@ -39,8 +39,30 @@ def parse(plan_path):
     return match.group(1), match.group(2), content
 
 
+HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
+
+
+def strip_implementation_sections(body):
+    """헤딩 텍스트가 '구현'으로 시작하는 섹션(그 헤딩부터 다음 헤딩 전까지)을 제외한다.
+
+    '구현'/'구현 단계'/'구현 후 발견' 등 승인 이후 자연스럽게 갱신되는 진행 기록
+    섹션을 해시 대상에서 빼, 체크박스·완료 노트 추가만으로 GATE 1 재진입이
+    걸리지 않도록 한다. 그 외 섹션(목적·핵심 기능·반례 등)은 그대로 해시된다.
+    """
+    kept = []
+    excluding = False
+    for line in body.splitlines():
+        m = HEADING_RE.match(line)
+        if m:
+            excluding = m.group(2).strip().startswith("구현")
+        if not excluding:
+            kept.append(line)
+    return "\n".join(kept)
+
+
 def compute(body):
-    normalized = re.sub(r"\s+", " ", body).strip()
+    filtered = strip_implementation_sections(body)
+    normalized = re.sub(r"\s+", " ", filtered).strip()
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
 
 
@@ -170,8 +192,8 @@ def main():
     elif cmd == "approve":
         front_matter, body, _ = parse(plan_path)
         status = get_field(front_matter, "상태") if front_matter else None
-        # minor 자동 승인: 상태가 없거나 '설계 중'/'메모'인 경우도 허용
-        ALLOWED_STATUSES = {"설계 완료", "설계 중", "메모", None}
+        # minor 자동 승인: 상태가 없거나 '설계 중'/'작성 중'인 경우도 허용
+        ALLOWED_STATUSES = {"설계 완료", "설계 중", "작성 중", None}
         if status not in ALLOWED_STATUSES:
             sys.stderr.write(
                 f"⛔ approve 거부: 현재 상태가 '{status}'입니다.\n"

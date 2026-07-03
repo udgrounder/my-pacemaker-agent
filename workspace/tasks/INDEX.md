@@ -82,7 +82,12 @@
 | 20260616_discussion-bias-warnings | minor | done | discussion_partner 편향 경고에 "이분법 조기 폐쇄"·"본주제 고도 이탈" 2개 항목 추가 (upgrade-candidate 채택) | 2026-06-16 | - |
 | 20260616_persona-skill-guidebook | minor | done | 페르소나·스킬 관계/주입/관리 토론(R1~14) 결론을 guidebook/persona_skill_principles.md 신규 원칙 문서로 정리 | 2026-06-16 | - |
 | 20260616_persona-skill-system-apply | major | done | persona_skill_principles 원칙을 .mpa-workspace 구조·규칙에 적용 (구성 층위 모델·skills/programming 개명·plan_interview→inject·페르소나 요구도메인 선언·가이드북 정합). Phase 5(배선 정본화)·리서치 도메인 팩은 후속 | 2026-06-16 | - |
-| 20260625_tools_guide_system | major | active | 외부 도구 운영 가이드 체계(tools/) — README가 뺀 운영자 관점 정보를 2단 구조로 정리. 템플릿 + graphify·serena 사례. 토론 external_tools_curation 파생 | 2026-06-25 | - |
+| 20260625_tools_guide_system | major | done | 외부 도구 운영 가이드 체계(tools/) — README가 뺀 운영자 관점 정보를 2단 구조로 정리. 템플릿 + graphify·serena 사례. 토론 external_tools_curation 파생 | 2026-06-25 | - |
+| 20260703_arcstudio_rule_absorption | minor | done | ArcStudio 검토 흡수 — 스크립트화 판단 기준(mpa_system_designer) + 완료 보고 증거 인용 원칙(agent_rules/layer1_implement) | 2026-07-03 | - |
+| 20260703_version_timestamp_precision | minor | done | 버전 필드(current_version/installed_at/upgraded_at) 시분초 정밀도 추가 — install.py write_version 및 관련 지시문 갱신 | 2026-07-03 | - |
+| 20260703_minor_initial_status_rename | minor | done | minor 초기 상태명 "메모"→"작성 중" 교체 + minor_plan_template.md 기본값 버그·plan_hash.py VALID_STATUS 누락 동시 수정 | 2026-07-03 | - |
+| 20260703_gate_hash_scope_reduction | major | done | GATE 1 재진입 해시가 "구현"류 섹션(체크박스·진행기록)을 오탐하던 마찰 해소 — plan_hash.py/code_gate.py 해시 계산에서 "구현" 헤딩 섹션 제외 | 2026-07-03 | - |
+| 20260703_hook_path_robustness | minor | done | 훅 커맨드 상대경로 cwd 드리프트 취약점 수정 — claude는 ${CLAUDE_PROJECT_DIR}, codex는 git rev-parse --show-toplevel 래퍼 (upgrade-candidate 채택) | 2026-07-03 | - |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05

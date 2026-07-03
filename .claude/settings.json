@@ -13,7 +13,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .mpa-workspace/hooks/session_start.py --agent claude"
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.mpa-workspace/hooks/session_start.py --agent claude"
           }
         ]
       }
@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .mpa-workspace/hooks/code_gate.py --agent claude"
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.mpa-workspace/hooks/code_gate.py --agent claude"
           }
         ]
       }
@@ -35,7 +35,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .mpa-workspace/hooks/dist_sync.py"
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.mpa-workspace/hooks/dist_sync.py"
           }
         ]
       }
@@ -45,7 +45,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .mpa-workspace/hooks/turn_end.py --agent claude"
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.mpa-workspace/hooks/turn_end.py --agent claude"
           }
         ]
       }

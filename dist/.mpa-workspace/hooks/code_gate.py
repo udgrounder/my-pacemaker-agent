@@ -129,10 +129,32 @@ def parse_plan_status(plan_path):
     return fields.get("상태")
 
 
+HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
+
+
+def strip_implementation_sections(body):
+    """헤딩 텍스트가 '구현'으로 시작하는 섹션(그 헤딩부터 다음 헤딩 전까지)을 제외한다.
+
+    plan_hash.py의 동일 함수와 정확히 같은 로직을 유지해야 한다 — 어긋나면
+    approve가 기록한 해시를 이 함수가 다른 값으로 재계산해 정상 태스크도
+    GATE 1 재진입 차단에 걸린다.
+    """
+    kept = []
+    excluding = False
+    for line in body.splitlines():
+        m = HEADING_RE.match(line)
+        if m:
+            excluding = m.group(2).strip().startswith("구현")
+        if not excluding:
+            kept.append(line)
+    return "\n".join(kept)
+
+
 def compute_plan_hash(body):
-    """plan.md 본문(프론트매터 제외)의 해시를 계산한다."""
+    """plan.md 본문(프론트매터 제외, '구현'류 섹션 제외)의 해시를 계산한다."""
     # 공백·줄바꿈 정규화 후 해시 — 사소한 포맷 변경에는 둔감
-    normalized = re.sub(r"\s+", " ", body).strip()
+    filtered = strip_implementation_sections(body)
+    normalized = re.sub(r"\s+", " ", filtered).strip()
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
 
 
