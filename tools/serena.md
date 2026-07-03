@@ -19,11 +19,17 @@
 ### 1. 설치
 `uv`로 관리한다. `uv tool install -p 3.13 serena-agent` (uv 설치가 유일한 선행 조건). **머신 전역 1회** 설치하면 `serena` 명령을 쓸 수 있다.
 
+**MPA와의 관계:** MPA는 serena를 **권장/가이드**할 뿐, `install.py`로 serena 자체를 설치하지 않는다. 즉 MPA를 설치했다고 serena가 자동으로 깔리지는 않는다.
+
 ### 2. 연결
 **MCP 서버.** 클라이언트(Claude Code/Desktop, VSCode·Cursor·JetBrains 등)에 실행 명령을 주거나, HTTP 모드로 직접 띄워 URL을 제공한다.
 
 ### 3. 프로젝트별
 `serena init` → 프로젝트 루트에 **`.serena/` 폴더**가 생성된다. (실측: `project.yml` = 언어·인코딩 등 진짜 config, `project.local.yml` = 로컬 오버라이드, `cache/`, `memories/`, `.serena/.gitignore`) 설정은 전역·프로젝트·컨텍스트 레벨로 합성된다.
+
+대시보드 자동 오픈 여부는 여기서 제어하지 않는다. **브라우저 탭/앱 창을 자동으로 띄울지**는 프로젝트별 `.serena/project.yml`이 아니라 전역 `~/.serena/serena_config.yml`의 `web_dashboard_open_on_launch`가 결정한다.
+
+즉, 어떤 프로젝트에 MPA가 설치돼 있든 이 값은 **프로젝트 로컬 설정이 아니라 사용자 전역 설정**이다. 프로젝트별로 다른 값을 갖게 하는 스위치는 이 repo 실측 범위에서는 보이지 않았다.
 
 ### 4. 팀원 공유
 공식 docs에는 명시가 없다. **실측 근거**: serena가 `.serena/.gitignore`로 `cache/`·`project.local.yml`만 제외하고, `project.yml`엔 "intended to be versioned" 주석이 있다. 따라서 최소한 다음처럼 보는 것이 안전하다.
@@ -39,6 +45,8 @@
 ### 6. 비용·주의·보안
 **로컬 실행.** 오픈소스 language server(또는 유료 JetBrains 백엔드)를 사용한다. 검색·편집이 "at the symbol level"로 동작하며 **코드를 외부 LLM에 보내지 않는다.**
 
+주의: `web_dashboard_open_on_launch: true` 상태면, serena를 쓰는 여러 프로젝트에서 비슷한 "창 활성화 때 브라우저가 뜬다" 체감이 반복될 수 있다. 원인이 특정 프로젝트의 MPA 설치본에 있다고 보기보다, **같은 사용자 계정의 전역 serena 설정**에서 오는 현상으로 보는 편이 맞다.
+
 ### 7. 되돌리기
 ⚠️ **미확인** — 공식 docs에 제거 절차 명시가 없다. (uv 설치이므로 `uv tool uninstall serena-agent` + 프로젝트 `.serena/` 삭제로 추정되나 문서 미확인.)
 
@@ -48,6 +56,13 @@
 ### 9. 실행/생명주기
 **상주 서버**(MCP, long-lived). 공식 README 기준으로는 보통 **클라이언트에 launch command를 설정**해 연결한다. 정확한 start/stop과 자동 기동 방식은 클라이언트별 설정에 따라 달라진다. (이 repo 환경에서는 클라이언트가 기동 시 연결하는 형태로 관찰됨.)
 
+기본 전역 설정이 `web_dashboard: true` + `web_dashboard_open_on_launch: true`이면, serena 프로세스가 뜰 때마다 **웹 대시보드가 같이 열릴 수 있다.** 프로젝트마다 따로 끄는 방식은 보이지 않았고, 실측 기준 제어점은 전역 `~/.serena/serena_config.yml`이다.
+
+- 자동 오픈을 막고 싶다: `web_dashboard_open_on_launch: false`
+- 대시보드는 유지하고 싶다: `web_dashboard: true`는 그대로 두고 필요할 때만 `open_dashboard` tool 또는 로컬 URL로 연다
+- 완전히 끄고 싶다: `web_dashboard: false`
+- 적용 범위 주의: 위 변경은 **현재 사용자 환경 전체**에 적용된다. MPA 설치/업그레이드가 이 값을 대신 바꾸는 구조는 아니다.
+
 ---
 
 ## 출처 메모
@@ -55,4 +70,4 @@
 - 1·2·3·6번: 공식 README(https://github.com/oraios/serena, 2026-06-25).
 - 4번: 공식 미명시 → 이 repo `.serena/.gitignore`·`project.yml` 주석·`memories/` 존재 실측으로 보강.
 - 5·7번: 공식 docs에서 확인 불가 → **미확인** 표기 유지(추측으로 채우지 않음).
-- 9번: "long-lived" 언급은 공식, 자동 기동 형태는 환경 관찰 기반.
+- 9번: "long-lived" 언급은 공식, 자동 기동 형태와 대시보드 자동 오픈 제어점은 환경 관찰 + `~/.serena/serena_config.yml` 실측 기반.
