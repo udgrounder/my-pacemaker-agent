@@ -205,7 +205,7 @@ def main():
         # 상태를 '구현 중'으로 전환하고 해시를 원자적으로 기록
         set_field(plan_path, "상태", "구현 중")
         set_field(plan_path, "승인해시", h)
-        print(f"GATE 1 통과: 상태 → 구현 중 / 승인해시: {h}")
+        print(f"계획 승인됨: 상태 → 구현 중 / 승인해시: {h}")
     elif cmd == "check":
         front_matter, body, _ = parse(plan_path)
         approved = get_field(front_matter, "승인해시")

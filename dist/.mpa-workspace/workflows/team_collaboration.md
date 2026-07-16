@@ -10,7 +10,7 @@
 | 구분 | 혼자 | 팀 |
 |------|------|----|
 | memory 관리 | 한 사람이 관리 | 공유 저장소(Git)에서 관리 |
-| 작업 배분 | 순서대로 | 의존성 기준으로 병렬 배분 |
+| 태스크 배분 | 순서대로 | 의존성 기준으로 병렬 배분 |
 | Layer 2 체크포인트 | 혼자 실행 | 팀 전체 동기화 포인트 |
 
 ---
@@ -24,7 +24,7 @@
 | 개인 워크플로우 | `workflows/new_feature.md` 또는 `workflows/bug_fix.md` |
 | 페르소나 | `personas/architect.md` (팀 레이어 0) |
 | 페르소나 | `personas/integration_auditor.md` (팀 체크포인트) |
-| 분석 스킬 | `skills/analysis/dependency_mapping.md` (작업 배분) |
+| 분석 스킬 | `skills/analysis/dependency_mapping.md` (태스크 배분) |
 
 ---
 
@@ -41,7 +41,7 @@ inject:  inject/layer0_init.md
 1. memory/ 초안 작성 (특히 shared/architecture.md)
 2. 팀 전원 검토 및 합의
 3. 공유 저장소(Git)에 저장
-4. dependency_mapping으로 전체 작업 목록 + 의존성 도출 → 작업 배분
+4. dependency_mapping으로 전체 태스크 목록 + 의존성 도출 → 태스크 배분
         ↓
 [개인 Layer 1 — 각자]
 각자 담당 워크플로우 실행:
@@ -51,7 +51,7 @@ inject:  inject/layer0_init.md
 - 최신 memory/ pull 확인 (다른 사람이 업데이트했을 수 있음)
         ↓
 [팀 Layer 2 — 함께]
-N개 작업마다 팀 전체 체크포인트
+N개 태스크마다 팀 전체 체크포인트
 스레드: 🆕 새 스레드
 inject:  inject/layer2_checkpoint.md
          └─ 페르소나: integration_auditor
@@ -69,18 +69,18 @@ inject:  inject/layer2_checkpoint.md
    a. 팀에 먼저 공유/합의
    b. 합의 후 공유 파일 업데이트
    c. 이후 작업에 반영
-4. 규칙 변경이 기존 작업에 영향을 주면 → Layer 2 체크포인트 즉시 실행
+4. 규칙 변경이 기존 태스크에 영향을 주면 → Layer 2 체크포인트 즉시 실행
 ```
 
 ---
 
-## 작업 배분 원칙
+## 태스크 배분 원칙
 
 ```
 병렬 가능:
-- 의존성 맵에서 같은 레벨에 있는 작업들
-- 서로 다른 도메인을 담당하는 작업들
-- shared/contracts.md가 확정된 후의 각 구현 작업들
+- 의존성 맵에서 같은 레벨에 있는 태스크들
+- 서로 다른 도메인을 담당하는 태스크들
+- shared/contracts.md가 확정된 후의 각 구현 태스크들
 
 순서대로 진행:
 - contracts.md 정의 → 각 도메인 구현
@@ -92,7 +92,7 @@ inject:  inject/layer2_checkpoint.md
 ## 핵심 체크포인트
 
 - [ ] 팀 Layer 0에서 memory를 공동으로 합의했는가
-- [ ] 작업 배분이 의존성 맵 기준으로 이루어졌는가
-- [ ] 각자 작업 전에 최신 memory를 확인하는가
+- [ ] 태스크 배분이 의존성 맵 기준으로 이루어졌는가
+- [ ] 각자 태스크 전에 최신 memory를 확인하는가
 - [ ] 규칙 변경은 팀 합의를 거치는가
 - [ ] Layer 2 체크포인트를 주기적으로 실행하는가

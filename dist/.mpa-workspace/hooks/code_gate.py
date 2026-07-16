@@ -191,7 +191,7 @@ def check_hash_integrity(cwd, mode, agent):
         if not approved_hash:
             current_hash = compute_plan_hash(body)
             msg = (
-                f"⛔ GATE 1 복구 필요: '{name}' plan.md 상태는 '구현 중'이지만 승인해시가 없습니다.\n"
+                f"⛔ 계획 승인 기록 복구 필요: '{name}' plan.md 상태는 '구현 중'이지만 승인해시가 없습니다.\n"
                 f"  현재해시: {current_hash}\n"
                 "자동 승인해시 등록은 하지 않습니다. 아래 중 하나로 명시적으로 복구하세요:\n"
                 "  1. 사용자 승인 이력이 불명확함 → 상태를 '설계 완료'로 되돌리고 plan.md 검토 후 재승인\n"
@@ -208,7 +208,7 @@ def check_hash_integrity(cwd, mode, agent):
         current_hash = compute_plan_hash(body)
         if current_hash != approved_hash:
             msg = (
-                f"⛔ GATE 1 재진입 차단: '{name}' plan.md가 승인 후 변경됐습니다.\n"
+                f"⛔ 계획 재승인 필요: '{name}' plan.md가 승인 후 변경됐습니다.\n"
                 f"  승인해시: {approved_hash}\n"
                 f"  현재해시: {current_hash}\n"
                 "plan.md 변경이 설계에 영향을 주는지 사용자에게 확인하고:\n"
