@@ -137,13 +137,13 @@ def build_message(cwd):
         lines.append("진행 중인 태스크가 있습니다. 번호로 선택해 주세요:")
         for i, row in enumerate(rows, 1):
             lines.append(f"  {i}.{row.lstrip()}")
-        lines.append(f"  {len(rows) + 1}. 새 작업 시작")
+        lines.append(f"  {len(rows) + 1}. 새 태스크 시작")
         lines.append("→ 번호를 말씀해 주시면 해당 태스크의 상태에 따라 진행합니다.")
         # 프론트매터 누락 항목이 있으면 처리 지시 추가
         if any("⚠️" in row for row in rows):
             lines.append("")
             lines.append("⚠️ 일부 plan.md의 프론트매터가 누락됐습니다.")
-            lines.append("해당 태스크 작업 진입 시 다음 절차를 따르세요:")
+            lines.append("해당 태스크 진입 시 다음 절차를 따르세요:")
             lines.append("  1. plan.md 본문을 읽고 누락 필드를 추론 (`plan_hash.py audit <path>`로 정확한 누락 목록 확인)")
             lines.append("  2. 추론한 값과 근거를 사용자에게 짧게 보여주고 확인")
             lines.append("  3. 확인 후 `plan_hash.py init <path> --field key=value ...` 로 주입")
@@ -151,7 +151,7 @@ def build_message(cwd):
     else:
         lines.append("진행 중인 태스크 없음.")
         lines.append(
-            "→ 진행 중 작업이 없으니, 사용자에게 두 경로를 한 줄로 안내하세요: "
+            "→ 진행 중 태스크가 없으니, 사용자에게 두 경로를 한 줄로 안내하세요: "
             "**작업**(\"○○ 만들어줘/고쳐줘\") 또는 **논의**(\"○○ 논의하자\" — 토론 모드)."
         )
 

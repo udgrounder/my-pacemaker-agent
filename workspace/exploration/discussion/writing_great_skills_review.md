@@ -108,4 +108,4 @@ Matt Pocock의 AI Engineer 강연 "The Missing Manual: How to Write Great Skills
 
 ## 결론
 
-토론은 여기서 종료하고 실행으로 핸드오프한다. 파생된 개발 태스크: [`workspace/tasks/active/20260716_mpa_glossary_and_layering/plan.md`](../../tasks/active/20260716_mpa_glossary_and_layering/plan.md) — `.mpa-workspace/core/glossary.md` 신설(태스크/작업/계획서/GATE/Zone/Tier 정의 확정) + `agent_rules.md`의 판단-로직/절차-서술 경계에 따른 온디맨드 재분리. GATE 1(사용자 승인) 대기 중.
+토론은 여기서 종료하고 실행으로 핸드오프했다. 파생된 개발 태스크: [`workspace/tasks/active/20260716_mpa_glossary_and_layering/plan.md`](../../tasks/active/20260716_mpa_glossary_and_layering/plan.md) — `.mpa-workspace/core/glossary.md` 신설(태스크/작업/계획서/GATE/Zone/Tier 정의 확정) + `agent_rules.md`의 판단-로직/절차-서술 경계에 따른 온디맨드 재분리. 계획 승인 완료 후 구현 진행 중 — 독립 서브에이전트 1차 검증(2026-07-21)에서 일부 잔여 항목(전역 범위 파일 누락·`dist/` 동기화·문서 표기 미반영)이 발견돼 수정 중이다. 완료 시 이 문단을 갱신한다.
