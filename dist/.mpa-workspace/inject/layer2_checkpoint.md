@@ -73,14 +73,16 @@
 
 ### 7. INDEX vs 태스크 폴더 동기화
 
-`active/` 및 `done/` 폴더의 태스크가 INDEX.md에 모두 등록됐는지 확인한다.
+`active/` 및 `hold/` 태스크가 INDEX.md에 모두 등록됐는지 확인한다. `done/` 폴더는 이력 원본이고 INDEX는 보존 기간이 적용되는 캐시이므로, INDEX에 없는 done 폴더를 자동 등록하지 않는다.
 
 ```bash
 ls workspace/tasks/active/ workspace/tasks/done/
 ```
 
-- 폴더에 있는데 INDEX에 없는 항목 → INDEX에 추가 (타입·상태·요약·생성일·점검 채움)
-- INDEX에 있는데 폴더에 없는 항목 → INDEX에서 제거 또는 경로 확인
+- active/hold 폴더에 있는데 INDEX에 없는 항목 → INDEX에 추가 (타입·상태·요약·생성일·완료일 `-`·점검 채움)
+- INDEX의 active/hold 행인데 폴더에 없는 항목 → INDEX에서 제거 또는 경로 확인
+- INDEX에 없는 done 폴더 → 보존 기간 정리된 정상 이력으로 간주한다. 재등록하지 않는다.
+- 동기화 뒤 `agent_rules.md`의 "INDEX.md 유지보수 원칙"을 수행한다. `[Layer 2 완료]` 마커는 태스크 행 정렬 대상이 아니다.
 
 > **점검 상태는 INDEX.md가 단일 소스다.** plan.md에는 점검 필드가 없으므로 INDEX가 손상되면 점검 상태는 재확인이 필요하다.
 

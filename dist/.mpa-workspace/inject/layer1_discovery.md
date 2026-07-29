@@ -77,7 +77,7 @@
 - → 다음 단계: 확장 범위 포함하여 `layer1_implement.md`로 재구현
 
 **신규 태스크:**
-- `workspace/tasks/INDEX.md`에 새 태스크로 등록 (상태: `active`)
+- `workspace/tasks/INDEX.md`에 새 태스크를 `상태: active`, `완료일: -`로 등록한 뒤 `agent_rules.md`의 "INDEX.md 유지보수 원칙"을 수행한다.
 - **반드시 포함:** `파생 출처: [현재 태스크명] — [발견 맥락]`
 - **원래 태스크 plan.md의 "구현 후 발견 > 파생된 태스크"에 링크 추가**
   - `[신규 태스크명] — [발견 맥락]`

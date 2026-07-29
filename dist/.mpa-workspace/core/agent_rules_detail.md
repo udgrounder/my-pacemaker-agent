@@ -303,12 +303,13 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
    - "major로 변경" → major 흐름으로 전환 (계획 승인 포함)
 2. **plan.md 작성** — 사용자 응답 반영 후 `templates/plan_template.md`를 Read하여 작성한다. minor 태스크는 에이전트 보고(사용자 결정·암묵적 결정·에이전트 가정·minor 판단 근거)·핵심 기능·구현 항목을 기록한다. 반례·검증 체크리스트·문서 업데이트 대상·구현 후 발견은 생략한다.
    - 작성 완료 후 파일 경로를 사용자에게 고지한다: `계획서: workspace/tasks/active/yyyymmdd_[태스크명]/plan.md`
-3. **`approve` 실행**:
+3. **INDEX 등록** — `workspace/tasks/INDEX.md`에 새 태스크 행을 `상태: active`, `완료일: -`로 추가한 뒤 `agent_rules.md`의 "INDEX.md 유지보수 원칙"을 수행한다.
+4. **`approve` 실행**:
    ```bash
    python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/yyyymmdd_[태스크명]/plan.md
    ```
-4. 구현 완료 후 **보고 + 사용자 확인 대기** → 확인 후 done 처리 (`agent_rules.md` "태스크 완료" 섹션 참조)
-5. minor에서는 changelog.md, review_phase*.md, 역할 메모리, docs 업데이트, Layer 2 현황 표시는 기본 생략한다. 외부 동작·아키텍처·계약이 바뀐 경우에만 해당 문서를 갱신하고, 그 순간 major 전환 여부를 재판단한다.
+5. 구현 완료 후 **보고 + 사용자 확인 대기** → 확인 후 done 처리 (`agent_rules.md` "태스크 완료" 섹션 참조)
+6. minor에서는 changelog.md, review_phase*.md, 역할 메모리, docs 업데이트, Layer 2 현황 표시는 기본 생략한다. 외부 동작·아키텍처·계약이 바뀐 경우에만 해당 문서를 갱신하고, 그 순간 major 전환 여부를 재판단한다.
 
 > **minor → major 전환**: 구현 중 예상 범위를 초과하거나 가치 결정이 생기면 즉시 사용자에게 알리고 major 흐름으로 전환한다.
 

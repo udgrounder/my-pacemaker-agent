@@ -38,9 +38,16 @@
 
 1. `workspace/project_rules.md` 확인 (존재하는 경우) — 프로젝트 고유 라우팅 힌트·행동 규칙 로드
 2. `workspace/tasks/active/` 폴더 확인 — **이 폴더가 진행 중 태스크의 primary source다**
-3. `workspace/tasks/INDEX.md` 확인 (존재하는 경우) — 요약·타입 참조용 cache
+3. `workspace/tasks/INDEX.md` 확인 (존재하는 경우) — 요약·타입 참조용 cache. **참조하기 전에 아래 INDEX 유지보수를 먼저 수행한다.**
 
-> **INDEX.md 동기화 원칙:** active/ 폴더에 있는데 INDEX에 없는 항목만 누락 처리. INDEX 업데이트는 태스크 생성·완료·Layer 2 체크포인트 시에만 수행.
+> **INDEX.md 유지보수 원칙:** INDEX는 최근·진행 중 태스크를 찾기 위한 캐시이고, `tasks/done/`은 이력 원본이다. INDEX를 참조하거나 작성할 때마다 프로젝트 실행 환경의 현재 날짜(`YYYY-MM-DD`)를 한 번만 기준일로 잡아 다음 순서로 한 번 저장한다.
+>
+> 1. `상태`·`완료일`을 먼저 반영한다. 새 active/hold 행의 `완료일`은 `-`이고, 완료 처리된 done 행은 실제 완료일이다.
+> 2. `완료일`이 비어 있는 기존 done 행은 기준일로 보정한다. 형식이 `YYYY-MM-DD`가 아닌 행은 삭제하지 않고 경고·보존한다.
+> 3. 완료일이 기준일의 달력상 정확히 3개월 전이거나 그 이전인 done 행만 제거한다. done 폴더와 plan.md는 제거하지 않는다.
+> 4. 태스크 행은 `active` → `hold` → `done` 순으로 정렬한다. active/hold는 생성일 내림차순, done은 완료일 내림차순, 같은 날짜는 태스크명 오름차순이다. `[Layer 2 완료]` 마커는 표 밖의 하단 상태 기록으로 보존한다.
+>
+> Layer 2의 점검 제안 집계도 INDEX에 남아 있는 done 행만 사용한다. INDEX에 없는 done 폴더는 보존 기간 정리된 정상 이력으로 간주해 자동 재등록하지 않는다.
 
 **메모리 시스템 우선순위:**
 
@@ -286,7 +293,9 @@
    - `상태`: done
    - `요약`: plan.md 목적 1줄
    - `생성일`: plan.md `생성일` 필드값
+   - `완료일`: 완료 승인 처리 시의 현재 날짜
    - `점검`: `-`
+   - 갱신 후 위 "INDEX.md 유지보수 원칙"을 수행한다.
 3. `workspace/tasks/active/yyyymmdd_[태스크명]/` → `workspace/tasks/done/yyyymmdd_[태스크명]/` 이동
 
 > minor 완료에서는 changelog, 에이전트 검증, 사용자 테스트 단계, docs 업데이트, 정합성 점검 제안을 생략한다. 필요한 항목이 생기면 minor가 아니라 major로 전환한다.
@@ -299,14 +308,16 @@
 
 사용자가 완료를 요청하면:
 1. **plan.md `상태`를 `완료 승인`으로 업데이트** (완료 승인 확인 통과 기록)
-2. `workspace/tasks/active/yyyymmdd_[태스크명]/` → `workspace/tasks/done/yyyymmdd_[태스크명]/` 이동
-3. **INDEX.md 업데이트** — 다음 컬럼 기록:
+2. **INDEX.md 업데이트** — mv 전에 완료 상태·완료일을 기록하고 유지보수를 수행한다. 다음 컬럼 기록:
    ```
-   | 태스크명 | 타입 | 상태 | 요약 | 생성일 | 점검 |
+   | 태스크명 | 타입 | 상태 | 요약 | 생성일 | 완료일 | 점검 |
    ```
    - `타입`: `major` / `minor`
    - `상태`: `done`
+   - `완료일`: 완료 승인 처리 시의 현재 날짜
    - `점검`: 신규 완료는 `-` (미점검). 전체 정합성 점검 후 `✅`로 갱신.
+   - 갱신 후 위 "INDEX.md 유지보수 원칙"을 수행한다.
+3. `workspace/tasks/active/yyyymmdd_[태스크명]/` → `workspace/tasks/done/yyyymmdd_[태스크명]/` 이동
 4. `plan.md`의 "완료 시 문서 업데이트 대상" 확인 후 `workspace/docs/` 반영
 5. **전체 정합성 점검 현황 표시**
    - INDEX.md에서 `점검` 컬럼이 `-`인 done 태스크를 집계한다 (단일 패스).
