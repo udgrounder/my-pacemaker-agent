@@ -12,7 +12,7 @@
 workspace/
 ├── memory/        ← 프로젝트 기억 (세션이 바뀌어도 유지돼야 하는 사실)
 ├── tasks/         ← 작업 단위 — 계획서·진행 상태·완료 이력
-├── docs/          ← 완료된 기능·설계의 결과 문서
+├── issues/        ← 방법론 개선 등 프로젝트 issue
 └── exploration/   ← 작업하며 도출되는 사고·연구 공간 (토론 모드 기록 위치)
     ├── discussion/   ← 철학·자세 논의 + 토론 모드 산출물
     ├── research/     ← 기술 동향 리서치
@@ -23,10 +23,10 @@ workspace/
 |------|-----------|----------|
 | `memory/` | `shared/`(아키텍처·계약·정체성), `domains/`(도메인 규칙), `roles/`(역할별 학습) | agent가 결정·발견 시 기록 |
 | `tasks/` | `active/`(진행 중), `done/`(완료), `INDEX.md`(색인) — 각 작업은 `plan.md`로 시작 | agent가 작업마다 생성·갱신 |
-| `docs/` | 구현이 끝난 기능·설계가 "어떻게 동작하는가" | 요청 완료 시 agent가 반영 |
+| `issues/` | 방법론 개선 등 회수 가능한 관찰 기록 | 프로젝트 agent가 생성, source는 명시 요청으로 수집 |
 | `exploration/` | `discussion/`(논의·토론 기록), `research/`(기술 조사), `use_cases/`(사례) | 토론 모드 등 자유 탐구 시 (Task 면제) |
 
-- **tasks vs docs:** `tasks/`는 "무엇을 만들까"(구현 전), `docs/`는 "만든 것이 어떻게 동작하나"(구현 후).
+- **tasks vs docs:** `tasks/`는 "무엇을 만들까"(구현 전), 루트 `docs/`는 "만든 것이 어떻게 동작하나"(구현 후)다. 루트 `docs/`는 프로젝트 사용자가 소유한다.
 - **작업 흐름:** 새 작업은 `tasks/active/yyyymmdd_[작업명]/plan.md`로 시작해, 완료되면 `tasks/done/`으로 이동한다. 상태는 `plan.md`의 YAML 프론트매터로 추적된다.
 
 ---
@@ -47,7 +47,7 @@ workspace/
 
 `.mpa-workspace/`는 agent가 이 프로젝트에서 **어떻게 일하는지를 정의한 협업 방법론**이다 (페르소나·세션 절차·규칙·hook·템플릿).
 
-> ⚠️ **`.mpa-workspace/`는 직접 수정하지 않는다.** 방법론 개선이 필요하면 `.mpa-workspace/upgrade-candidates/`에 후보를 기록하고, MPA 시스템 업데이트(재설치)로 반영한다. 직접 수정하면 다음 업그레이드 때 덮어쓰여 사라진다.
+> ⚠️ **`.mpa-workspace/`는 직접 수정하지 않는다.** 방법론 개선이 필요하면 `workspace/issues/`에 `methodology_improvement` issue를 기록하고, 사용자가 승인한 수집·검토·release 절차로 반영한다. 직접 수정하면 다음 Runtime 배포 때 덮어쓰여 사라진다.
 
 | | `workspace/` | `.mpa-workspace/` |
 |--|-------------|-------------------|

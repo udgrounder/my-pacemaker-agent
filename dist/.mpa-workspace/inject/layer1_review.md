@@ -325,7 +325,7 @@ review_summary.md 형식:
      - 다음에 이 유형에서 주의할 점: [내용]
      ```
    - 맞은 경우에도 "기록할 것 없음"으로 명시적으로 확인한다
-4. MPA 시스템 개선 후보 발견 → `.mpa-workspace/upgrade-candidates/[내용].md`
+4. MPA 시스템 개선 발견 → local `workspace/issues/`에 `methodology_improvement` issue 기록
 5. **리포트를 사용자에게 제시하고 항목 심각도에 따라 처리한다 (Zone 차별화):**
 
    - 🚨 즉시 수정 항목이 있으면 (Zone 2) → *"위 이슈들이 발견됐습니다. 수정을 진행할까요?"* — 명시적 응답 필수

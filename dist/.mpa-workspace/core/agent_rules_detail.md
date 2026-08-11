@@ -160,11 +160,11 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 
 > **"이 지식이 다른 프로젝트의 의사결정도 바꾸는가?"**
 
-답이 Yes인 항목만 `.mpa-workspace/upgrade-candidates/[내용].md`에 도메인 지식 형식으로 export한다. (`agent_rules_detail.md` "upgrade-candidates 형식" 타입 B 참조)
+답이 Yes인 항목은 local `workspace/issues/`에 `knowledge_promotion` issue로 기록한다.
 
-### 3단계 — upgrade-candidates 검토 시: knowledge/로 승격
+### 3단계 — issue 검토 후: knowledge/로 승격
 
-사용자가 `upgrade-candidates`를 검토하고 승인하면 `.mpa-workspace/knowledge/[도메인명].md`로 이동한다.  
+사용자가 수집·검토한 `knowledge_promotion` issue를 승인하면 `.mpa-workspace/knowledge/[도메인명].md`로 이동한다.
 승격된 지식은 **실제로 다른 프로젝트에서 import해 사용 가능한 검증된 지식**이다.
 
 ### 위치 요약
@@ -172,7 +172,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 | 위치 | 단계 | 신뢰도 |
 |------|------|--------|
 | `workspace/memory/domains/[도메인]/rules.md` | 발견 즉시 기록 | 이 프로젝트 한정 |
-| `.mpa-workspace/upgrade-candidates/` | Layer 2 시 export 후보 | 평가 중 |
+| `workspace/issues/` | Layer 2 시 기록한 승격 issue | 평가 중 |
 | `.mpa-workspace/knowledge/[도메인].md` | 사용자 승인 후 승격 | 검증된 범용 지식 |
 
 > 기록 시점에 경계를 판단하지 않으므로 인지 부담이 분산된다.
@@ -214,9 +214,9 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 
 ---
 
-## upgrade-candidates 형식
+## issue 기록
 
-**타입 A — 방법론 개선** (agent 운영 방식, inject 파일, 규칙 등)
+**`methodology_improvement` — 방법론 개선** (agent 운영 방식, inject 파일, 규칙 등)
 ```markdown
 # [개선 내용 제목]
 **타입**: 방법론 개선
@@ -233,7 +233,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 - `.mpa-workspace/[파일명]`
 ```
 
-**타입 B — 도메인 지식** (다른 프로젝트에도 유효한 도메인·업종 지식)
+**`knowledge_promotion` — 도메인 지식** (다른 프로젝트에도 유효한 도메인·업종 지식)
 ```markdown
 # [도메인명]: [지식 제목]
 **타입**: 도메인 지식
@@ -247,19 +247,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 - `.mpa-workspace/knowledge/[도메인명].md`
 ```
 
-> 코드·비즈니스 개선이 아닌 **에이전트 운영 방식 또는 도메인 지식**만 여기에 기록한다.
-
-**처리 후 archive 절차:**
-
-1. 파일 상단에 처리 결과 한 줄 추가:
-   ```
-   # [처리] 승인 — YYYY-MM-DD / 적용: [파일명]
-   # [처리] 거부 — 이유: [한 줄]
-   # [처리] 보류 — 이유: [한 줄]
-   ```
-2. `.mpa-workspace/upgrade-candidates/archive/`로 이동 (삭제하지 않는다)
-
-세션 시작 시 `upgrade-candidates/`(루트)에 있는 파일만 처리 대상으로 안내한다. `archive/`는 이력 참조용이므로 사용자에게 알리지 않는다.
+> local issue는 `workspace/issues/issue-*.md`에 기록한다. map-product source 저장소로의 수집·review·triage·archive는 사용자 명시 요청에서만 수행한다.
 
 ---
 
@@ -267,7 +255,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 
 > **트리거:** "규칙 바꿔줘", "inject 수정", ".mpa-workspace 수정" 등 MPA 시스템 파일 수정 요청 시
 
-> **기본 원칙:** `.mpa-workspace/`는 협업 방법론 파일이다. **되도록 직접 수정하지 않는다** — 개선이 필요하면 `upgrade-candidates/`에 후보로 기록하고 MPA 시스템 업데이트로 반영한다. 아래는 직접 수정이 정당한 경우의 절차다.
+> **기본 원칙:** `.mpa-workspace/`는 협업 방법론 파일이다. **되도록 직접 수정하지 않는다** — 개선이 필요하면 local issue로 기록하고 map-product review를 거쳐 반영한다. 아래는 직접 수정이 정당한 경우의 절차다.
 
 **적용 대상:** `.mpa-workspace/` 하위 파일 직접 수정. 버전 업그레이드는 `layer0_update.md` 참조.
 

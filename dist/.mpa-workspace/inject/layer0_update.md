@@ -26,9 +26,9 @@ MPA 시스템 → 프로젝트 (인바운드)
 
 ## 작업 순서
 
-### 1단계 — 아웃바운드: upgrade-candidates 수집
+### 1단계 — 아웃바운드: issue 수집 안내
 
-`.mpa-workspace/upgrade-candidates/` 를 확인한다.
+local `workspace/issues/`를 확인한다.
 
 파일이 있는 경우:
 1. 각 파일을 읽고 목록으로 정리한다
@@ -45,10 +45,10 @@ MPA 시스템 → 프로젝트 (인바운드)
 ```
 
 3. 사용자가 선택한 항목을:
-   - **MPA 시스템 프로젝트 경로를 알 수 있는 경우**: 해당 경로의 `.mpa-workspace/upgrade-candidates/` 로 복사
+   - **MAP source 경로를 아는 경우**: `release_manager.py issue-collect`로 명시된 issue만 `workspace/issues/inbox/`에 수집
    - **경로를 모르는 경우**: 이전할 파일 목록과 내용을 요약해 사용자에게 전달 (수동 이전)
 
-4. 이전 완료된 항목은 `.mpa-workspace/upgrade-candidates/` 에서 제거한다.
+4. 수집 성공 후에만 원본 issue가 source inbox로 이동됐는지 확인한다.
 
 파일이 없는 경우: 이 단계를 건너뛴다.
 
@@ -77,7 +77,7 @@ MPA 시스템 → 프로젝트 (인바운드)
 
 ## 완료 기준
 
-- [ ] upgrade-candidates 수집 및 이전 완료 (없으면 해당 없음)
+- [ ] issue 수집 안내 또는 처리 완료 (없으면 해당 없음)
 - [ ] MPA 시스템 파일 업데이트 확인 완료
 - [ ] memory 정합성 확인 완료
 
@@ -85,5 +85,5 @@ MPA 시스템 → 프로젝트 (인바운드)
 
 ## 세션 종료 시
 
-1. `.mpa-workspace/upgrade-candidates/` 잔여 파일 없는지 확인
+1. 수집 요청한 issue의 source inbox 이동 결과 확인
 2. 업데이트 내역 요약을 사용자에게 보고

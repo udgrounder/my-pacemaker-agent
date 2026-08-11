@@ -10,7 +10,7 @@
 @install.md 설치해줘
 ```
 
-Agent가 `install.md`의 절차에 따라 프로젝트 경로와 사용할 agent를 확인한 뒤 알아서 설치한다. 이미 설치된 프로젝트면 업그레이드 모드로 자동 처리한다.  
+Agent가 `install.md`의 절차에 따라 프로젝트 경로와 사용할 agent를 확인한 뒤 신규 설치한다. 기존 설치본은 자동으로 바꾸지 않으며, 준비된 Runtime release를 명시적으로 배포한다.
 → 옵션과 설치 결과 등 자세한 내용은 아래 [설치](#설치) 참조.
 
 ---
@@ -67,8 +67,8 @@ agent가 진행하는 절차:
 
 1. 프로젝트 경로 확인
 2. 사용할 agent 결정 — 프로젝트 폴더를 보고 자동 감지한 뒤 사용자 확인
-3. `.mpa-workspace/` 존재 여부로 신규 설치 / 업그레이드 자동 판단
-4. 수집한 정보를 요약해 알린 뒤 설치 실행
+3. `.mpa-workspace/` 존재 여부로 신규 설치 또는 Runtime 배포 절차 판단
+4. 신규 설치일 때만 수집한 정보를 요약해 설치 실행
 
 **지원 agent:** `claude`(CLAUDE.md) · `codex`(AGENTS.md) · `antigravity`(GEMINI.md) · `openagent`
 
@@ -179,13 +179,11 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 │   │   ├── knowledge/                     ← 검증된 범용 도메인 지식
 │   │   ├── workflows/                    ← 작업 유형별 세션 시퀀스
 │   │   ├── templates/                    ← 파일 생성용 템플릿 (plan/changelog/shared 등)
-│   │   └── upgrade-candidates/           ← 방법론 개선 후보 수집
 │   │
 │   └── workspace/                    ← workspace/ 초기화 템플릿 (복사 소스, 골격만)
 │       ├── README.md  (workspace·.mpa-workspace 사용 안내 — 설치본 사용자용)
 │       ├── memory/   (shared/ domains/ roles/ 빈 골격)
 │       ├── tasks/    (INDEX.md, active/ done/)
-│       └── docs/     (INDEX.md)
 │
 ├── agent-specs/                      ← agent별 설치 스펙 (claude/codex/antigravity/openagent)
 ├── guidebook/                        ← 실용 안내서 (guidebook.md)
@@ -201,21 +199,19 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 
 ```
 [project]/
-├── .mpa-workspace/    ← 방법론 (업그레이드로 최신화, 직접 수정 금지)
+├── .mpa-workspace/    ← 방법론 (승인된 Runtime release로 최신화, 직접 수정 금지)
 │   ├── core/, personas/, skills/, workflows/, inject/
 │   ├── hooks/, templates/, knowledge/
-│   └── upgrade-candidates/   ← 작업 중 발견된 방법론 개선 후보
 │
 └── workspace/            ← 프로젝트 데이터 (agent가 직접 관리)
     ├── README.md         ← 설치본 사용자용 안내 (workspace·.mpa-workspace 소개)
     ├── memory/
     ├── tasks/
-    └── docs/
 ```
 
 | 폴더 | 역할 | 업데이트 방식 |
 |------|------|--------------|
-| `.mpa-workspace/` | 방법론 (HOW) | 업그레이드로 최신화 / `mpa_system_designer` 프로세스로 직접 수정 가능 |
+| `.mpa-workspace/` | 방법론 (HOW) | 승인된 Runtime release로만 최신화 / `mpa_system_designer` 프로세스로 직접 수정 가능 |
 | `workspace/` | 프로젝트 데이터 (WHAT) — agent가 관리 | 작업할 때마다 자동 업데이트 |
 
 ---
@@ -270,14 +266,13 @@ MPA_GATE=off claude     # 또는 codex / gemini — 잠시 끄기
 ```
 작업 중 더 나은 방법 발견
       ↓
-[project]/.mpa-workspace/upgrade-candidates/ 에 후보 파일 추가
+[project]/workspace/issues/ 에 `methodology_improvement` issue 생성
       ↓
-.mpa-workspace/ 업데이트 시 my-pacemaker-agent/dist/.mpa-workspace/upgrade-candidates/ 로 자동 이동 (1단계)
+사용자 명시 요청으로 my-pacemaker-agent/workspace/issues/inbox/ 에 수집
       ↓
-검토 및 정제 → my-pacemaker-agent/dist/.mpa-workspace/ 해당 파일에 반영
-              (절차: my-pacemaker-agent/harness-maintenance.md 참조)
+검토 및 정제 → my-pacemaker-agent/.mpa-workspace/ 해당 파일에 반영
       ↓
-다음 프로젝트 업데이트 시 새 스냅샷으로 배포
+sync-runtime → 불변 release package 준비 → 대상 Runtime에 명시 배포
 ```
 
 ### 업데이트 기준

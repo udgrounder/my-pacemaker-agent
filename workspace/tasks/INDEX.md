@@ -2,6 +2,7 @@
 
 | 태스크명 | 타입 | 상태 | 요약 | 생성일 | 완료일 | 점검 |
 |---------|------|------|------|--------|--------|------|
+| 20260805_release_deployment_management | major | active | Git 선택 보조 기반 release·deployment receipt 및 issue 생성·수집·분류 lifecycle 도입 | 2026-08-05 | - | - |
 | 20260729_task_index_maintenance | major | active | 설치 대상 태스크 INDEX 보존 기간·완료일·정렬 정책 도입 | 2026-07-29 | - | - |
 | 20260716_mpa_glossary_and_layering | major | active | MPA 용어 정리·용어집 신설·agent_rules 온디맨드 분리·plan.md 표준 템플릿화 | 2026-07-16 | - | - |
 | 20260604_MPA시스템개선 | minor | done | 비평 도출 구조적 문제 9개 수정 + "놀라움 필터" → "자가 개선 필터" 명칭 변경 | 2026-06-04 | 2026-07-29 | - |

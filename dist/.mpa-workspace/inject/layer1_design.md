@@ -24,7 +24,7 @@
 5. `workspace/memory/roles/architect.md` (존재하는 경우) — 이 프로젝트에서 architect 역할이 축적한 학습
 6. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
 
-관련 기존 문서가 있으면 `workspace/docs/INDEX.md` 도 확인한다.
+관련 기존 문서가 있으면 `docs/INDEX.md` 도 확인한다.
 
 ---
 
@@ -157,7 +157,7 @@ INDEX.md에서 이 태스크의 **파생 출처**를 확인한다.
      > 매 대화마다 즉시 기록하지 않고, **plan.md 저장 시점에 누적 결정을 한 번에 정리**한다.
 5. tasks/INDEX.md 업데이트 → 새 태스크 항목을 `상태: active`, `완료일: -`로 추가한 뒤 `agent_rules.md`의 "INDEX.md 유지보수 원칙"을 수행한다.
    > INDEX는 **생명주기 상태**(`active`/`done`/`hold`)만 쓴다. 세부 진행 단계(`설계 완료`/`구현 중` 등)는 plan.md의 상태에 둔다 — 두 축을 섞지 않는다.
-6. MPA 시스템 개선 후보 발견 → `.mpa-workspace/upgrade-candidates/[내용].md`
+6. MPA 시스템 개선 발견 → local `workspace/issues/`에 `methodology_improvement` issue 기록
 7. **태스크 분리 검토** — 아래 중 하나에 해당하면 분리안을 계획서와 함께 제안한다
    - 구현 단계가 5개 이상
    - 독립적으로 완료·검증 가능한 단위가 2개 이상 존재

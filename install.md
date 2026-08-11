@@ -18,7 +18,7 @@ install.py
 |---------|------|------|
 | `--project` | ✅ | 설치 대상 프로젝트 경로 (절대 경로 권장) |
 | `--agents` | ✅ | 사용할 agent (claude, codex, antigravity, openagent). 여러 개는 공백 또는 콤마로 구분: `--agents claude codex` 또는 `--agents claude,codex` |
-| `--upgrade` | ❌ | 이미 설치된 경우 업그레이드 모드로 실행 |
+| `--upgrade` | ❌ | 지원하지 않음 — 기존 설치본 Runtime 업데이트에는 `release_manager.py deploy` 사용 |
 
 ---
 
@@ -109,14 +109,14 @@ install.py는 hook을 자동 등록하지 않는다. 실행 중인 agent가 `age
 
 ---
 
-### Q4. 신규 설치 vs 업그레이드 (자동 판단)
+### Q4. 신규 설치 vs Runtime 업데이트
 
 질문 없이 자동으로 결정한다.
 
 | 조건 | 모드 |
 |------|------|
-| `.mpa-workspace/` 폴더 없음 | 신규 설치 |
-| `.mpa-workspace/` 폴더 있음 | 업그레이드 |
+| `.mpa-workspace/` 폴더 없음 | 신규 설치 — `install.py` 실행 |
+| `.mpa-workspace/` 폴더 있음 | 설치 중단 — 승인된 release manifest로 Runtime만 배포 |
 
 ---
 
@@ -125,7 +125,7 @@ install.py는 hook을 자동 등록하지 않는다. 실행 중인 agent가 `age
 Q1~Q4에서 수집한 정보를 요약하여 사용자에게 알린 뒤 `install.py`를 실행한다.
 
 ```
-모드   : 신규 설치 | 업그레이드
+모드   : 신규 설치
 경로   : <결정된 경로>
 agents : <결정된 agent>
 ```
@@ -136,9 +136,48 @@ agents : <결정된 agent>
 # 신규 설치
 python3 install.py --project <경로> --agents <agent ...>
 
-# 업그레이드
-python3 install.py --project <경로> --agents <agent ...> --upgrade
+# Runtime 업데이트 (source 저장소에서 실행)
+python3 release_manager.py deploy \
+  --manifest workspace/releases/manifests/<release-id>.json \
+  --target <경로> --target-ref <대상-식별자> --verified-by <검증자>
 ```
+
+### Runtime release 준비·배포·롤백
+
+다음 명령은 **my-pacemaker-agent source 저장소에서만** 실행한다. Runtime release에는 `dist/.mpa-workspace/`만 포함되며, 대상의 `workspace/`, 루트 `docs/`, agent 설정, 일반 소스는 변경하지 않는다.
+
+```bash
+# 1. 방법론 source를 Runtime 배포본에 동기화
+python3 release_manager.py sync-runtime
+
+# 2. 불변 package와 manifest 생성 (출력된 release ID를 기록)
+python3 release_manager.py prepare-release \
+  --verified-by <검증자> --compatibility <호환성> --breaking-change <없음/내용> \
+  --migration <없음/절차> --rollback-condition <조건> --release-note <요약> \
+  --validation-command '<검증-명령>'
+
+# 3. 모든 활성 manifest와 package의 정합성 확인
+python3 release_manager.py release-audit
+
+# 4. 대상·release·현재 Runtime을 기록한 dry-run 생성
+python3 release_manager.py deployment-dry-run \
+  --manifest workspace/releases/manifests/<release-id>.json \
+  --target <프로젝트-경로> --target-ref <소문자-식별자>
+
+# 5. dry-run, 명시 승인, rollback 책임자를 연결해 Runtime만 배포
+python3 release_manager.py deploy \
+  --manifest workspace/releases/manifests/<release-id>.json \
+  --target <프로젝트-경로> --target-ref <소문자-식별자> --verified-by <검증자> \
+  --dry-run workspace/receipts/deployments/<대상>/dry-run-<release-id>-<id>.json \
+  --approved-by <승인자> --approval-ref <승인-기록> --rollback-owner <책임자>
+
+# 6. 문제가 있을 때, deploy 출력의 .mpa-backups/... 값을 그대로 사용해 rollback
+python3 release_manager.py rollback \
+  --target <프로젝트-경로> --target-ref <소문자-식별자> \
+  --backup .mpa-backups/<release-id>-<timestamp>-<id>
+```
+
+`installation refresh`는 Runtime release의 일부가 아니다. agent 설정 또는 최초 설치 골격을 바꾸려면 대상·변경 파일·보존 범위를 명시한 별도 요청으로 처리한다. 기존 설치본에 자동으로 적용하지 않는다.
 
 ---
 
@@ -155,7 +194,6 @@ python3 install.py --project <경로> --agents <agent ...> --upgrade
 ├── workspace/                  ← 모든 agent 공용 (프로젝트 루트)
 │   ├── memory/
 │   ├── tasks/
-│   └── docs/
 ├── .claude/                    ← claude 포함 시
 │   ├── agents/mpa_pacemaker.md ← native 폴더에 직접 배치
 │   └── settings.json           ← hook 등록 (SessionStart / PreToolUse / Stop)
@@ -172,9 +210,4 @@ python3 install.py --project <경로> --agents <agent ...> --upgrade
 > Codex는 `.codex/hooks.json`의 `PreToolUse` matcher에 `apply_patch|write_file|replace|edit` 등을 포함해 게이트 실효성을 확보한다.
 > 게이트 강도는 환경변수 `MPA_GATE`(block/warn/off)로 조절한다.
 
-업그레이드 시 추가 동작:
-- `.mpa-workspace/upgrade-candidates/` 파일을 harness로 이동 후 `.mpa-workspace/` 교체
-
-> **설치·업그레이드 공통 규칙:**  
-> `.mpa-workspace/upgrade-candidates/` 디렉토리는 생성되지만 **내용은 비워진다**.  
-> 하네스 자체의 개선 후보는 프로젝트로 넘어가지 않는다.
+기존 설치본의 Runtime 업데이트는 `.mpa-workspace/`만 backup·교체한다. `workspace/`, 루트 `docs/`, agent 설정과 일반 소스는 읽거나 변경하지 않는다. 설치 골격·agent 설정을 바꾸는 installation refresh는 자동 실행하지 않으며, 별도 명시 요청으로만 수행한다.

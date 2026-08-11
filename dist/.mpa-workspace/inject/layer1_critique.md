@@ -199,4 +199,4 @@ plan.md를 읽고 `personas/plan_critic.md`의 비평 체크리스트를 순서�
 
 1. 비평 결과를 `workspace/tasks/active/[태스크명]/critique.md`에 저장한다
 2. 메인 에이전트에 반환: "critique.md 저장 완료: [경로]" (내용 요약 없음)
-3. MPA 시스템 개선 후보 발견 → `.mpa-workspace/upgrade-candidates/[내용].md`
+3. MPA 시스템 개선 발견 → local `workspace/issues/`에 `methodology_improvement` issue 기록

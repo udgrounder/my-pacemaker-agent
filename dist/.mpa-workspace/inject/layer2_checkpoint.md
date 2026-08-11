@@ -22,7 +22,7 @@
 5. `workspace/memory/domains/` 하위 모든 `rules.md`, `registry.md`
 6. `workspace/memory/roles/` 하위 모든 `.md` 파일 (존재하는 경우)
 7. `workspace/tasks/INDEX.md`
-8. `workspace/docs/INDEX.md`
+8. `docs/INDEX.md`
 
 ---
 
@@ -95,8 +95,8 @@ ls workspace/tasks/active/ workspace/tasks/done/
 
 에이전트가 다음 두 가지를 준비해 사용자에게 제시한다:
 
-**1. 최근 upgrade-candidates 요약**
-`.mpa-workspace/upgrade-candidates/` 파일 목록과 각 파일의 발견 상황 한 줄 요약.
+**1. 최근 methodology issue 요약**
+local `workspace/issues/`의 방법론 개선 issue 목록과 각 발견 상황 한 줄 요약.
 
 **2. 에이전트 가정 오류 사례**
 이번 Layer 2 대상 태스크들의 plan.md에서 "에이전트 가정" 항목 중 구현 중 틀린 것으로 밝혀진 사례를 수집한다.
@@ -106,7 +106,7 @@ ls workspace/tasks/active/ workspace/tasks/done/
 ```
 [사용자 회고 요청]
 
-upgrade-candidates 누적: [N]개
+methodology issue 누적: [N]개
 에이전트 가정 오류 사례:
   - [태스크명]: "[가정 내용]" → 실제: "[결과]"
   - (없으면 생략)
@@ -116,7 +116,7 @@ upgrade-candidates 누적: [N]개
 ```
 
 **사용자 답변 처리:**
-- 패턴 발견 → `.mpa-workspace/upgrade-candidates/[내용].md`에 타입 A(방법론 개선)로 기록
+- 패턴 발견 → local `workspace/issues/`에 `methodology_improvement` issue로 기록
 - "없음" 또는 무응답 → 다음 단계로 진행
 
 ---
@@ -127,11 +127,11 @@ upgrade-candidates 누적: [N]개
 
 > **"이 지식이 다른 프로젝트의 의사결정도 바꾸는가?"**
 
-통과 항목은 `.mpa-workspace/upgrade-candidates/[내용].md`에 도메인 지식 형식(타입 B)으로 export한다.
-형식: `core/agent_rules_detail.md` "upgrade-candidates 형식" 섹션 참조.
+통과 항목은 local `workspace/issues/`에 `knowledge_promotion` issue로 기록한다.
+형식: `core/agent_rules_detail.md` "issue 기록" 섹션 참조.
 
 > 매 태스크마다 경계를 판단하지 않는다. Layer 2에서 한꺼번에 평가하는 것이 단방향 흐름 원칙이다.
-> 사용자가 upgrade-candidates를 승인하면 `.mpa-workspace/knowledge/[도메인].md`로 승격된다.
+> map-product review가 승인하면 `.mpa-workspace/knowledge/[도메인].md`로 승격된다.
 
 ---
 
@@ -143,8 +143,8 @@ upgrade-candidates 누적: [N]개
 - [ ] memory 업데이트 항목 도출됨
 - [ ] 요청/문서 동기화 점검 완료
 - [ ] INDEX vs 태스크 폴더 동기화 확인 (누락·불일치 없음)
-- [ ] 사용자 회고 제시 완료 (upgrade-candidates 요약 + 가정 오류 사례)
-- [ ] 지식 승격 후보 평가 완료 (`domains/` → `upgrade-candidates/`)
+- [ ] 사용자 회고 제시 완료 (methodology issue 요약 + 가정 오류 사례)
+- [ ] 지식 승격 후보 평가 완료 (`domains/` → `workspace/issues/`)
 - [ ] 발견 사항이 즉시 / 다음 스프린트 / 기록으로 분류됨
 
 ---
@@ -178,4 +178,4 @@ upgrade-candidates 누적: [N]개
 ## 세션 종료 시
 
 산출물에 따라 `workspace/` 파일을 직접 업데이트한다.
-MPA 시스템 개선 후보 발견 시 `.mpa-workspace/upgrade-candidates/[내용].md` 에 기록한다.
+MPA 시스템 개선 발견 시 local `workspace/issues/`에 `methodology_improvement` issue를 기록한다.

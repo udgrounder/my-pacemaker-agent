@@ -2,7 +2,7 @@
 
 > **사용법 — 작성 완료 후 이 블록을 삭제한다**
 > - 이 파일은 MPA 시스템 관리자가 `dist/.mpa-workspace/knowledge/`에 추가한다
-> - 프로젝트에서 직접 작성하지 않는다 → upgrade-candidates/ 경로 이용
+> - 프로젝트에서 직접 작성하지 않는다 → `knowledge_promotion` issue review를 거쳐 작성
 > - 출처 프로젝트명을 반드시 명시한다
 
 **도메인:** [결제 / 인증 / 알림 / ...]

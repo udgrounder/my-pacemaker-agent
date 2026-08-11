@@ -490,7 +490,7 @@ AI를 잘 쓰는 사람과 못 쓰는 사람의 차이는 프롬프트 실력이
 ├── hooks/                   ← agent 강제 메커니즘 (세션 시작 주입·소스 수정 게이트·종료 리마인드)
 ├── knowledge/               ← 크로스 프로젝트 도메인 지식 (승격된 검증 사실)
 ├── templates/               ← 파일 생성 시 복사해 쓰는 템플릿
-└── upgrade-candidates/      ← 체계 개선 후보 임시 저장 (12장에서 설명)
+└── (프로젝트 issue는 `workspace/issues/`에 기록)
 ```
 
 각 파일이 언제 쓰이는지는 이후 각 장에서 작업 흐름과 함께 설명한다.
@@ -928,7 +928,7 @@ Layer 2를 거치며 Layer 0 문서가 점점 정교해진다. 프로젝트가 �
 - 과정·결과를 `workspace/exploration/discussion/`에 **living document**로 남긴다 (진행될 때마다 갱신).
 - **plan.md·GATE·"완료 처리"를 적용하지 않는다.** 종료는 에이전트가 압박하지 않고, 사용자가 토론을 마치겠다고 할 때 이뤄진다.
 - 진입: "○○에 대해 논의하자/토론하자". (라우팅 우선순위상 개발 동사가 섞여도 토론으로 판정 — `agent_rules.md` §2)
-- 출구: 논의가 "만들자"로 수렴하면 거기서 **개발 태스크로 핸드오프**하고, 방법론 개선이면 `upgrade-candidates/`에 남긴다.
+- 출구: 논의가 "만들자"로 수렴하면 거기서 **개발 태스크로 핸드오프**하고, 방법론 개선이면 `workspace/issues/`에 `methodology_improvement` issue로 남긴다.
 
 개발 트랙이 "무엇을 만들까"라면 토론 모드는 "무엇을 이해할까"다. 둘은 나란히 선다.
 
@@ -972,7 +972,7 @@ inject 파일의 구성:
 | inject 파일 | 사용 시점 | 핵심 목적 | 스레드 |
 |------------|-----------|-----------|--------|
 | `layer0_init.md` | 프로젝트 초기화 | 아키텍처 규칙 문서화 또는 현황 분석 | 새 스레드 |
-| `layer0_update.md` | 체계 업데이트 | upgrade-candidates 이전 + 인바운드 반영 | 새 스레드 |
+| `layer0_update.md` | 체계 업데이트 | 수집된 issue 검토 + Runtime 반영 | 새 스레드 |
 | `layer1_design.md` | 개별 작업 설계 | 계획서(plan.md) 작성 | 새 스레드 |
 | `layer1_critique.md` | 계획 독립 비평 | plan.md의 약점·숨은 가정·실패 시나리오 발굴 | **반드시 새 스레드** |
 | `layer1_implement.md` | 구현 | 계획서 충실 이행 | 같은 스레드 |
@@ -1132,8 +1132,8 @@ C. 부정 컨텍스트 — "건드리지 말아야 할 것" 명시
    Q1. 프로젝트 경로 확인
    Q2. 사용할 agent 결정 (프로젝트 폴더를 보고 자동 감지 → 사용자 확인)
    Q3. agent-specs/{agent}/spec.md를 읽어 설치 내용 파악·안내
-   Q4. .mpa-workspace/ 존재 여부로 신규/업그레이드 자동 판단
-   Q5. 수집한 정보를 요약해 알린 뒤 install.py 실행
+   Q4. .mpa-workspace/ 존재 여부로 신규 설치 또는 Runtime 배포 절차를 판단
+   Q5. 신규 설치일 때만 수집한 정보를 요약해 install.py 실행
 ```
 
 에이전트가 최종적으로 실행하는 명령:
@@ -1141,11 +1141,11 @@ C. 부정 컨텍스트 — "건드리지 말아야 할 것" 명시
 # 신규 설치
 python3 install.py --project <경로> --agents <agent>
 
-# 업그레이드
-python3 install.py --project <경로> --agents <agent> --upgrade
+# Runtime 업데이트 (source 저장소에서 실행)
+python3 release_manager.py deploy --manifest workspace/releases/manifests/<release-id>.json --target <경로> --target-ref <대상-식별자> --verified-by <검증자>
 ```
 
-`--project`와 `--agents`는 **둘 다 필수**다. 신규/업그레이드는 `.mpa-workspace/` 존재 여부로 자동 판단되며, `--upgrade`로 강제할 수도 있다.
+`--project`와 `--agents`는 신규 설치에만 **둘 다 필수**다. 기존 `.mpa-workspace/`가 있으면 `install.py`는 중단하며, Runtime update는 승인된 release manifest로만 수행한다.
 
 **설치 후 프로젝트 구조:**
 ```
@@ -1169,14 +1169,9 @@ my-project/
 | `antigravity` | `GEMINI.md` | `GEMINI.md` 또는 `.gemini/` 존재 |
 | `openagent` | spec.md 질의로 결정 | 감지 불가 → 사용자 확인 |
 
-**업그레이드 시 추가 동작:**
+**Runtime 업데이트:**
 
-업그레이드도 같은 절차(install.md)로 진행되며, 신규 설치와 다른 점은 다음과 같다.
-```
-1. 프로젝트의 upgrade-candidates/ → 체계 저장소로 이전 (발견한 것 반영)
-2. 체계 최신 .mpa-workspace/ → 프로젝트에 교체 복사 (템플릿 최신화)
-3. workspace/ 템플릿의 누락 항목만 추가 (기존 프로젝트 데이터는 건드리지 않음)
-```
+release preparation에서 `dist/.mpa-workspace/` 해시와 불변 package를 고정한다. deployment는 그 package로 프로젝트의 `.mpa-workspace/`만 backup·교체·검증한다. `workspace/`, 루트 `docs/`, agent 설정과 일반 소스는 건드리지 않는다.
 
 복사되는 것과 복사 안 되는 것:
 - **복사됨**: 에이전트 행동 규칙, inject 파일, 페르소나, 스킬 등 체계 운영 파일
@@ -1188,13 +1183,13 @@ my-project/
 
 ```
 프로젝트 A에서 검증된 패턴
-    ↓ upgrade-candidates → 체계 반영
+    ↓ workspace/issues/ 수집·검토 → 체계 반영
 프로젝트 B의 Layer 0에서 활용
 ```
 
 이 경로가 없으면, 각 프로젝트에서 발견한 것들이 체계에 반영되지 않고 사라진다.
 
-`upgrade-candidates/` 내용은 설치/업데이트 시 비워진다. 체계 자체 후보는 프로젝트로 넘기지 않는다.
+issue는 자동 수집·자동 삭제하지 않는다. 사용자가 지정한 프로젝트·파일만 source inbox로 수집하고, 검토·release 근거를 연결한 뒤 archive한다.
 
 ---
 
@@ -1251,7 +1246,7 @@ workspace/memory/roles/[페르소나명].md에 기록 (자가 개선 필터 적�
 | 역할 레벨 | `workspace/memory/roles/[페르소나명].md` — 자가 개선 필터로 기록 |
 | 도메인 레벨 | `workspace/memory/domains/[도메인]/rules.md` (부정 정의 포함) |
 | 시스템 레벨 | `workspace/memory/shared/project_identity.md` (부정 정의 포함) |
-| 체계 레벨 | `.mpa-workspace/upgrade-candidates/` — 방법론 개선 |
+| 체계 레벨 | `workspace/issues/` — `methodology_improvement` issue |
 
 체계의 성숙도는 사용 시간에 비례한다.
 
@@ -1391,30 +1386,30 @@ N개 작업마다 팀 체크포인트 — 개인 작업들이 전체 아키텍�
 
 ### 13장. 체계 개선 파이프라인
 
-#### 13.1 upgrade-candidates 기록 방법
+#### 13.1 방법론 개선 issue 기록 방법
 
-운영 중 발견한 체계 개선 후보를 기록하는 위치: `.mpa-workspace/upgrade-candidates/`
+운영 중 발견한 체계 개선 후보를 기록하는 위치: `workspace/issues/` (`kind: methodology_improvement`)
 
 기록 전 판단 기준:
 > "이 발견이 다른 프로젝트에도 적용될 가치가 있는가?"
 
 - 이 프로젝트에만 해당하는 특수 케이스 → workspace/memory/에 기록
-- 다른 프로젝트에도 일반적으로 적용될 패턴 → upgrade-candidates/에 기록
+- 다른 프로젝트에도 일반적으로 적용될 패턴 → `methodology_improvement` issue로 기록
 
 #### 13.2 프로젝트 → 체계 이전 흐름
 
 ```
 운영 중 발견
     ↓
-upgrade-candidates/ 기록
+workspace/issues/ 기록
     ↓
-(다음 업데이트 시점)
+(사용자 명시 수집·검토 시점)
     ↓
 전체 후보 목록 검토
     ↓
 하나씩 확인 후 반영
     ↓
-upgrade-candidates/ 비워짐 → 다음 프로젝트에 전파
+불변 release package 준비 → 승인된 대상 Runtime에 배포
 ```
 
 #### 13.3 체계 시스템 업데이트 원칙
@@ -1587,7 +1582,7 @@ git clone https://github.com/udgrounder/my-pacemaker-agent.git
 @install.md 를 읽고 /path/to/my-project 에 설치해줘
 ```
 
-에이전트가 install.md의 질의응답 절차로 경로와 agent를 확정하고(폴더를 보고 자동 감지 → 확인), 신규/업그레이드를 판단한 뒤 `install.py`를 실행한다.  
+에이전트가 install.md의 질의응답 절차로 경로와 agent를 확정하고(폴더를 보고 자동 감지 → 확인), 신규 설치일 때만 `install.py`를 실행한다. 기존 설치본 Runtime은 release manifest를 명시적으로 배포한다.
 설치 후 프로젝트에 `.mpa-workspace/`, `workspace/`(템플릿 골격)가 생기고, 선택한 agent의 진입점이 루트 설정 파일(`CLAUDE.md` 등)에 추가된다.
 
 ---
@@ -1642,7 +1637,7 @@ plan_critic이 설계 과정 없이 plan.md만 보고 독립 비평을 수행한
 **Step 4 — 작업이 익숙해지면**
 
 - Layer 2 체크포인트 (6.4): 3~5개 작업마다 전체 정합성 확인
-- 체계 개선 발견 시 (12장): `upgrade-candidates/`에 기록
+- 체계 개선 발견 시 (13장): `workspace/issues/`에 `methodology_improvement` issue 기록
 - 세션이 끊기면 (10장): `plan.md` + `workspace/memory/` 파일을 새 스레드에 주입해 재개
 
 ---
@@ -1718,7 +1713,7 @@ plan_critic이 설계 과정 없이 plan.md만 보고 독립 비평을 수행한
 
 **completion bias**: 컨텍스트에 완성된 결과물이 있을 때 LLM이 그것을 정당화하는 방향으로 읽으려는 경향. 인간의 자아 보호와 다르다 — 심리가 아닌 확률 분포의 문제다. layer1_critique를 새 스레드로 분리하는 이유다.
 
-**upgrade-candidates**: 운영 중 발견한 체계 개선 후보를 임시 저장하는 공간. 업데이트 시 체계에 반영되고 비워진다.
+**methodology_improvement issue**: 운영 중 발견한 체계 개선 후보를 `workspace/issues/`에 기록하는 항목. 사용자 명시 수집·검토와 release 근거 연결 뒤 archive한다.
 
 **조용한 결정(Silent Decision)**: 에이전트가 명세되지 않은 공간을 스스로 채우면서 그 결정을 명시하지 않는 현상.
 

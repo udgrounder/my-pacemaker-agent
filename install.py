@@ -10,7 +10,6 @@ import json
 import shutil
 import stat
 import sys
-import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -44,7 +43,7 @@ def _hook_cmd(script: str, agent: str) -> str:
 
     상대경로(`.mpa-workspace/hooks/...`)만 쓰면 에이전트가 Bash에서 cd한 뒤
     cwd가 바뀐 상태로 훅이 실행될 때 파일을 못 찾아 크래시한다
-    (`.mpa-workspace/upgrade-candidates/hook_relative_path_fragility.md` 참조).
+    (`workspace/issues/`로 이관된 hook path robustness issue 참조).
     agent별로 cwd에 의존하지 않는 방식을 쓴다 — 둘 다 절대경로를 파일에
     박아넣지 않으므로 settings.json/hooks.json을 git으로 공유해도 안전하다.
     """
@@ -128,55 +127,6 @@ def read_config_content(agent: str) -> Optional[str]:
 # ──────────────────────────────────────────────
 # 설치 로직
 # ──────────────────────────────────────────────
-
-def migrate_upgrade_candidates(agents_workspace_dst: Path) -> int:
-    """프로젝트의 upgrade-candidates 파일을 harness로 이동한다.
-    동일 파일명이 이미 존재하면 UUID suffix를 붙여 보존한다.
-    반환값: 이동된 파일 수
-    """
-    candidates_src = agents_workspace_dst / "upgrade-candidates"
-    candidates_dst = AGENTS_WORKSPACE_SRC / "upgrade-candidates"
-
-    if not candidates_src.exists():
-        print("  [확인] upgrade-candidates/ 폴더 없음, 건너뜀")
-        return 0
-
-    candidates_dst.mkdir(parents=True, exist_ok=True)
-
-    moved = 0
-    for f in sorted(candidates_src.iterdir()):
-        # .gitkeep, archive/(처리 완료 후보 이력)는 dist로 이동하지 않는다.
-        if f.name in (".gitkeep", "archive"):
-            continue
-
-        dest = candidates_dst / f.name
-        if dest.exists():
-            uid = uuid.uuid4().hex[:8]
-            dest = candidates_dst / f"{f.stem}_{uid}{f.suffix}"
-            print(f"  [이동] {f.name} → harness/upgrade-candidates/{dest.name} (충돌 해결)")
-        else:
-            print(f"  [이동] {f.name} → harness/upgrade-candidates/")
-
-        shutil.move(str(f), dest)
-        moved += 1
-
-    if moved == 0:
-        print("  [확인] upgrade-candidates/ 이동할 파일 없음")
-
-    return moved
-
-
-def clear_upgrade_candidates(agents_workspace_dst: Path):
-    """복사된 upgrade-candidates/ 를 비운다 (.gitkeep 유지)"""
-    candidates = agents_workspace_dst / "upgrade-candidates"
-    if not candidates.exists():
-        return
-    for f in candidates.iterdir():
-        if f.name == ".gitkeep":
-            continue
-        f.unlink() if f.is_file() else shutil.rmtree(f)
-    print("  [초기화] upgrade-candidates/ 비움")
-
 
 _IGNORE = shutil.ignore_patterns(".DS_Store", ".gitkeep")
 
@@ -449,28 +399,13 @@ def run_install(project_path: Path, agents: list, upgrade: bool):
     workspace_dst = project_path / "workspace"
 
     if upgrade:
-        print("\n[1단계] upgrade-candidates 이동")
-        migrate_upgrade_candidates(agents_workspace_dst)
+        raise ValueError("install.py는 기존 설치본의 update를 지원하지 않습니다")
 
-        # .mpa-workspace 교체 전에 레거시 설치일을 읽어둔다 (마이그레이션).
-        legacy_installed = read_legacy_installed(agents_workspace_dst)
-
-        print("\n[2단계] .mpa-workspace 교체")
-        shutil.rmtree(agents_workspace_dst)
-        copy_agents_workspace(agents_workspace_dst)
-        clear_upgrade_candidates(agents_workspace_dst)
-
-        print("\n[3단계] workspace 템플릿 업데이트 및 누락 항목 추가")
-        copy_workspace_template(workspace_dst, upgrade=True)
-        write_version(workspace_dst, "upgraded", legacy_installed)
-    else:
-        print("\n[1단계] .mpa-workspace 설치")
-        copy_agents_workspace(agents_workspace_dst)
-        clear_upgrade_candidates(agents_workspace_dst)
-
-        print("\n[2단계] workspace 초기화")
-        copy_workspace_template(workspace_dst)
-        write_version(workspace_dst, "installed")
+    print("\n[1단계] .mpa-workspace 설치")
+    copy_agents_workspace(agents_workspace_dst)
+    print("\n[2단계] workspace 초기화")
+    copy_workspace_template(workspace_dst)
+    write_version(workspace_dst, "installed")
 
     print("\n[hook] 스크립트 실행 권한 부여")
     make_hooks_executable(project_path)
@@ -549,7 +484,10 @@ def parse_args():
         help="사용 중인 agent (claude, codex, antigravity, openagent). "
         "공백 또는 콤마로 여러 개 지정: --agents claude codex 또는 --agents claude,codex",
     )
-    parser.add_argument("--upgrade", action="store_true", help="업그레이드 모드로 실행")
+    parser.add_argument(
+        "--upgrade", action="store_true",
+        help="더 이상 지원하지 않음: Runtime 업데이트는 release_manager.py deploy를 사용",
+    )
     return parser.parse_args()
 
 
@@ -568,14 +506,14 @@ def main():
     else:
         project_path = prompt_project_path()
 
-    # 2. 신규 설치 vs 업그레이드 자동 판단
+    # 2. 최초 설치만 담당한다. Runtime 업데이트는 release_manager.py deploy로
+    # .mpa-workspace만 교체해야 하므로 여기서 workspace/설정을 다시 건드리지 않는다.
     agents_workspace_dst = project_path / ".mpa-workspace"
-    upgrade = cli.upgrade or agents_workspace_dst.exists()
-
-    if upgrade:
-        print(f"\n.mpa-workspace/ 가 이미 존재합니다 → 업그레이드 모드")
-    else:
-        print(f"\n.mpa-workspace/ 없음 → 신규 설치 모드")
+    if cli.upgrade or agents_workspace_dst.exists():
+        print("오류: 기존 설치본 업데이트는 release_manager.py deploy를 사용하세요.")
+        return 1
+    upgrade = False
+    print(f"\n.mpa-workspace/ 없음 → 신규 설치 모드")
 
     # 3. agent 선택
     if cli.agents:

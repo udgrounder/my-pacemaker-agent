@@ -12,9 +12,9 @@
 | code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 필요" 출력 | "계획 승인 재확인" |
 | 사용자가 "이어서 해줘"·"계속해줘"·"어디까지 했어" 발화 | "태스크 재개" |
 | 태스크 완료 처리 직후 (Layer 2 현황 표시 시점) | "Layer 2 현황 표시" (단, `agent_rules.md`에 인라인으로 있음 — detail 불필요) |
-| 사용자가 "정합성 점검"·"전체 점검" 발화 후 점검 항목 #7 도달 시 | "upgrade-candidates 형식" |
-| 세션 종료 시 정정 회고에서 기록 항목 발생 | "upgrade-candidates 형식" |
-| 라우팅 정정이 발생해 기록할 때 | "upgrade-candidates 형식" (타입 A — 방법론 개선) |
+| 사용자가 "정합성 점검"·"전체 점검" 발화 후 점검 항목 #7 도달 시 | "issue 기록" |
+| 세션 종료 시 정정 회고에서 기록 항목 발생 | "issue 기록" |
+| 라우팅 정정이 발생해 기록할 때 | "issue 기록" (`methodology_improvement`) |
 | 코드 탐색이 필요한 시점 (구현·검증 진입 전) | "코드 탐색" |
 | 세션 종료 시 memory(architecture/contracts/domains/roles) 기록 여부를 판단할 시점 | "기억 여부 판단" |
 | 기술·도메인 지식을 기록해야 할 시점 | "기술/도메인 지식 기록 기준" |
@@ -98,9 +98,7 @@
 
 **진행 중 토론 확인 (토론 모드 안전망):** 토론은 `tasks/active/`에 등록되지 않으므로 별도로 확인한다. `workspace/exploration/discussion/`에 상태 마커가 `진행 중`인 문서가 있으면, 진행 중 태스크 현황과 함께 짧게 표시한다 — "진행 중 토론: [주제] (이어서 논의하려면 말씀해 주세요)". 폴더가 없거나 진행 중 문서가 없으면 침묵한다.
 
-**upgrade-candidates 확인:** 세션 시작 시에는 확인하지 않는다. 태스크 완료 후(아래 "태스크 완료" 섹션)에만 안내한다.
-
-**처리 완료 후:** `core/agent_rules_detail.md` "upgrade-candidates 형식" 섹션의 "처리 후 archive 절차" 참조.
+**issue 확인:** 세션 시작 시에는 확인하지 않는다. 태스크 완료 후 local `workspace/issues/`에 기록할 항목만 안내한다.
 
 **workspace/ 자체가 없는 경우:** "workspace/가 없습니다. 프로젝트 초기화(Layer 0)가 필요합니다. 지금 시작할까요?"
 
@@ -171,7 +169,7 @@
 1. "지금 [기능]이 의도한 대로 작동하고 있나요?" → 아니오: 버그 / 예: 질문 2
 2. "새 기능 추가인가요, 기존 기능 개선인가요?" → 새 기능: 설계 / 개선: 리팩터링
 
-**라우팅 정정 발생 시:** 정정된 유형으로 즉시 재라우팅 + `.mpa-workspace/upgrade-candidates/`에 타입 A(방법론 개선) 형식으로 기록.
+**라우팅 정정 발생 시:** 정정된 유형으로 즉시 재라우팅 + local `workspace/issues/`에 `methodology_improvement` issue로 기록.
 
 ---
 
@@ -318,7 +316,7 @@
    - `점검`: 신규 완료는 `-` (미점검). 전체 정합성 점검 후 `✅`로 갱신.
    - 갱신 후 위 "INDEX.md 유지보수 원칙"을 수행한다.
 3. `workspace/tasks/active/yyyymmdd_[태스크명]/` → `workspace/tasks/done/yyyymmdd_[태스크명]/` 이동
-4. `plan.md`의 "완료 시 문서 업데이트 대상" 확인 후 `workspace/docs/` 반영
+4. `plan.md`의 "완료 시 문서 업데이트 대상" 확인 후 `docs/` 반영
 5. **전체 정합성 점검 현황 표시**
    - INDEX.md에서 `점검` 컬럼이 `-`인 done 태스크를 집계한다 (단일 패스).
    - 집계 결과를 사용자에게 보여준다:
@@ -336,11 +334,7 @@
    - 트리거: 마커 이후 done 태스크 중 `major`가 1개 이상 포함, 또는 `minor`만 5개 이상일 때 제안
    - 사용자가 판단. 에이전트는 임계값을 갖지 않는다.
    - 전체 점검 완료 시: 점검 대상 태스크들의 `점검` 컬럼을 일괄 `✅`로 갱신.
-6. **upgrade-candidates 확인** — `.mpa-workspace/upgrade-candidates/` 폴더에 파일이 있으면 정합성 점검 현황과 함께 안내한다:
-   ```
-   📦 MPA 시스템 개선 후보가 [N]개 있습니다. 검토하시겠어요? (나중에 하셔도 됩니다)
-   ```
-   사용자가 거절하거나 무시하면 이번 세션에서는 더 이상 언급하지 않는다.
+6. **methodology issue 확인** — local `workspace/issues/`에 방법론 개선 issue가 있으면 필요 시 수집을 제안한다. 수집·review·triage는 map-product source에서만 실행한다.
 
 > **점검 상태 단일 소스: INDEX.md**
 > `점검` 컬럼은 INDEX.md에서만 관리한다. plan.md에는 점검 상태를 기록하지 않는다.
@@ -358,12 +352,12 @@ inject 파일의 "세션 종료 시" 항목을 확인하고 필요한 `workspace
 
 > **이번 세션에서 내가 잘못 판단한 것 / 사용자가 정정한 것이 있는가?**
 
-- **있음:** 어떤 패턴인지 식별하고 `.mpa-workspace/upgrade-candidates/[내용].md`에 기록 (방법론 개선 타입 A 형식).
+- **있음:** 어떤 패턴인지 식별하고 local `workspace/issues/`에 `methodology_improvement` issue로 기록.
 - **없음:** "정정 회고: 없음"이라고 명시한다. (회고 자체를 건너뛰지 않음으로 다음 세션에도 회고 습관이 유지된다.)
 
 > **회고의 한계 인지:** LLM은 자신이 체계적으로 잘못 판단하는 패턴은 인식하지 못한다.  
 > 이 회고는 "사용자가 명시적으로 정정한 것"과 "스스로 의식한 오판"만 잡는다.  
 > 완전한 검증 메커니즘이 아니다 — 일부라도 잡는 차선책이다.
 
-MPA 시스템 개선 후보 발견 시 → `.mpa-workspace/upgrade-candidates/[내용].md` 기록.
-형식: `agent_rules_detail.md` "upgrade-candidates 형식" 섹션 참조.
+MPA 시스템 개선 발견 시 → local `workspace/issues/`에 `methodology_improvement` issue 기록.
+형식: `agent_rules_detail.md` "issue 기록" 섹션 참조.

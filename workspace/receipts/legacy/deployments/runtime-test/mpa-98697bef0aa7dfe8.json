@@ -1,0 +1,8 @@
+{
+  "release_id": "mpa-98697bef0aa7dfe8",
+  "manifest": "workspace/releases/manifests/mpa-98697bef0aa7dfe8.json",
+  "target": "/private/tmp/map-runtime-test.j9iUPK",
+  "backup": ".mpa-backups/mpa-98697bef0aa7dfe8-20260811203705",
+  "applied_at": "2026-08-11T11:37:05+00:00",
+  "verified_by": "codex"
+}
