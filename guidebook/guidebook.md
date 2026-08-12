@@ -1142,17 +1142,20 @@ C. 부정 컨텍스트 — "건드리지 말아야 할 것" 명시
 python3 install.py --project <경로> --agents <agent>
 
 # Runtime 업데이트 (source 저장소에서 실행)
-python3 release_manager.py deploy --manifest workspace/releases/manifests/<release-id>.json --target <경로> --target-ref <대상-식별자> --verified-by <검증자>
+python3 release_manager.py deployment-dry-run --manifest workspace/releases/manifests/<release-id>.json --target <경로> --target-ref <대상-식별자>
+python3 release_manager.py deploy --manifest workspace/releases/manifests/<release-id>.json --target <경로> --target-ref <대상-식별자> --verified-by <검증자> --dry-run <dry-run-receipt> --approved-by <승인자> --approval-ref <승인기록> --rollback-owner <책임자>
 ```
 
-`--project`와 `--agents`는 신규 설치에만 **둘 다 필수**다. 기존 `.mpa-workspace/`가 있으면 `install.py`는 중단하며, Runtime update는 승인된 release manifest로만 수행한다.
+`--project`와 `--agents`는 신규 설치에만 **둘 다 필수**다. `install.py --dry-run`으로 template·agent spec·변경 범위를 먼저 확인할 수 있다. 기존 `.mpa-workspace/`가 있으면 `install.py`는 중단하며, Runtime update는 validation을 통과한 immutable release manifest와 recorded dry-run, 승인, rollback 책임자로만 수행한다.
+
+기존 설치에서 agent wiring 또는 agent spec만 갱신할 때에는 Runtime update와 분리된 `installation refresh`를 사용한다. 대상·agent·agent 관리 파일 allowlist·`workspace/`/루트 `docs/`/일반 소스 preserve 목록·대상 `.mpa-installation-backups/` 아래 backup·승인 reference가 담긴 JSON plan 없이는 실행하지 않는다. Runtime deploy와 최초 install은 refresh를 호출하지 않는다.
 
 **설치 후 프로젝트 구조:**
 ```
 my-project/
 ├── .mpa-workspace/              ← 체계 파일 (에이전트 행동 규칙)
 ├── workspace/                   ← 프로젝트 데이터 (템플릿 골격만 있는 상태)
-│   ├── memory/ tasks/ docs/
+│   ├── memory/ tasks/
 ├── CLAUDE.md / AGENTS.md / GEMINI.md  ← 선택한 agent의 진입점 (기존 파일이면 섹션 추가)
 ├── .claude/agents/mpa_pacemaker.md    ← claude 포함 시 (native 폴더에 직접 배치)
 └── .agents/rules/mpa_pacemaker.md     ← codex/antigravity 포함 시

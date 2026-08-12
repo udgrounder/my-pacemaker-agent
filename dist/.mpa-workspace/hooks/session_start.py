@@ -125,7 +125,7 @@ def active_tasks(cwd):
 
 def build_message(cwd):
     rows = active_tasks(cwd)
-    mode = os.environ.get("MPA_GATE", "block").strip().lower()
+    mode = os.environ.get("MPA_GATE", "warn").strip().lower()
 
     lines = ["[my-pacemaker-agent] 세션 시작 루틴"]
 
@@ -160,8 +160,8 @@ def build_message(cwd):
         "해당 inject 파일을 로드해 작업하세요."
     )
     lines.append(
-        f"코드 수정 게이트: MPA_GATE={mode}. '구현 중' 상태인 태스크 없이 소스를 "
-        "수정하면 차단/경고됩니다 — 구현 전 plan.md 상태를 '구현 중'으로 설정하세요."
+        f"코드 수정 안내: MPA_GATE={mode}. '구현 중' 상태 태스크가 없거나 계획이 달라지면 "
+        "기본은 경고로 안내합니다. agent rule을 따라 태스크·계획을 정리하세요."
     )
     return "\n".join(lines)
 

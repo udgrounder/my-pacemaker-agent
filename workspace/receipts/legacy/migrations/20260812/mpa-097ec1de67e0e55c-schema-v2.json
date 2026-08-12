@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "kind": "release-artifact-migration",
+  "release_id": "mpa-097ec1de67e0e55c",
+  "migrated_at": "2026-08-12T01:06:28+00:00",
+  "reason": "active manifest did not satisfy release schema v2",
+  "legacy_manifest": "workspace/releases/legacy/migrated/20260812/manifests/mpa-097ec1de67e0e55c.json",
+  "legacy_package": "workspace/releases/legacy/migrated/20260812/packages/mpa-097ec1de67e0e55c",
+  "legacy_release_receipt": "workspace/receipts/legacy/migrations/20260812/mpa-097ec1de67e0e55c-pre-schema-v2-release.json",
+  "replacement_manifest": "workspace/releases/manifests/mpa-097ec1de67e0e55c.json",
+  "verified_by": "kjkim"
+}

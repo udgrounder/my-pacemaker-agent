@@ -2,6 +2,17 @@
 
 ## 디렉토리 구조 원칙
 
+### map-product와 Runtime 배포 경계
+
+| Plane | 소유·진입점 | 복사/배포 규칙 |
+|---|---|---|
+| map-product | `MAP_PRODUCT_RULES.md`, `map-product-rules/`, `release_manager.py`, `install.py`, source `workspace/` | source 전용이며 배포하지 않음 |
+| Runtime | `.mpa-workspace/` | `sync-runtime`으로만 `dist/.mpa-workspace/`에 동기화하고 release asset으로 포함 |
+| 신규 설치 골격 | `dist/workspace/` | 최초 설치에만 복사, Runtime release에는 제외 |
+| 대상 사용자 데이터 | 대상 `workspace/`, 루트 `docs/`, agent 설정, 일반 소스 | install/deploy/rollback이 보존하며 release에 포함하지 않음 |
+
+release는 immutable package·manifest·receipt로 고정한다. deployment는 dry-run·승인·rollback 책임자 뒤 대상 `.mpa-workspace`만 교체하며, 대상 history와 receipt를 남긴다. Git은 scoped source 식별 보조 정보일 뿐 dirty worktree 차단 Gate가 아니다.
+
 ### dist/ 가 단일 배포 소스
 `install.py`가 `dist/.mpa-workspace/`를 대상 프로젝트로 복사한다.  
 `agent-configs/`는 구버전 호환 fallback이며 신규 개발 대상이 아니다.  

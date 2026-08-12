@@ -14,8 +14,8 @@ GATE 2 — 완료 이동 (Bash mv):
   아니면 차단.
 
 동작 강도: MPA_GATE 환경변수
-  - block (기본) : 조건 불충족 시 차단 (exit 2)
-  - warn         : 차단하지 않고 경고만 주입
+  - block (명시 설정 시) : 조건 불충족 시 차단 (exit 2)
+  - warn (기본) : 차단하지 않고 경고만 주입
   - off          : 게이트 비활성
 
 사용법: code_gate.py --agent {claude|codex|gemini}
@@ -255,7 +255,7 @@ def check_done_write(rel, cwd, agent):
 
 
 def check_bash_mv(data, cwd, mode, agent):
-    """GATE 2 — Bash mv tasks/active → tasks/done 차단."""
+    """GATE 2 — Bash mv tasks/active → tasks/done 절차 경고 또는 명시적 차단."""
     tool_input = get(data, "tool_input", "toolInput", "input") or {}
     command = tool_input.get("command", "") if isinstance(tool_input, dict) else ""
 
@@ -300,7 +300,7 @@ def main():
     ap.add_argument("--agent", default="claude")
     args = ap.parse_args()
 
-    mode = os.environ.get("MPA_GATE", "block").strip().lower()
+    mode = os.environ.get("MPA_GATE", "warn").strip().lower()
     if mode == "off":
         sys.exit(0)
 

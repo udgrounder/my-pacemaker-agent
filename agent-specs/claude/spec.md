@@ -37,7 +37,7 @@ tool: Claude Code (Anthropic)
 | `PreToolUse` | `Edit\|Write` | `code_gate.py` | 승인 마커 없는 소스 수정 차단 |
 | `Stop` | — | `turn_end.py` | changelog/memory 갱신 리마인드 |
 
-- 차단: `code_gate.py` 가 exit 2 + stderr 로 도구 호출을 막는다.
+- 기본 동작: `code_gate.py`는 경고를 context로 주입하고 도구 호출을 막지 않는다. `MPA_GATE=block`을 명시한 환경에서만 exit 2로 차단한다.
 - 컨텍스트 주입: `hookSpecificOutput.additionalContext` 사용.
 - 게이트 강도는 환경변수 `MPA_GATE` (block/warn/off) 로 조절한다.
 

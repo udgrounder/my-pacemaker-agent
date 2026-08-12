@@ -10,6 +10,7 @@ import json
 import shutil
 import stat
 import sys
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -19,6 +20,7 @@ AGENTS_WORKSPACE_SRC = DIST_ROOT / ".mpa-workspace"
 WORKSPACE_TEMPLATE_SRC = DIST_ROOT / "workspace"
 AGENT_SPECS_SRC = HARNESS_ROOT / "agent-specs"
 AGENT_CONFIGS_SRC = HARNESS_ROOT / "agent-configs"  # 레거시 fallback
+DOCS_INDEX_TEMPLATE = "# 문서 색인\n\n> 이 파일은 agent가 문서 산출물의 위치와 요약을 관리합니다. 일반 문서 내용은 프로젝트 사용자가 소유합니다.\n\n"
 
 AGENT_CONFIG_MAP = {
     "claude":       "CLAUDE.md",
@@ -36,6 +38,22 @@ HOOK_SETTINGS_PATH = {
 
 HOOK_DIR_REL = ".mpa-workspace/hooks"
 HOOK_MARKER = "mpa-workspace/hooks"  # 멱등성 판별용 (이미 등록됐는지)
+REFRESH_SCHEMA_VERSION = 1
+
+
+def _refresh_allowed_paths(agent: str) -> set[str]:
+    """Return the only project paths an installation refresh may touch."""
+    paths = set()
+    config = AGENT_CONFIG_MAP.get(agent)
+    if config:
+        paths.add(config)
+    paths.update({str(path.relative_to(AGENT_SPECS_SRC / agent / "files"))
+                  for path in (AGENT_SPECS_SRC / agent / "files").rglob("*")
+                  if path.is_file()} if (AGENT_SPECS_SRC / agent / "files").exists() else set())
+    hook = HOOK_SETTINGS_PATH.get(agent)
+    if hook:
+        paths.add("/".join(hook))
+    return paths
 
 
 def _hook_cmd(script: str, agent: str) -> str:
@@ -206,6 +224,10 @@ def _merge_dir(src: Path, dst: Path, base: Path, label: str = "", upgrade: bool 
     for item in src.iterdir():
         if item.name in (".DS_Store", ".gitkeep"):
             continue
+        # docs/는 프로젝트 사용자가 루트에 소유·생성한다. 과거 템플릿의 빈
+        # workspace/docs/ 디렉터리도 신규 설치에 복사하지 않는다.
+        if src == WORKSPACE_TEMPLATE_SRC and item.name == "docs":
+            continue
         dst_item = dst / item.name
         rel = dst_item.relative_to(base)
         prefix = f"{label}/" if label else ""
@@ -298,6 +320,19 @@ def copy_agent_spec_files(agent: str, project_path: Path):
     added = _merge_dir(files_src, project_path, project_path, label="")
     if added == 0:
         print(f"  [확인] {agent} spec 파일 추가할 항목 없음")
+
+
+def copy_agent_spec_files_selected(agent: str, project_path: Path, allowed_paths: set[str]):
+    """Copy only plan-approved agent spec files during installation refresh."""
+    files_src = AGENT_SPECS_SRC / agent / "files"
+    for relative in sorted(allowed_paths):
+        source = files_src / relative
+        if source.is_file():
+            target = project_path / relative
+            if not target.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+                print(f"  [추가] {relative}")
 
 
 # workspace/README.md 단일본으로 통합되면서 폐기된 폴더별 README.
@@ -405,7 +440,17 @@ def run_install(project_path: Path, agents: list, upgrade: bool):
     copy_agents_workspace(agents_workspace_dst)
     print("\n[2단계] workspace 초기화")
     copy_workspace_template(workspace_dst)
+    (workspace_dst / "issues").mkdir(parents=True, exist_ok=True)
+    print("  [생성] workspace/issues/ (로컬 issue 수집함, 빈 폴더)")
     write_version(workspace_dst, "installed")
+    docs_dst = project_path / "docs"
+    if not docs_dst.exists():
+        docs_dst.mkdir(parents=True)
+        print("  [생성] docs/ (사용자 문서 루트, 빈 폴더)")
+    docs_index = docs_dst / "INDEX.md"
+    if not docs_index.exists():
+        docs_index.write_text(DOCS_INDEX_TEMPLATE, encoding="utf-8")
+        print("  [생성] docs/INDEX.md (agent 관리 문서 색인)")
 
     print("\n[hook] 스크립트 실행 권한 부여")
     make_hooks_executable(project_path)
@@ -420,6 +465,78 @@ def run_install(project_path: Path, agents: list, upgrade: bool):
         elif agent in ("antigravity", "openagent"):
             print(f"  [안내] {agent} — hook 지원 확인 필요. "
                   f"agent-specs/{agent}/spec.md 질의 절차에 따라 설정하세요.")
+
+
+def _refresh_backup(project_path: Path, paths: list[str], backup: Path) -> None:
+    """Back up only the approved refresh paths, preserving absent-file state."""
+    backup.mkdir(parents=True, exist_ok=False)
+    state = {"target": str(project_path), "paths": {}}
+    for relative in paths:
+        source = project_path / relative
+        state["paths"][relative] = source.exists()
+        if source.is_file():
+            destination = backup / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+    (backup / "refresh-state.json").write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _restore_refresh_backup(project_path: Path, backup: Path) -> None:
+    state = json.loads((backup / "refresh-state.json").read_text(encoding="utf-8"))
+    for relative, existed in state["paths"].items():
+        target = project_path / relative
+        original = backup / relative
+        if existed:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(original, target)
+        elif target.exists():
+            target.unlink()
+
+
+def run_installation_refresh(plan_path: Path) -> None:
+    """Apply a separately approved, agent-only installation refresh plan."""
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    required = ("schema_version", "target", "agent", "changes", "preserve", "backup", "approval_ref")
+    if any(not plan.get(field) for field in required):
+        raise ValueError("refresh plan requires target, agent, changes, preserve, backup, and approval_ref")
+    if plan["schema_version"] != REFRESH_SCHEMA_VERSION:
+        raise ValueError("unsupported refresh plan schema")
+    agent = plan["agent"]
+    if agent not in AGENT_CONFIG_MAP:
+        raise ValueError("refresh plan agent is unsupported")
+    project_path = Path(plan["target"]).resolve()
+    if not project_path.is_dir() or not (project_path / ".mpa-workspace").is_dir():
+        raise ValueError("refresh target must be an existing installation")
+    changes = plan["changes"]
+    preserve = set(plan["preserve"])
+    allowed = _refresh_allowed_paths(agent)
+    if not isinstance(changes, list) or not changes or any(path not in allowed for path in changes):
+        raise ValueError("refresh changes must be a non-empty allowlist of agent-managed paths")
+    required_preserve = {"workspace/", "docs/", "general source files"}
+    if not required_preserve.issubset(preserve):
+        raise ValueError("refresh plan preserve list must protect workspace/, docs/, and general source files")
+    backup = Path(plan["backup"]).resolve()
+    backups_root = (project_path / ".mpa-installation-backups").resolve()
+    if backups_root not in backup.parents:
+        raise ValueError("refresh backup must be inside target .mpa-installation-backups")
+    _refresh_backup(project_path, changes, backup)
+    try:
+        config = AGENT_CONFIG_MAP[agent]
+        if config and config in changes:
+            append_agent_config(agent, project_path)
+        spec_files = set(changes) - ({config} if config else set())
+        copy_agent_spec_files_selected(agent, project_path, spec_files)
+        hook = HOOK_SETTINGS_PATH.get(agent)
+        if hook and "/".join(hook) in changes:
+            wire_hooks(agent, project_path)
+    except Exception:
+        _restore_refresh_backup(project_path, backup)
+        raise
+    receipt = {"schema_version": REFRESH_SCHEMA_VERSION, "target": str(project_path), "agent": agent,
+               "changes": changes, "preserve": sorted(preserve), "backup": str(backup.relative_to(project_path)),
+               "approval_ref": plan["approval_ref"], "applied_at": datetime.datetime.now().isoformat()}
+    (backup / "refresh-receipt.json").write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(receipt, ensure_ascii=False))
 
 
 # ──────────────────────────────────────────────
@@ -488,6 +605,17 @@ def parse_args():
         "--upgrade", action="store_true",
         help="더 이상 지원하지 않음: Runtime 업데이트는 release_manager.py deploy를 사용",
     )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="신규 설치 가능 여부와 변경 범위만 확인하고 파일은 변경하지 않음",
+    )
+    parser.add_argument(
+        "--json", action="store_true",
+        help="dry-run 결과를 machine-readable JSON으로 출력",
+    )
+    parser.add_argument("--installation-refresh", action="store_true",
+                        help="승인된 installation refresh plan만 적용")
+    parser.add_argument("--plan", help="installation refresh plan JSON 경로")
     return parser.parse_args()
 
 
@@ -496,11 +624,25 @@ def main():
 
     cli = parse_args()
 
+    if cli.installation_refresh:
+        if not cli.plan or cli.project or cli.agents or cli.upgrade or cli.dry_run:
+            print("오류: --installation-refresh에는 --plan만 지정하세요.")
+            return 1
+        try:
+            run_installation_refresh(Path(cli.plan).resolve())
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            print(f"오류: {error}", file=sys.stderr)
+            return 1
+        return 0
+    if cli.plan:
+        print("오류: --plan은 --installation-refresh와 함께 사용하세요.")
+        return 1
+
     # 1. 프로젝트 경로
     if cli.project:
         project_path = Path(cli.project).resolve()
-        if not project_path.exists():
-            print(f"오류: 경로가 존재하지 않습니다: {project_path}")
+        if project_path.exists() and not project_path.is_dir():
+            print(f"오류: 프로젝트 경로가 디렉터리가 아닙니다: {project_path}")
             return 1
         print(f"\n프로젝트 경로: {project_path}")
     else:
@@ -533,13 +675,55 @@ def main():
         print("오류: agent를 하나 이상 선택해야 합니다.")
         return 1
 
+    # 신규 설치 전에 source·Python·agent spec의 최소 실행 조건과 변경 범위를 확인한다.
+    missing = [str(path) for path in (DIST_ROOT / ".mpa-workspace", DIST_ROOT / "workspace") if not path.is_dir()]
+    missing.extend(str(AGENT_SPECS_SRC / agent / "spec.md") for agent in agents
+                   if not (AGENT_SPECS_SRC / agent / "spec.md").is_file())
+    for agent in agents:
+        if agent in HOOK_SETTINGS_PATH:
+            try:
+                if not build_hook_block(agent):
+                    missing.append(f"{agent} hook configuration")
+            except (KeyError, ValueError):
+                missing.append(f"{agent} hook configuration")
+    if sys.version_info < (3, 8):
+        missing.append("python>=3.8")
+    plan = {
+        "schema_version": 1,
+        "mode": "install",
+        "target": str(project_path),
+        "agents": agents,
+        "create": (["project root/"] if not project_path.exists() else []) + [".mpa-workspace/", "workspace/ initial skeleton", "docs/ empty user document root", "selected agent entry settings"],
+        "preserve": ["workspace/ existing data", "docs/", "existing agent settings", "general source files"],
+        "checks": {"python": f"{sys.version_info.major}.{sys.version_info.minor}", "missing": missing},
+        "status": "failed" if missing else "ready",
+    }
+    if missing:
+        if cli.json:
+            print(json.dumps(plan, ensure_ascii=False))
+        else:
+            print("오류: 설치 dry-run 실패: " + ", ".join(missing))
+        return 1
+
     # 4. 최종 확인
     mode = "업그레이드" if upgrade else "신규 설치"
     print(f"\n─────────────────────────────")
     print(f"  모드    : {mode}")
     print(f"  경로    : {project_path}")
     print(f"  agents  : {', '.join(agents)}")
+    print(f"  변경    : .mpa-workspace/, workspace/ 초기 골격, 빈 docs/, 선택 agent 진입 설정")
     print(f"─────────────────────────────")
+
+    if cli.dry_run:
+        if cli.json:
+            print(json.dumps(plan, ensure_ascii=False))
+        else:
+            print("\n설치 dry-run 통과: 파일을 변경하지 않았습니다.")
+        return 0
+
+    if not project_path.exists():
+        project_path.mkdir(parents=True)
+        print("  [생성] project root/")
 
     if not cli.project and not ask_yes_no("\n진행할까요?", default=True):
         print("취소되었습니다.")
