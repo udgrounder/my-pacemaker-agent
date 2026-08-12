@@ -153,7 +153,7 @@ def read_legacy_installed(agents_workspace_dst: Path) -> str:
     """업그레이드 시 .mpa-workspace 교체 전에 호출한다.
     구버전 .mpa-workspace/.mpa-version에서 설치일(installed_at 또는 레거시
     harness_date)을 읽어 마이그레이션용으로 반환한다. 없으면 빈 문자열.
-    (방법론 버전은 이제 current_version으로 분리되며 install.py가 다루지 않는다.)
+    (방법론 release ID는 `current_release`로 분리되며 install.py가 다루지 않는다.)
     """
     legacy = agents_workspace_dst / ".mpa-version"
     if not legacy.exists():
@@ -170,7 +170,7 @@ def read_legacy_installed(agents_workspace_dst: Path) -> str:
 def write_version(workspace_dst: Path, mode: str, legacy_installed: str = ""):
     """프로젝트 설치 이력을 workspace/.mpa-version-info에 기록한다.
 
-    방법론 버전(current_version)은 .mpa-workspace/.mpa-version에 있고 통째 교체로
+    방법론 release ID(current_release)는 .mpa-workspace/.mpa-version에 있고 통째 교체로
     갱신되므로 여기서 다루지 않는다. 이력은 workspace에 있어 업그레이드 시 보존된다.
 
     - installed_at: 기존 history 값 보존 > 레거시 승계(마이그레이션) > 설치 당일

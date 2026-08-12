@@ -2,7 +2,7 @@
 
 ## Trigger
 
-검증된 Runtime 변경을 배포 가능한 release로 준비할 때.
+검증된 Runtime 변경을 배포 가능한 release로 준비할 때. `prepare-release`가 UTC `YYYYMMDDHHMMSS-uuid8` 단일 release ID를 생성한다.
 
 ## Input
 

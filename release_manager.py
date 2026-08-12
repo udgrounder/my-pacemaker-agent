@@ -32,7 +32,7 @@ SECRET = re.compile(r"(?i)(api[_-]?key|secret|password|token)\s*[:=]\s*\S+")
 ABSOLUTE_PATH = re.compile(r"(?<![\w.-])/(?:Users|home|var|private|tmp|etc)/")
 IGNORED_RUNTIME_NAMES = {"__pycache__", ".DS_Store", "history"}
 RELEASE_METADATA = ("compatibility", "breaking_change", "migration", "rollback_condition", "release_note")
-RELEASE_SCHEMA_VERSION = 3
+RELEASE_SCHEMA_VERSION = 4
 VALIDATION_TIMEOUT_SECONDS = 120
 DOCS_INDEX_TEMPLATE = "# 문서 색인\n\n> 이 파일은 agent가 문서 산출물의 위치와 요약을 관리합니다. 일반 문서 내용은 프로젝트 사용자가 소유합니다.\n\n"
 
@@ -128,20 +128,39 @@ def scoped_git() -> dict:
         return {"status": "unavailable"}
 
 
-def runtime_version(root: Path) -> str:
+def current_release(root: Path) -> str:
     version_file = root / ".mpa-version"
     if not version_file.is_file():
         raise ValueError("Runtime .mpa-version is missing")
-    match = re.search(r"^current_version:\s*(.+?)\s*$", version_file.read_text(encoding="utf-8"), re.MULTILINE)
+    content = version_file.read_text(encoding="utf-8")
+    match = re.search(r"^current_release:\s*(.+?)\s*$", content, re.MULTILINE)
+    if match:
+        return match.group(1)
+    match = re.search(r"^current_version:\s*(.+?)\s*$", content, re.MULTILINE)
     if not match:
-        raise ValueError("Runtime current_version is missing")
-    return match.group(1)
+        raise ValueError("Runtime current_release is missing")
+    # Upgrade keeps the pre-schema-4 value only as an historical origin marker.
+    return "legacy-" + re.sub(r"[^a-z0-9._-]+", "-", match.group(1).lower()).strip("-")
 
 
-def release_id(version: str, assets: dict[str, str]) -> str:
-    payload = json.dumps(assets, sort_keys=True, separators=(",", ":")).encode()
-    version_tag = re.sub(r"[^a-zA-Z0-9]+", "-", version).strip("-").lower()
-    return f"mpa-{version_tag}-{hashlib.sha256(payload).hexdigest()[:12]}"
+def new_release_id() -> str:
+    """Return the sole user-visible release key: UTC timestamp plus random suffix."""
+    return f"{dt.datetime.now(dt.timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:8]}"
+
+
+def set_current_release(root: Path, ident: str) -> None:
+    require_safe_ref(ident, "release-id")
+    version_file = root / ".mpa-version"
+    version_file.parent.mkdir(parents=True, exist_ok=True)
+    version_file.write_text(f"current_release: {ident}\n", encoding="utf-8")
+
+
+def restore_release_version(version_file: Path, original: str | None) -> None:
+    if original is None:
+        version_file.unlink(missing_ok=True)
+    else:
+        version_file.write_text(original, encoding="utf-8")
+    sync_runtime(argparse.Namespace())
 
 
 def migrate_legacy_active_releases() -> None:
@@ -206,31 +225,27 @@ def prepare_release(args: argparse.Namespace) -> None:
             validation_command = json.loads(args.validation_command)
         except (TypeError, json.JSONDecodeError) as error:
             raise ValueError("validation-command must be an argv JSON array") from error
-    migrate_legacy_active_releases()
-    validation = run_validation(validation_command)
     metadata = {field: getattr(args, field) for field in RELEASE_METADATA}
     if any(not value.strip() for value in metadata.values()):
         raise ValueError("release metadata fields must not be empty")
+    migrate_legacy_active_releases()
+    version_file = RUNTIME_SOURCE / ".mpa-version"
+    original_version = version_file.read_text(encoding="utf-8") if version_file.exists() else None
+    ident = new_release_id()
+    try:
+        set_current_release(RUNTIME_SOURCE, ident)
+        sync_runtime(argparse.Namespace())
+        validation = run_validation(validation_command)
+    except Exception:
+        restore_release_version(version_file, original_version)
+        raise
     assets = asset_map(RUNTIME_DIST)
-    version = runtime_version(RUNTIME_DIST)
-    ident = release_id(version, assets)
-    for existing_path in MANIFESTS.glob("*.json") if MANIFESTS.exists() else []:
-        existing = json.loads(existing_path.read_text(encoding="utf-8"))
-        if existing.get("runtime_version") == version and existing.get("assets") != assets:
-            raise ValueError("runtime_version already has a different immutable package")
+    if current_release(RUNTIME_DIST) != ident:
+        raise ValueError("Runtime release ID does not match prepared release")
     manifest_path = MANIFESTS / f"{ident}.json"
     package_path = PACKAGES / ident
-    if manifest_path.exists() != package_path.exists():
-        raise ValueError("release manifest and package must either both exist or both be absent")
-    if manifest_path.exists():
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if manifest.get("assets") != assets or asset_map(package_path) != assets:
-            raise ValueError("existing release ID does not match its immutable package")
-        write_json(RELEASE_RECEIPTS / f"{ident}-{receipt_suffix()}.json", {
-            "schema_version": RELEASE_SCHEMA_VERSION, "release_id": ident, "runtime_version": version,
-            "manifest": relative_to_root(manifest_path), "created_at": now(),
-            "verified_by": args.verified_by, "validation": validation,
-        })
+    if manifest_path.exists() or package_path.exists():
+        raise ValueError("generated release ID already exists")
     else:
         package_path.parent.mkdir(parents=True, exist_ok=True)
         staging = package_path.with_name(f".{package_path.name}.new-{uuid.uuid4().hex[:8]}")
@@ -242,7 +257,7 @@ def prepare_release(args: argparse.Namespace) -> None:
             staging.replace(package_path)
             receipt = {
                 "schema_version": RELEASE_SCHEMA_VERSION,
-                "release_id": ident, "runtime_version": version,
+                "release_id": ident,
                 "manifest": relative_to_root(manifest_path),
                 "created_at": now(),
                 "verified_by": args.verified_by,
@@ -251,7 +266,7 @@ def prepare_release(args: argparse.Namespace) -> None:
             write_json(receipt_path, receipt)
             manifest = {
                 "schema_version": RELEASE_SCHEMA_VERSION,
-                "release_id": ident, "runtime_version": version,
+                "release_id": ident,
                 "created_at": now(),
                 "asset_root": "dist/.mpa-workspace",
                 "package": relative_to_root(package_path),
@@ -269,6 +284,7 @@ def prepare_release(args: argparse.Namespace) -> None:
                 receipt_path.unlink()
             if package_path.exists():
                 shutil.rmtree(package_path)
+            restore_release_version(version_file, original_version)
             raise
         finally:
             if staging.exists():
@@ -285,7 +301,7 @@ def load_manifest(value: str) -> tuple[Path, dict]:
         raise ValueError("manifest must be inside workspace/releases/manifests")
     data = json.loads(path.read_text(encoding="utf-8"))
     if (data.get("schema_version") != RELEASE_SCHEMA_VERSION or not data.get("release_id") or
-            not data.get("runtime_version") or not isinstance(data.get("assets"), dict)):
+            not isinstance(data.get("assets"), dict)):
         raise ValueError("invalid release manifest")
     if data.get("package") != relative_to_root(PACKAGES / data["release_id"]):
         raise ValueError("manifest package path is invalid")
@@ -298,7 +314,7 @@ def load_manifest(value: str) -> tuple[Path, dict]:
         raise ValueError("manifest release receipt is missing")
     receipt_data = json.loads(receipt.read_text(encoding="utf-8"))
     if (receipt_data.get("schema_version") != RELEASE_SCHEMA_VERSION or
-            receipt_data.get("release_id") != data["release_id"] or receipt_data.get("runtime_version") != data["runtime_version"] or
+            receipt_data.get("release_id") != data["release_id"] or
             receipt_data.get("manifest") != relative_to_root(path) or
             receipt_data.get("validation") != data["validation"]):
         raise ValueError("manifest release receipt does not match")
@@ -311,6 +327,8 @@ def release_package(manifest: dict) -> Path:
         raise ValueError("immutable release package is missing")
     if asset_map(package) != manifest["assets"]:
         raise ValueError("immutable release package does not match manifest")
+    if current_release(package) != manifest["release_id"]:
+        raise ValueError("immutable release package has a different current_release")
     return package
 
 
@@ -410,8 +428,8 @@ def deployment_dry_run(args: argparse.Namespace) -> None:
     if not target.is_dir():
         raise ValueError("target .mpa-workspace is missing; use install.py for first installation")
     created_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
-    result = {"release_id": manifest["release_id"], "runtime_version": manifest["runtime_version"],
-              "from_version": runtime_version(target), "to_version": manifest["runtime_version"], "manifest": relative_to_root(manifest_path),
+    result = {"release_id": manifest["release_id"],
+              "from_release": current_release(target), "to_release": manifest["release_id"], "manifest": relative_to_root(manifest_path),
               "release_receipt": manifest["release_receipt"],
               "target": str(root), "target_ref": target_ref, "current_assets": asset_map(target),
               "release_assets": manifest["assets"], "history": target_history(target), "issue_inventory": update_issue_inventory(root),
@@ -435,7 +453,7 @@ def deploy(args: argparse.Namespace) -> None:
     if DEPLOYMENT_RECEIPTS.resolve() not in dry_run.parents or not dry_run.is_file():
         raise ValueError("deploy requires a recorded deployment dry-run")
     dry_run_data = json.loads(dry_run.read_text(encoding="utf-8"))
-    if (dry_run_data.get("release_id") != manifest["release_id"] or dry_run_data.get("to_version") != manifest["runtime_version"] or
+    if (dry_run_data.get("release_id") != manifest["release_id"] or dry_run_data.get("to_release") != manifest["release_id"] or
             dry_run_data.get("target") != str(root) or dry_run_data.get("target_ref") != target_ref):
         raise ValueError("dry-run does not match deployment inputs")
     if dry_run_data.get("release_receipt") != manifest.get("release_receipt"):
@@ -447,7 +465,7 @@ def deploy(args: argparse.Namespace) -> None:
     if dt.datetime.now(dt.timezone.utc) > expires_at:
         raise ValueError("dry-run has expired")
     if (dry_run_data.get("current_assets") != asset_map(target) or dry_run_data.get("history") != target_history(target) or
-            dry_run_data.get("from_version") != runtime_version(target)):
+            dry_run_data.get("from_release") != current_release(target)):
         raise ValueError("target changed after dry-run")
     if dry_run_data.get("issue_inventory") != update_issue_inventory(root):
         raise ValueError("project issues changed after dry-run")
@@ -455,9 +473,7 @@ def deploy(args: argparse.Namespace) -> None:
         raise ValueError("approved-by, approval-ref, and rollback-owner are required")
     if target_history(target).get(manifest["release_id"], {}).get("status") == "applied":
         raise ValueError("target history already contains this release ID")
-    if any(record.get("to_version") == manifest["runtime_version"] for record in target_history(target).values()):
-        raise ValueError("target history already contains this runtime_version")
-    from_version = runtime_version(target)
+    from_release = current_release(target)
     backup = root / ".mpa-backups" / f"{manifest['release_id']}-{receipt_suffix()}"
     replacement = None
     previous = None
@@ -488,7 +504,7 @@ def deploy(args: argparse.Namespace) -> None:
         collected = collect_update_issues(root, target_ref, dry_run_data["issue_inventory"])
         receipt = {
             "status": "applied", "release_id": manifest["release_id"],
-            "from_version": from_version, "to_version": manifest["runtime_version"],
+            "from_release": from_release, "to_release": manifest["release_id"],
             "manifest": relative_to_root(manifest_path), "target": str(root),
             "backup": str(backup.relative_to(root)), "applied_at": now(), "verified_by": args.verified_by,
             "approved_by": args.approved_by, "approval_ref": args.approval_ref,
@@ -505,7 +521,8 @@ def deploy(args: argparse.Namespace) -> None:
             if target.exists():
                 shutil.rmtree(target)
             previous.replace(target)
-        failure = {"status": "failed", "release_id": manifest["release_id"], "manifest": relative_to_root(manifest_path),
+        failure = {"status": "failed", "release_id": manifest["release_id"], "from_release": from_release,
+                   "to_release": manifest["release_id"], "manifest": relative_to_root(manifest_path),
                    "target": str(root), "backup": str(backup.relative_to(root)) if backup.exists() else None,
                    "failed_at": now(), "error": str(error), "dry_run": relative_to_root(dry_run)}
         write_json(DEPLOYMENT_RECEIPTS / target_ref / f"deploy-failed-{manifest['release_id']}-{receipt_suffix()}.json", failure)
@@ -539,6 +556,7 @@ def rollback(args: argparse.Namespace) -> None:
     ensure_required_project_directories(root)
     previous = None
     target = root / ".mpa-workspace"
+    from_release = None
     try:
         backups_root = (root / ".mpa-backups").resolve()
         backup = (root / args.backup).resolve()
@@ -549,6 +567,7 @@ def rollback(args: argparse.Namespace) -> None:
         release_id = require_safe_ref(args.release_id, "release-id")
         if release_id not in target_history(target):
             raise ValueError("target history does not contain the release to roll back")
+        from_release = current_release(target)
         replacement = target.with_name(f".mpa-workspace.rollback-{uuid.uuid4().hex[:8]}")
         previous = target.with_name(f".mpa-workspace.rollback-previous-{uuid.uuid4().hex[:8]}")
         try:
@@ -573,7 +592,7 @@ def rollback(args: argparse.Namespace) -> None:
         raise
     try:
         receipt = {"status": "rolled_back", "release_id": release_id, "target": str(root),
-                   "from_version": runtime_version(previous), "to_version": runtime_version(root / ".mpa-workspace"),
+                   "from_release": from_release, "to_release": current_release(root / ".mpa-workspace"),
                    "backup": str(backup.relative_to(root)), "rolled_back_at": now(),
                    "approved_by": args.approved_by, "approval_ref": args.approval_ref,
                    "rollback_owner": args.rollback_owner, "verified_by": args.verified_by,

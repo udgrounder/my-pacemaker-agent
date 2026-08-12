@@ -4,7 +4,7 @@
 타입: major
 실패비용: major
 상태: 구현 중
-승인해시: 23cb0d7d250cb40d
+승인해시: 65314c82bbb9876f
 ---
 
 # 태스크 계획서: release_deployment_management
@@ -36,6 +36,7 @@
 - source 저장소의 `AGENTS.md`는 `MAP_PRODUCT_RULES.md`를 Runtime 규칙보다 먼저 로드한다. map-product route가 이슈 회수·review/triage·릴리스 준비·배포·rollback 요청을 먼저 처리하고, 그 밖의 대상 프로젝트 작업만 Runtime `agent_rules.md`에 위임한다.
 - **최초 설치**는 `install.py`가 명시된 빈 대상에 `.mpa-workspace/`, `dist/workspace/`의 초기 골격, agent 진입 설정을 한 번만 설치한다. **Runtime 업데이트**는 준비된 release manifest를 입력으로 `release_manager.py deploy`가 대상 `workspace/issues/`의 수집 후보를 먼저 확인하고, Runtime 검증 성공 후 수집 receipt를 기록하면서 승인된 issue를 source 저장소 `workspace/issues/inbox/<project-ref>/`로 원자 이동해 대상 원본을 정리한 뒤 대상 `.mpa-workspace/`만 backup·교체한다. `install.py --upgrade`의 기존 전체 교체 경로는 Runtime 업데이트에 사용하지 않으며, 설치 도구·agent 설정 변경은 기존 설치본에 자동 적용하지 않는다.
 - Circled Wiki의 clean worktree·commit Gate는 도입하지 않는다. 이는 관계없는 dirty 파일 때문에 작업이 중단되지 않아야 한다는 사용자 결정과 충돌한다. 대신 release asset map, scoped Git 식별자, 실행된 검증 명령과 결과를 immutable receipt에 함께 남긴다.
+- 사용자에게 표시하는 버전·배포·backup·rollback의 유일한 키는 `YYYYMMDDHHMMSS-<uuid8>` 형식의 `release_id`다. checksum·asset map·선택적 Git 정보는 내부 무결성 증빙이며, 별도의 사용자용 Runtime version을 만들지 않는다.
 - release manifest는 asset map 외에 compatibility, breaking change, migration, rollback condition, release note를 명시한다. 이 중 하나라도 미기록이면 release 준비를 완료하지 않는다.
 - deployment는 `dry-run → 명시 승인 정보·rollback 책임자 기록 → backup → apply → Runtime 검증 → deployment receipt` 순서로만 진행한다. 대상 `.mpa-workspace/history/releases/<release-id>.json`에는 승인된 manifest asset map과 적용 결과를 기록한다.
 - issue triage는 accepted review receipt뿐 아니라 재현성, 영향도, 우선순위, archive 유사 관계(`recurrence`/`regression`/`duplicate`/`related`/`new`/`undetermined`)와 후속 task를 기록한다. 근거가 부족하면 archive하지 않고 inbox의 `needs_information` 또는 `undetermined`로 유지한다.
@@ -94,7 +95,7 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 
 | 비교 기준 | Circled Wiki 절차 | 현재 MPA의 부족점 | 보완 원칙 |
 |---|---|---|---|
-| Version lineage | source revision과 release manifest로 사람이 읽을 수 있는 릴리스 전환을 추적 | `mpa-<asset-hash>`가 사실상 버전이며 `.mpa-version`은 deployment lifecycle에 참여하지 않음 | 선언 Runtime 버전을 primary identity로 하고 `from_version → to_version` 이력을 남긴다. Git revision은 선택적 보조 정보로만 둔다. |
+| Version lineage | source revision과 release manifest로 사람이 읽을 수 있는 릴리스 전환을 추적 | 선언 version과 instance ID가 분리되어 여러 값을 함께 확인해야 함 | 단일 `release_id`를 primary identity로 하고 `from_release → to_release` 이력을 남긴다. Git revision은 선택적 보조 정보로만 둔다. |
 | Release 준비 | validation·allowlist·manifest·receipt를 하나의 실패-원자 절차로 처리 | 과거 artifact migration, validation 결과와 receipt 참조 검증이 부족 | legacy를 명시 분리하고 active schema·receipt 무결성을 audit한다 |
 | Deployment | release receipt, dry-run, backup, verification을 대상별로 기록 | dry-run 만료·대상 map/history 재검증과 상태 전이가 불완전 | apply 전후 asset map과 receipt 관계를 확인한다 |
 | Installation | dependency·launcher·보존 영역을 dry-run에서 판정 | 현재 dry-run은 파일 존재 확인 중심 | 구조화된 계획과 hook smoke, 보존 테스트를 추가한다 |
@@ -119,11 +120,11 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 | 영역 | 계약 |
 |---|---|
 | Validation | `--validation-command`는 shell을 실행하지 않는 argv JSON 배열로 받는다. timeout 120초, stdout/stderr는 각 4 KiB까지만 receipt에 저장한다. 실패·timeout이면 package/manifest/release receipt를 만들지 않는다. |
-| Version identity | `.mpa-workspace/.mpa-version`의 선언 Runtime version은 release의 primary identity다. 같은 version에 서로 다른 package checksum/asset map을 연결하는 release는 거부한다. 재배포·rollback은 version과 immutable release receipt를 함께 참조한다. |
-| Release artifact | active manifest는 `runtime_version`, immutable `release_id`, source snapshot(선택적 Git 보조 정보 포함), asset checksum/map, package, metadata, validation result, release receipt reference를 가져야 한다. asset checksum은 package 무결성 검증용이며 version을 대체하지 않는다. 과거 형식은 `legacy/`에만 두며 migration receipt로 사유를 연결한다. |
+| Version identity | `.mpa-workspace/.mpa-version`의 `current_release`가 현재 Runtime의 유일한 표시 ID다. `prepare-release`가 UTC timestamp와 uuid8로 새 ID를 생성해 source와 dist에 기록한 뒤 package를 만든다. 재배포·rollback은 immutable release receipt와 같은 ID만 참조한다. |
+| Release artifact | active manifest는 immutable `release_id`, source snapshot(선택적 Git 보조 정보 포함), asset checksum/map, package, metadata, validation result, release receipt reference를 가져야 한다. checksum은 package 무결성 검증용이며 release ID를 대체하지 않는다. 과거 분리-version schema는 `legacy/`에만 두며 migration receipt로 사유를 연결한다. |
 | Update issue intake | Runtime update는 없는 `workspace/`·`workspace/issues/`·루트 `docs/`만 생성하고, `docs/INDEX.md`가 없으면 agent 관리 색인 템플릿만 만든다. 이미 있는 docs·INDEX·일반 문서는 변경하지 않는다. dry-run은 대상 `workspace/issues/`의 수집 후보 key·상대 경로·checksum을 사용자에게 고지하고 기록한다. apply는 이 inventory를 재확인한 뒤 Runtime 검증 성공 후 자동 수집한다. 중앙 receipt 확정·원본 삭제를 하나의 이동으로 처리하고, 수집된 issue·원본 정리 결과 또는 실패·보류 사유를 사용자에게 고지한다. 실패·보류·재검증 불일치면 대상 원본을 보존한다. |
-| Dry-run | dry-run에는 `from_version`, `to_version`, release ID, release receipt, target 절대 경로, target asset map, target history 상태, issue collection inventory, 생성 시각, 30분 만료 시각을 기록한다. apply 직전에 이 모든 값을 다시 확인하며 하나라도 달라지면 거부한다. |
-| Target history | `history/releases/`는 대상 관리 이력이며 package asset map에서는 제외한다. deploy는 교체 전 history를 보존해 새 Runtime에 복사하고, history 파싱 실패·version/release ID 충돌은 apply 전에 중단한다. history와 receipt는 `from_version → to_version`, backup, verification을 함께 기록한다. backup에는 history를 포함한다. |
+| Dry-run | dry-run에는 `from_release`, `to_release`, release receipt, target 절대 경로, target asset map, target history 상태, issue collection inventory, 생성 시각, 30분 만료 시각을 기록한다. apply 직전에 이 모든 값을 다시 확인하며 하나라도 달라지면 거부한다. |
+| Target history | `history/releases/`는 대상 관리 이력이며 package asset map에서는 제외한다. deploy는 교체 전 history를 보존해 새 Runtime에 복사하고, history 파싱 실패·release ID 충돌은 apply 전에 중단한다. history와 receipt는 `from_release → to_release`, backup, verification을 함께 기록한다. backup에는 history를 포함한다. |
 | Installation refresh | 별도 `installation-refresh --plan <receipt>`로만 실행한다. plan에는 대상, agent, 변경 allowlist, preserve 목록, backup, 승인 reference가 필수다. 일반 install과 Runtime deploy는 refresh를 호출하지 않는다. |
 | Issue 이동 | 동일 파일시스템이면 rename, 다른 파일시스템이면 목적지 임시 파일→fsync→rename→원본 삭제 순서로 이동한다. receipt 기록 실패 시 destination을 원복하고 source 보존을 확인한다. |
 | User review | review receipt에는 `approved_by`, `approval_ref`, `decision`을 기록한다. CLI actor만으로 사용자 확인을 대체하지 않으며 rejected는 archive/triage를 금지하고 inbox에 보존한다. |
@@ -132,7 +133,7 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 
 | 순서 | 작업 묶음 | 선행 조건 | 산출물 | 완료 증빙 |
 |---|---|---|---|---|
-| 1 | Versioned release artifact | 선언 Runtime version·Runtime source/dist 동기화 | version lineage, active/legacy inventory, migration receipt, schema audit | version↔manifest↔receipt↔package가 일대일이고 checksum은 무결성만 검증 |
+| 1 | Versioned release artifact | 단일 release ID 생성·Runtime source/dist 동기화 | release lineage, active/legacy inventory, migration receipt, schema audit | release ID↔manifest↔receipt↔package가 일대일이고 checksum은 무결성만 검증 |
 | 2 | Deployment 상태 | 유효한 versioned release | from/to version dry-run, issue collection inventory, target history, applied/rolled_back/failed receipt | stale dry-run·version/history·issue inventory 충돌·검증 실패가 apply 전에 중단 |
 | 3 | Installation 계약 | 설치 골격·agent spec | 구조화된 dry-run, smoke 결과, refresh plan | 기존 설치와 사용자 영역을 변경하지 않는 테스트 |
 | 4 | Issue lifecycle | release/deployment evidence 형식 | canonical issue schema, 원자 이동, review/triage/resolve/archive receipt | 정상 전이와 실패 시 inbox/원본 보존 테스트 |
@@ -142,14 +143,14 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 
 ### 설계 결정
 
-- 버전과 release ID: `.mpa-workspace/.mpa-version`의 `current_version`을 manifest·receipt·deployment history의 공식 `runtime_version`으로 사용한다. `release_id`는 그 version의 immutable release instance 식별자이고, asset map 해시만으로 version을 만들지 않는다. 같은 `runtime_version`으로 다른 package checksum/asset map을 준비하면 거부한다.
+- 버전과 release ID: `prepare-release`가 `.mpa-workspace/.mpa-version`의 `current_release`를 UTC `YYYYMMDDHHMMSS-uuid8`으로 갱신한다. 이 `release_id` 하나를 manifest·receipt·deployment history·backup의 공식 식별자로 사용하며, asset map 해시는 표시 version을 만들지 않는다.
 - checksum 역할: allowlist asset map의 정규화된 상대 경로·SHA-256 값은 package와 대상 Runtime의 무결성 검증에 사용한다. Git 식별자, 대상 프로젝트, backup 경로, 사용자 데이터는 checksum 입력에서 제외한다.
 - Git 범위 처리: `git diff`는 allowlist·설치/배포 도구 경로로 제한한다. 범위 밖 dirty 파일은 무시하며 Git 없음·실패는 `source.git`에 `unavailable`로만 남긴다. Git은 어떤 Gate도 아니다.
 - release 검증: validation command는 shell 없이 명시된 실행 파일·인자 목록으로 저장하고 종료 코드·표준 출력 요약·실행 시각을 receipt에 기록한다. 검증 실패 시 manifest/package/receipt를 생성하지 않는다.
-- deployment 승인: `approved_by`, approval reference, rollback owner는 필수 값이며 dry-run 결과의 `from_version`·`to_version`·release ID·target·asset map과 실제 apply 입력이 정확히 같아야 한다.
+- deployment 승인: `approved_by`, approval reference, rollback owner는 필수 값이며 dry-run 결과의 `from_release`·`to_release`·target·asset map과 실제 apply 입력이 정확히 같아야 한다.
 - update issue collection: update가 지정된 대상 `workspace/issues/`를 검사해 후보 key·상대 경로·checksum을 dry-run 단계에서 사용자에게 고지하고 고정한다. Runtime 검증 후 중앙 `workspace/issues/inbox/<project-ref>/`로 자동 원자 수집하고 receipt가 확정된 항목만 대상 원본을 삭제한다. apply 완료 시 수집 목록·원본 정리 결과 또는 no-op/실패·보류 사유를 사용자에게 고지한다. inventory 변경은 원본을 보존하고 update completion을 실패로 보고한다.
 - docs index ownership: `docs/INDEX.md`는 agent 관리 색인이다. 최초 설치·Runtime update는 파일이 없을 때만 템플릿을 생성하고, agent는 문서 산출물 생성·갱신 뒤 해당 색인을 갱신한다. 기존 INDEX 또는 일반 docs 파일을 배포·rollback이 덮어쓰거나 삭제하지 않는다.
-- 대상 history: source release manifest를 복사하지 않고, `from_version`·`to_version`·release ID·manifest/receipt 경로·asset checksum/map·backup·applied/rolled_back 상태와 검증 결과를 `.mpa-workspace/history/releases/`에 기록한다. 이 history는 Runtime update 관리 파일로 배포 자산에는 포함하지 않는다.
+- 대상 history: source release manifest를 복사하지 않고, `from_release`·`to_release`·manifest/receipt 경로·asset checksum/map·backup·applied/rolled_back 상태와 검증 결과를 `.mpa-workspace/history/releases/`에 기록한다. 이 history는 Runtime update 관리 파일로 배포 자산에는 포함하지 않는다.
 - backup 범위: 대상 `.mpa-workspace/`만 보관한다. `workspace/`, agent 설정, 임의 설정, 일반 소스 파일은 backup·읽기·덮어쓰기 대상에서 제외한다.
 - issue 수집: copy 후 delete가 아닌 동일 파일시스템에서는 rename, 다른 파일시스템에서는 임시 목적지+원본 보존 확인을 사용하는 원자적 이동으로 구현한다.
 - 민감정보 검사: credential 형태와 절대 경로를 휴리스틱으로 거부하며, 애매한 경우 자동 마스킹하지 않고 사용자에게 수정 요청한다.
@@ -171,7 +172,7 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 | `dist/workspace/issues/README.md` | 신규 설치에만 제공되는 issue 경로·수명주기 설명 (release asset 제외) |
 | `workspace/issues/{README.md,inbox/,archived/}` | source 저장소의 명시적 회수함·archive·receipt 연결 운영 구조 |
 | `workspace/tasks/INDEX.md` | active 태스크 등록 |
-| `.mpa-workspace/.mpa-version` | 방법론 의미 변경 후 current_version 갱신 |
+| `.mpa-workspace/.mpa-version` | `prepare-release`가 current_release를 갱신하는 Runtime 상태 파일 |
 
 ### 참고 파일 (수정 없음)
 
@@ -198,8 +199,8 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 
 ### 완료 검증 체크리스트
 
-- [ ] Release: runtime version↔manifest↔receipt↔package 일대일성, argv validation의 성공·실패·timeout, active/legacy migration, schema/receipt audit을 검증한다.
-- [ ] Deployment: valid `from_version → to_version` dry-run과 issue collection inventory만 apply하고, 대상 외 파일 보존·post-deploy verification·issue 원자 수집/원본 정리·rollback·실패 history/receipt를 검증한다.
+- [ ] Release: 단일 release ID↔manifest↔receipt↔package 일대일성, argv validation의 성공·실패·timeout, active/legacy migration, schema/receipt audit을 검증한다.
+- [ ] Deployment: valid `from_release → to_release` dry-run과 issue collection inventory만 apply하고, 대상 외 파일 보존·post-deploy verification·issue 원자 수집/원본 정리·rollback·실패 history/receipt를 검증한다.
 - [ ] Installation: 구조화 dry-run·hook smoke와 기존 `.mpa-workspace`, `workspace`, `docs`, agent 설정의 무변경을 검증한다. 단 없는 `docs/INDEX.md`의 생성·agent 색인 갱신은 허용하며 기존 INDEX 내용은 보존하는지 검증한다.
 - [ ] Issue: create→collect→review→triage→resolve→archive 정상 경로와 rejected/needs-information/중복/근거 불일치/이동 실패의 보존 경로를 검증한다.
 - [ ] 운영 정합성: profile/CLI/doc matrix, source/dist sync, release audit, 전체 테스트, `git diff --check`, scoped dirty Git·No-Git을 검증한다.

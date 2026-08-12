@@ -2,18 +2,22 @@
 
 > 이 파일은 실행 순서와 완료 증빙의 원본이다. 항목을 완료로 바꾸려면 **구현 위치·검증 명령·결과**를 해당 항목 바로 아래에 기록한다. 완료된 묶음도 후속 묶음의 전제 조건이 깨지면 다시 미완료로 되돌린다.
 
-## 0. Circled Wiki 장점 흡수: 버전 중심 release lineage
+## 0. Circled Wiki 장점 흡수: 단일 release key 중심 lineage
 
-- [ ] 선언 Runtime version을 release의 primary identity로 만든다.
-  - 완료: `.mpa-workspace/.mpa-version`의 `current_version`이 manifest, release receipt, deployment dry-run, target history, rollback receipt의 `runtime_version`/`from_version`/`to_version`에 기록된다.
-  - 금지: asset hash 또는 Git revision을 사용자용 Runtime version으로 대체하지 않는다.
-- [ ] immutable release instance와 checksum의 역할을 분리한다.
-  - 완료: `release_id`는 immutable instance 식별자이고, asset map/checksum은 package·대상 Runtime 무결성 검증에만 쓴다.
-  - 검증: 같은 Runtime version에 package checksum 또는 asset map이 다른 release를 준비하면 실패한다.
-- [ ] Git 없는 source snapshot을 manifest에 남긴다.
+- [x] 단일 release ID를 release의 primary identity로 만든다.
+  - 완료: `prepare-release`가 UTC `YYYYMMDDHHMMSS-uuid8`을 생성해 `.mpa-version`의 `current_release`, manifest, release receipt, deployment dry-run, target history, rollback receipt, backup 이름에 같은 값으로 기록한다.
+  - 금지: `runtime_version`/`current_version` 또는 asset hash/Git revision을 별도 사용자용 version으로 만들지 않는다.
+  - 구현/검증: `release_manager.py`의 `new_release_id()`, `set_current_release()`, `prepare_release()`; `test_release_id_is_the_only_runtime_identity_and_checksum_is_evidence` 통과.
+- [x] immutable release와 checksum의 역할을 분리한다.
+  - 완료: asset map/checksum은 package·대상 Runtime 무결성 검증에만 쓰고, 릴리스의 표시·전환·backup 식별에는 `release_id` 하나만 쓴다.
+  - 검증: manifest·receipt·package의 ID가 불일치하거나 checksum/asset map이 달라지면 실패한다.
+  - 구현/검증: schema 4 `load_manifest()`·`release_package()`와 `release-audit`; `20260812090303-ee377e06` release audit 통과.
+- [x] Git 없는 source snapshot을 manifest에 남긴다.
   - 완료: allowlist path/asset checksum, validation 결과, compatibility, migration, issue 참조를 source snapshot으로 기록한다. Git 정보가 있으면 보조 필드에만 기록하고, 없거나 dirty여도 release가 계속된다.
-- [ ] versioned release의 legacy migration과 audit을 보완한다.
-  - 완료: 기존 hash-only artifact는 legacy로 분리하고, active audit은 version↔manifest↔receipt↔package의 일대일성과 checksum 무결성을 검증한다.
+  - 검증: `test_release_allows_scoped_dirty_or_no_git_source` 통과.
+- [x] versioned release의 legacy migration과 audit을 보완한다.
+  - 완료: 기존 분리-version 또는 hash-only artifact는 legacy로 분리하고, active audit은 release ID↔manifest↔receipt↔package의 일대일성과 checksum 무결성을 검증한다.
+  - 구현/검증: schema 4 전환 시 기존 schema 3 active artifact를 `workspace/releases/legacy/migrated/20260812/`와 `workspace/receipts/legacy/migrations/20260812/`로 이관; `release-audit` → `1 manifest(s)`.
 
 ## 1. Release artifact 정합성
 
@@ -37,9 +41,10 @@
 
 ## 2. Deployment 상태와 보존
 
-- [ ] deployment를 `from_version → to_version` 전환으로 기록·검증한다.
-  - 완료: dry-run, apply, failure, rollback의 receipt/history에 이전·신규 Runtime version과 immutable release ID가 함께 남는다.
-  - 검증: target Runtime version 또는 history가 dry-run 뒤 바뀌거나, 동일 version에 다른 asset map을 적용하려 하면 apply 전에 거부한다.
+- [x] deployment를 `from_release → to_release` 전환으로 기록·검증한다.
+  - 완료: dry-run, apply, failure, rollback의 receipt/history에 이전·신규 release ID만 남는다.
+  - 검증: target Runtime release 또는 history가 dry-run 뒤 바뀌면 apply 전에 거부한다.
+  - 구현/검증: `deployment_dry_run()`, `deploy()`, `rollback()`; `test_deploy_legacy_current_version_records_a_single_legacy_origin`, `test_deploy_revalidates_target_receipt_and_approval` 통과.
 - [ ] Runtime update에 issue 수집·원본 정리 단계를 결합한다.
   - 완료: dry-run이 대상 `workspace/issues/`의 수집 후보 key·상대 경로·checksum을 기록하고 사용자에게 고지하며, apply가 inventory 불일치를 거부한다.
   - 완료: Runtime 검증 성공 후 issue를 source `workspace/issues/inbox/<project-ref>/`로 자동 원자 이동하고, 중앙 수집 receipt가 확정된 뒤에만 대상 원본을 삭제한다.
@@ -131,6 +136,6 @@
   - 2026-08-12 부분 확인: `/Users/kjkim/Temp/mpa-test`에 Codex Runtime·AGENTS.md·agent spec·3개 hook이 설치됐고 SessionStart command는 exit 0으로 실행됐다. 다만 과거 template의 `workspace/docs/`가 생성됐고, 당시 정책상 필요했던 루트 `docs/`는 없었다.
   - 보완 및 재확인: 신규 install/update는 없는 `workspace/`·루트 `docs/`만 빈 폴더로 만들고, 이미 존재하는 내용은 건드리지 않도록 변경했다. `test_new_install_creates_root_docs_but_not_workspace_docs`, `test_deploy_creates_only_missing_workspace_and_docs_roots` 통과. `mpa-test`는 upgrade 과정에서 root `docs/`가 생성됐고 기존 `workspace/docs/`·AGENTS.md·hook 설정은 보존됐다.
 - [ ] 실제 대상 프로젝트에 승인된 Runtime release를 dry-run → deploy → rollback으로 적용한다.
-  - 이전 부분 확인: `mpa-9326fb5686135269`을 `/Users/kjkim/Temp/mpa-test`에 dry-run → deploy 했다. 이는 hash-only release 모델의 검증이므로, versioned release 구현 뒤 `from_version → to_version`과 rollback을 다시 검증한다.
+  - 이전 부분 확인: `mpa-9326fb5686135269`을 `/Users/kjkim/Temp/mpa-test`에 dry-run → deploy 했다. 이는 이전 형식 검증이므로, 단일 release key 구현 뒤 `from_release → to_release`과 rollback을 다시 검증한다.
 - [ ] installation refresh plan의 allowlist가 조직의 agent 설정 변경 정책과 맞는지 승인한다.
   - 확인: `AGENTS.md`/agent spec/hook 설정 중 자동 갱신을 허용할 경로를 확정한다.

@@ -39,7 +39,7 @@ class ReleaseManagerTest(unittest.TestCase):
     @staticmethod
     def write_runtime(path, version):
         path.mkdir(parents=True, exist_ok=True)
-        (path / ".mpa-version").write_text(f"current_version: {version}\n", encoding="utf-8")
+        (path / ".mpa-version").write_text(f"current_release: {version}\n", encoding="utf-8")
         (path / "rule.md").write_text(version, encoding="utf-8")
 
     def prepare(self):
@@ -233,7 +233,7 @@ class ReleaseManagerTest(unittest.TestCase):
                 target=str(target_root), target_ref="test-target", backup=".mpa-workspace",
             ))
 
-    def test_repeated_preparation_preserves_manifest_and_adds_receipts(self):
+    def test_repeated_preparation_creates_distinct_immutable_release_ids(self):
         manifest = self.prepare()
         original = json.loads(manifest.read_text(encoding="utf-8"))
         release_manager.prepare_release(argparse.Namespace(
@@ -242,22 +242,21 @@ class ReleaseManagerTest(unittest.TestCase):
             validation_command=[sys.executable, "-c", "print('ok')"],
         ))
 
-        self.assertEqual(json.loads(manifest.read_text(encoding="utf-8")), original)
+        manifests = list(release_manager.MANIFESTS.glob("*.json"))
+        self.assertEqual(len(manifests), 2)
+        self.assertNotEqual(json.loads(manifests[0].read_text(encoding="utf-8"))["release_id"],
+                            json.loads(manifests[1].read_text(encoding="utf-8"))["release_id"])
+        self.assertEqual(original["release_id"], release_manager.current_release(release_manager.PACKAGES / original["release_id"]))
         self.assertEqual(len(list(release_manager.RELEASE_RECEIPTS.glob("*.json"))), 2)
 
-    def test_runtime_version_is_primary_identity_and_rejects_changed_assets(self):
+    def test_release_id_is_the_only_runtime_identity_and_checksum_is_evidence(self):
         manifest = self.prepare()
         data = json.loads(manifest.read_text(encoding="utf-8"))
-        self.assertEqual(data["runtime_version"], "v1")
-        self.assertIn("v1", data["release_id"])
+        self.assertRegex(data["release_id"], r"^\d{14}-[0-9a-f]{8}$")
+        self.assertNotIn("runtime_version", data)
         self.assertIn("asset_checksum", data)
-        (release_manager.RUNTIME_DIST / "rule.md").write_text("different", encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "runtime_version already"):
-            release_manager.prepare_release(argparse.Namespace(
-                verified_by="test", compatibility="compatible", breaking_change="none", migration="none",
-                rollback_condition="verification failure", release_note="test release",
-                validation_command=[sys.executable, "-c", "print('ok')"],
-            ))
+        self.assertEqual(release_manager.current_release(release_manager.RUNTIME_SOURCE), data["release_id"])
+        self.assertEqual(release_manager.current_release(release_manager.RUNTIME_DIST), data["release_id"])
 
     def test_update_collects_issues_only_after_runtime_verification(self):
         manifest = self.prepare()
@@ -311,6 +310,7 @@ class ReleaseManagerTest(unittest.TestCase):
 
     def test_timeout_and_manifest_write_failure_leave_no_release_artifacts(self):
         release_manager.sync_runtime(argparse.Namespace())
+        original_release = release_manager.current_release(release_manager.RUNTIME_SOURCE)
         arguments = argparse.Namespace(
             verified_by="test", compatibility="compatible", breaking_change="none", migration="none",
             rollback_condition="verification failure", release_note="test release",
@@ -331,6 +331,23 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertFalse(release_manager.MANIFESTS.exists())
         self.assertFalse(list(release_manager.PACKAGES.glob("*")))
         self.assertFalse(list(release_manager.RELEASE_RECEIPTS.glob("*")))
+        self.assertEqual(release_manager.current_release(release_manager.RUNTIME_SOURCE), original_release)
+        self.assertEqual(release_manager.current_release(release_manager.RUNTIME_DIST), original_release)
+
+    def test_deploy_legacy_current_version_records_a_single_legacy_origin(self):
+        manifest = self.prepare()
+        target = self.root / "legacy-target"
+        target_runtime = target / ".mpa-workspace"
+        target_runtime.mkdir(parents=True)
+        (target_runtime / ".mpa-version").write_text("current_version: 2026-08-12 12:06:00\n", encoding="utf-8")
+        (target_runtime / "rule.md").write_text("legacy", encoding="utf-8")
+        release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="legacy-target"))
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "legacy-target").glob("dry-run-*.json"))
+        dry_data = json.loads(dry_run.read_text(encoding="utf-8"))
+        self.assertEqual(dry_data["from_release"], "legacy-2026-08-12-12-06-00")
+        release_manager.deploy(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="legacy-target", verified_by="test",
+                                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+        self.assertEqual(release_manager.current_release(target_runtime), json.loads(manifest.read_text(encoding="utf-8"))["release_id"])
 
     def test_empty_metadata_creates_nothing_and_audit_rejects_missing_package(self):
         release_manager.sync_runtime(argparse.Namespace())

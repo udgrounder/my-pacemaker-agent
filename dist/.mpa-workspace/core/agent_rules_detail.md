@@ -265,9 +265,9 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 | 페르소나 | task_designer | **`personas/mpa_system_designer.md`** |
 | 수정 후 동기화 | 불필요 | `dist/`와 설치본 양쪽 동기화 필수 |
 
-**처리 흐름:** `mpa_system_designer.md` 읽기 → plan.md 작성 및 승인 → 수정 → 일관성 점검 → `dist/` 동기화 → **`current_version` 갱신**
+**처리 흐름:** `mpa_system_designer.md` 읽기 → plan.md 작성 및 승인 → 수정 → 일관성 점검 → `prepare-release`로 Runtime 동기화·검증·단일 release ID 생성
 
-> **current_version 갱신:** 방법론(`.mpa-workspace/`)을 의미 있게 수정한 태스크를 완료하면 **설치본 `.mpa-workspace/.mpa-version`**의 `current_version`을 작업 시각(`YYYY-MM-DD HH:MM:SS`)으로 갱신한다 — 같은 날 여러 번 수정해도 구분 가능하도록 시분초까지 기록한다. dist_sync가 `dist/.mpa-workspace/.mpa-version`으로 자동 미러한다. **dist를 직접 편집하지 않는다** (소스→dist 단방향 미러이므로 dist를 직접 고치면 설치본과 어긋나 버전이 역전된다). 이 값은 업그레이드 시 `.mpa-workspace` 통째 교체로 각 프로젝트에 전파된다. (프로젝트의 설치·업그레이드 이력은 별도로 `workspace/.mpa-version-info`에 보존되며 install.py가 관리한다.)
+> **release ID 생성:** 방법론(`.mpa-workspace/`)을 의미 있게 수정한 태스크를 release할 때 `release_manager.py prepare-release`가 `.mpa-version`의 `current_release`를 UTC `YYYYMMDDHHMMSS-uuid8`으로 갱신하고 `dist/.mpa-workspace/`에 동기화한다. 이 값 하나가 package·manifest·receipt·대상 history·backup의 표시 ID다. checksum은 내부 무결성 증빙이며 **dist를 직접 편집하지 않는다**.
 
 ---
 

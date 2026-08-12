@@ -14,7 +14,7 @@
 - `docs_template.md`의 "복사 위치: workspace/docs/..." → "docs/..."로 변경
 - `core/agent_rules.md`, `inject/layer1_design.md`, `inject/layer1_implement.md`, `inject/layer2_checkpoint.md` 내 `workspace/docs` 언급을 `docs`로 일괄 변경
 - MPA 태스크 완료 문서는 최상위 `docs/INDEX.md`의 "운영매뉴얼/ (운영 가이드 — MPA 태스크 완료 문서)" 섹션에 등록하도록 안내 문구 조정
-- 처리 절차는 "MPA 파일 수정 세부"(agent_rules_detail.md) 절차를 따른다 — mpa_system_designer 페르소나로 plan.md 작성·승인 후 적용, dist/ 동기화, current_version 갱신 필요
+- 처리 절차는 "MPA 파일 수정 세부"(agent_rules_detail.md) 절차를 따른다 — mpa_system_designer 페르소나로 plan.md 작성·승인 후 적용하고, `prepare-release`가 dist 동기화와 단일 release ID 생성을 처리한다.
 
 ## 적용 대상 파일
 

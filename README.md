@@ -74,7 +74,7 @@ agent가 진행하는 절차:
 
 설치되면 프로젝트에 `.mpa-workspace/`(방법론 파일), `workspace/`(프로젝트 데이터 골격), 빈 루트 `docs/`가 없을 때만 생성되고, 선택한 agent의 진입점이 루트 설정 파일에 추가된다. 기존 폴더와 내용은 변경하지 않는다. 자세한 절차와 옵션은 [`install.md`](install.md), 운영 맥락은 가이드북 9장을 참조한다.
 
-기존 설치본의 Runtime update는 `install.py`가 아니라 source 저장소의 `release_manager.py`를 사용한다. `sync-runtime → prepare-release → release-audit → deployment-dry-run → deploy` 순서이며, deploy에는 명시 승인과 rollback 책임자가 필요하다. 대상의 `workspace/`·루트 `docs/`가 없으면 빈 폴더만 생성하고, 이미 존재하는 폴더·agent 설정은 변경하지 않는다.
+기존 설치본의 Runtime update는 `install.py`가 아니라 source 저장소의 `release_manager.py`를 사용한다. `prepare-release → release-audit → deployment-dry-run → deploy` 순서이며, `prepare-release`가 UTC `YYYYMMDDHHMMSS-uuid8` 단일 release ID를 생성하고 source/dist에 기록한다. deploy에는 명시 승인과 rollback 책임자가 필요하다. 대상의 `workspace/`·루트 `docs/`가 없으면 빈 폴더만 생성하고, 이미 존재하는 폴더·agent 설정은 변경하지 않는다.
 
 설치 도구·agent wiring을 기존 설치본에 반영해야 하면 Runtime deploy와 분리된 `installation refresh`를 쓴다. 승인 reference, agent 관리 파일 allowlist, `workspace/`·루트 `docs/`·일반 소스 preserve 목록, 대상 `.mpa-installation-backups/` 아래 backup을 담은 JSON plan을 `install.py --installation-refresh --plan <파일>`로 적용한다.
 

@@ -149,31 +149,28 @@ python3 release_manager.py deploy \
 다음 명령은 **my-pacemaker-agent source 저장소에서만** 실행한다. Runtime release에는 `dist/.mpa-workspace/`만 포함된다. update 시 대상의 `workspace/` 또는 루트 `docs/`가 없으면 빈 폴더만 생성하며, 이미 존재하는 폴더·agent 설정·일반 소스는 변경하지 않는다.
 
 ```bash
-# 1. 방법론 source를 Runtime 배포본에 동기화
-python3 release_manager.py sync-runtime
-
-# 2. 불변 package와 manifest 생성 (출력된 release ID를 기록)
+# 1. source 동기화·검증 후 불변 package와 manifest 생성 (출력된 단일 release ID를 기록)
 python3 release_manager.py prepare-release \
   --verified-by <검증자> --compatibility <호환성> --breaking-change <없음/내용> \
   --migration <없음/절차> --rollback-condition <조건> --release-note <요약> \
   --validation-command '["python3", "-m", "unittest", "discover", "-s", "tests"]'
 
-# 3. 모든 활성 manifest와 package의 정합성 확인
+# 2. 모든 활성 manifest와 package의 정합성 확인
 python3 release_manager.py release-audit
 
-# 4. 대상·release·현재 Runtime을 기록한 dry-run 생성
+# 3. 대상의 현재 release와 새 release를 기록한 dry-run 생성
 python3 release_manager.py deployment-dry-run \
   --manifest workspace/releases/manifests/<release-id>.json \
   --target <프로젝트-경로> --target-ref <소문자-식별자>
 
-# 5. dry-run, 명시 승인, rollback 책임자를 연결해 Runtime만 배포
+# 4. dry-run, 명시 승인, rollback 책임자를 연결해 Runtime만 배포
 python3 release_manager.py deploy \
   --manifest workspace/releases/manifests/<release-id>.json \
   --target <프로젝트-경로> --target-ref <소문자-식별자> --verified-by <검증자> \
   --dry-run workspace/receipts/deployments/<대상>/dry-run-<release-id>-<id>.json \
   --approved-by <승인자> --approval-ref <승인-기록> --rollback-owner <책임자>
 
-# 6. 문제가 있을 때, deploy 출력의 .mpa-backups/... 값을 그대로 사용해 rollback
+# 5. 문제가 있을 때, deploy 출력의 .mpa-backups/... 값을 그대로 사용해 rollback
 python3 release_manager.py rollback \
   --target <프로젝트-경로> --target-ref <소문자-식별자> \
   --backup .mpa-backups/<release-id>-<timestamp>-<id> --release-id <release-id> \
