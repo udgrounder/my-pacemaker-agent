@@ -220,4 +220,4 @@ python3 install.py --installation-refresh --plan /path/to/refresh-plan.json
 > Codex는 `.codex/hooks.json`의 `PreToolUse` matcher에 `apply_patch|write_file|replace|edit` 등을 포함해 게이트 실효성을 확보한다.
 > 게이트 강도는 환경변수 `MPA_GATE`(block/warn/off)로 조절한다.
 
-기존 설치본의 Runtime 업데이트는 `.mpa-workspace/`만 backup·교체한다. 단, `workspace/`와 루트 `docs/`가 없으면 빈 폴더만 생성한다. 이미 존재하는 `workspace/`, `docs/`, agent 설정과 일반 소스는 읽거나 변경하지 않는다. 설치 골격·agent 설정을 바꾸는 installation refresh는 자동 실행하지 않으며, 별도 명시 요청으로만 수행한다.
+기존 설치본의 Runtime 업데이트는 `.mpa-workspace/`만 backup·교체한다. 성공한 deploy 뒤 대상 `.mpa-backups/`의 Runtime backup 디렉터리는 최신 3개만 남긴다. 실패한 deploy에서는 backup을 정리하지 않는다. `.mpa-project/config.yaml`과 그 안의 기존 값은 Runtime update/rollback이 변경하지 않는다. 단, `workspace/`와 루트 `docs/`가 없으면 빈 폴더만 생성한다. 이미 존재하는 `workspace/`, `docs/`, agent 설정과 일반 소스는 읽거나 변경하지 않는다. 설치 골격·agent 설정·고유 config를 바꾸는 installation refresh는 자동 실행하지 않으며, 별도 명시 요청으로만 수행한다. config refresh도 누락 필드만 추가한다.

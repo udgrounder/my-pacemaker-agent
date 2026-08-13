@@ -34,6 +34,7 @@ IGNORED_RUNTIME_NAMES = {"__pycache__", ".DS_Store", "history"}
 RELEASE_METADATA = ("compatibility", "breaking_change", "migration", "rollback_condition", "release_note")
 RELEASE_SCHEMA_VERSION = 4
 VALIDATION_TIMEOUT_SECONDS = 120
+RUNTIME_BACKUP_RETENTION = 3
 DOCS_INDEX_TEMPLATE = "# 문서 색인\n\n> 이 파일은 agent가 문서 산출물의 위치와 요약을 관리합니다. 일반 문서 내용은 프로젝트 사용자가 소유합니다.\n\n"
 
 
@@ -379,6 +380,20 @@ def ensure_required_project_directories(root: Path) -> list[str]:
     return created
 
 
+def prune_runtime_backups(root: Path, keep: int = RUNTIME_BACKUP_RETENTION) -> list[str]:
+    """Retain only the newest successful Runtime backups; leave unknown files untouched."""
+    backups = root / ".mpa-backups"
+    if not backups.is_dir():
+        return []
+    candidates = sorted((path for path in backups.iterdir() if path.is_dir()),
+                        key=lambda path: path.stat().st_mtime_ns, reverse=True)
+    removed = []
+    for path in candidates[keep:]:
+        shutil.rmtree(path)
+        removed.append(path.name)
+    return removed
+
+
 def update_issue_inventory(root: Path) -> list[dict[str, str]]:
     folder = root / "workspace" / "issues"
     if not folder.is_dir():
@@ -516,6 +531,13 @@ def deploy(args: argparse.Namespace) -> None:
         write_json(target / "history" / "releases" / f"{manifest['release_id']}.json", receipt)
         if previous and previous.exists():
             shutil.rmtree(previous)
+        try:
+            removed_backups = prune_runtime_backups(root)
+            if removed_backups:
+                print(f"pruned runtime backups: {', '.join(removed_backups)}", file=sys.stderr)
+        except OSError as error:
+            # Deployment is already durably recorded; retention failure must not rewrite it as failed.
+            print(f"warning: runtime backup retention deferred: {error}", file=sys.stderr)
     except Exception as error:
         if previous and previous.exists():
             if target.exists():

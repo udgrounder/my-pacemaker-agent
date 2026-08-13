@@ -1,6 +1,7 @@
 import argparse
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import errno
@@ -83,6 +84,18 @@ class ReleaseManagerTest(unittest.TestCase):
         (target_root / "main.py").write_text("user source", encoding="utf-8")
         (target_root / "workspace" / "user.txt").write_text("workspace", encoding="utf-8")
         (target_root / "docs" / "user.md").write_text("docs", encoding="utf-8")
+        docs_index = target_root / "docs" / "INDEX.md"
+        docs_index.write_text("# operator index\n", encoding="utf-8")
+        config = target_root / ".mpa-project" / "config.yaml"
+        config.parent.mkdir()
+        config.write_text(
+            "schema_version: 1\nproject:\n"
+            "  name: \"operator-owned\"\n"
+            f"  root_path: \"{target_root}\"\n"
+            "  initialized_at: \"2026-08-13T00:00:00Z\"\n",
+            encoding="utf-8",
+        )
+        config_before = config.read_text(encoding="utf-8")
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target_root), target_ref="test-target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "test-target").glob("dry-run-*.json"))
         release_manager.deploy(argparse.Namespace(
@@ -95,8 +108,10 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertEqual((target_root / ".mpa-workspace" / "rule.md").read_text(encoding="utf-8"), "old")
         self.assertEqual((target_root / "workspace" / "user.txt").read_text(encoding="utf-8"), "workspace")
         self.assertEqual((target_root / "docs" / "user.md").read_text(encoding="utf-8"), "docs")
+        self.assertEqual(docs_index.read_text(encoding="utf-8"), "# operator index\n")
         self.assertEqual((target_root / "AGENTS.md").read_text(encoding="utf-8"), "user config")
         self.assertEqual((target_root / "main.py").read_text(encoding="utf-8"), "user source")
+        self.assertEqual(config.read_text(encoding="utf-8"), config_before)
 
     def test_deploy_creates_only_missing_workspace_and_docs_roots(self):
         manifest = self.prepare()
@@ -110,6 +125,23 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertTrue((target / "workspace" / "issues").is_dir())
         self.assertTrue((target / "docs").is_dir())
         self.assertTrue((target / "docs" / "INDEX.md").is_file())
+
+    def test_runtime_backup_retention_keeps_the_newest_three_directories_only(self):
+        target = self.root / "target"
+        backups = target / ".mpa-backups"
+        for index in range(4):
+            backup = backups / f"backup-{index}"
+            backup.mkdir(parents=True)
+            timestamp = 1_700_000_000 + index
+            os.utime(backup, (timestamp, timestamp))
+        note = backups / "operator-note.txt"
+        note.write_text("preserve", encoding="utf-8")
+
+        removed = release_manager.prune_runtime_backups(target)
+
+        self.assertEqual(removed, ["backup-0"])
+        self.assertEqual(sorted(path.name for path in backups.iterdir()),
+                         ["backup-1", "backup-2", "backup-3", "operator-note.txt"])
 
     def test_rollback_receipt_failure_restores_applied_runtime(self):
         manifest = self.prepare()

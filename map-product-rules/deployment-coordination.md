@@ -10,7 +10,7 @@ manifest, target, target-ref, recorded dry-run, 승인자·승인 기록·rollba
 
 ## Allowed Actions
 
-dry-run, `.mpa-workspace` backup·교체·검증, target history와 deployment/rollback receipt 기록.
+dry-run, `.mpa-workspace` backup·교체·검증, target history와 deployment/rollback receipt 기록. 성공한 deploy 뒤에는 대상 `.mpa-backups/`의 Runtime backup 디렉터리를 최신 3개만 유지한다.
 
 ## Checks
 
@@ -18,7 +18,7 @@ dry-run의 release·target·target-ref와 실제 apply 입력, package checksum,
 
 ## Gates
 
-dry-run·승인·rollback 책임자 없이는 apply하지 않는다. rollback 원본은 대상 `.mpa-backups/` 아래만 허용한다.
+dry-run·승인·rollback 책임자 없이는 apply하지 않는다. rollback 원본은 대상 `.mpa-backups/` 아래만 허용한다. retention은 성공 receipt/history가 기록된 후에만 수행하며, 실패한 deploy에서는 기존 backup을 정리하지 않는다.
 
 ## Output
 

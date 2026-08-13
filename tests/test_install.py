@@ -5,6 +5,8 @@ import json
 import importlib.util
 from pathlib import Path
 
+import project_config
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("install", ROOT / "install.py")
@@ -35,6 +37,10 @@ class InstallDryRunTest(unittest.TestCase):
             self.assertFalse((target / "workspace" / "docs").exists())
             self.assertTrue((target / "docs").is_dir())
             self.assertTrue((target / "docs" / "INDEX.md").is_file())
+            config = (target / ".mpa-project" / "config.yaml").read_text(encoding="utf-8")
+            self.assertIn("schema_version: 1", config)
+            self.assertIn('name: "' + target.name + '"', config)
+            self.assertIn('root_path: "' + str(target.resolve()) + '"', config)
 
     def test_new_install_creates_missing_explicit_project_root(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -119,6 +125,103 @@ class InstallDryRunTest(unittest.TestCase):
             plan_path.write_text(json.dumps(plan), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "preserve"):
                 install.run_installation_refresh(plan_path)
+
+    def test_existing_project_config_only_adds_missing_fields_and_preserves_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "configured-project"
+            target.mkdir()
+            config = target / ".mpa-project" / "config.yaml"
+            config.parent.mkdir()
+            original = (
+                "# operator-owned\n"
+                "schema_version: 1\n"
+                "project:\n"
+                "  name: \"custom-name\"\n"
+                "  owner_defined: \"keep-me\"\n"
+            )
+            config.write_text(original, encoding="utf-8")
+
+            result = project_config.ensure_project_config(target)
+
+            updated = config.read_text(encoding="utf-8")
+            self.assertEqual(result["status"], "updated")
+            self.assertIn(original, updated)
+            self.assertIn('name: "custom-name"', updated)
+            self.assertIn('owner_defined: "keep-me"', updated)
+            self.assertIn("root_path:", updated)
+            self.assertIn("initialized_at:", updated)
+            self.assertNotIn("custom-name", result.get("warnings", []))
+
+    def test_missing_schema_is_added_but_future_schema_is_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            config = target / ".mpa-project" / "config.yaml"
+            config.parent.mkdir()
+            config.write_text("project:\n  name: \"legacy\"\n", encoding="utf-8")
+            result = project_config.ensure_project_config(target)
+            self.assertEqual(result["status"], "updated")
+            self.assertTrue(config.read_text(encoding="utf-8").startswith("schema_version: 1\n"))
+
+            future = "schema_version: 99\nproject:\n  name: \"future\"\n"
+            config.write_text(future, encoding="utf-8")
+            result = project_config.ensure_project_config(target)
+            self.assertEqual(result["status"], "warning")
+            self.assertEqual(config.read_text(encoding="utf-8"), future)
+
+    def test_invalid_schema_is_preserved_without_duplicate_schema_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            config = target / ".mpa-project" / "config.yaml"
+            config.parent.mkdir()
+            invalid = "schema_version: latest\nproject:\n  name: \"owned\"\n"
+            config.write_text(invalid, encoding="utf-8")
+
+            result = project_config.ensure_project_config(target)
+
+            self.assertEqual(result["status"], "warning")
+            self.assertEqual(config.read_text(encoding="utf-8"), invalid)
+            self.assertEqual(config.read_text(encoding="utf-8").count("schema_version:"), 1)
+
+    def test_config_audit_warns_on_moved_root_without_exposing_absolute_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            config = target / ".mpa-project" / "config.yaml"
+            config.parent.mkdir()
+            config.write_text(
+                "schema_version: 1\nproject:\n"
+                "  name: \"project\"\n"
+                "  root_path: \"/old/private/project\"\n"
+                "  initialized_at: \"2026-08-13T00:00:00Z\"\n",
+                encoding="utf-8",
+            )
+            result = project_config.audit_project_config(target)
+            rendered = json.dumps(result, ensure_ascii=False)
+            self.assertIn("differs from configured root_path", rendered)
+            self.assertNotIn("/old/private/project", rendered)
+
+    def test_refresh_can_add_config_fields_only_when_explicitly_allowed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            (target / ".mpa-workspace").mkdir()
+            config = target / ".mpa-project" / "config.yaml"
+            config.parent.mkdir()
+            config.write_text("schema_version: 1\nproject:\n  name: \"owned\"\n", encoding="utf-8")
+            plan = {
+                "schema_version": 1, "target": str(target), "agent": "codex",
+                "changes": [".mpa-project/config.yaml"],
+                "preserve": ["workspace/", "docs/", "general source files"],
+                "backup": str(target / ".mpa-installation-backups" / "config-refresh"),
+                "approval_ref": "config-test",
+            }
+            plan_path = target / "refresh.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+            install.run_installation_refresh(plan_path)
+
+            updated = config.read_text(encoding="utf-8")
+            self.assertIn('name: "owned"', updated)
+            self.assertIn("root_path:", updated)
+            self.assertTrue((target / ".mpa-installation-backups" / "config-refresh" / ".mpa-project" / "config.yaml").is_file())
 
     def test_existing_install_rejection_preserves_workspace_docs_and_agent_settings(self):
         with tempfile.TemporaryDirectory() as directory:

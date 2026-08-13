@@ -14,6 +14,8 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
+from project_config import CONFIG_RELATIVE, ensure_project_config, inspect_project_config
+
 HARNESS_ROOT = Path(__file__).parent
 DIST_ROOT = HARNESS_ROOT / "dist"
 AGENTS_WORKSPACE_SRC = DIST_ROOT / ".mpa-workspace"
@@ -53,6 +55,9 @@ def _refresh_allowed_paths(agent: str) -> set[str]:
     hook = HOOK_SETTINGS_PATH.get(agent)
     if hook:
         paths.add("/".join(hook))
+    # Project-local configuration is refreshable only when the plan explicitly
+    # includes it. The refresh operation itself is additive-only.
+    paths.add(CONFIG_RELATIVE)
     return paths
 
 
@@ -436,6 +441,12 @@ def run_install(project_path: Path, agents: list, upgrade: bool):
     if upgrade:
         raise ValueError("install.py는 기존 설치본의 update를 지원하지 않습니다")
 
+    config_result = ensure_project_config(project_path)
+    if config_result["status"] in {"warning", "unchanged"}:
+        print(f"  [확인] {CONFIG_RELATIVE} — {config_result['status']}")
+    else:
+        print(f"  [생성/보강] {CONFIG_RELATIVE} — {', '.join(config_result.get('add', []))}")
+
     print("\n[1단계] .mpa-workspace 설치")
     copy_agents_workspace(agents_workspace_dst)
     print("\n[2단계] workspace 초기화")
@@ -524,7 +535,12 @@ def run_installation_refresh(plan_path: Path) -> None:
         config = AGENT_CONFIG_MAP[agent]
         if config and config in changes:
             append_agent_config(agent, project_path)
+        if CONFIG_RELATIVE in changes:
+            config_result = ensure_project_config(project_path)
+            if config_result["status"] == "warning":
+                print(f"  [경고] {CONFIG_RELATIVE}: {'; '.join(config_result.get('warnings', []))}")
         spec_files = set(changes) - ({config} if config else set())
+        spec_files.discard(CONFIG_RELATIVE)
         copy_agent_spec_files_selected(agent, project_path, spec_files)
         hook = HOOK_SETTINGS_PATH.get(agent)
         if hook and "/".join(hook) in changes:
@@ -688,13 +704,16 @@ def main():
                 missing.append(f"{agent} hook configuration")
     if sys.version_info < (3, 8):
         missing.append("python>=3.8")
+    config_plan = inspect_project_config(project_path)
     plan = {
         "schema_version": 1,
         "mode": "install",
         "target": str(project_path),
         "agents": agents,
-        "create": (["project root/"] if not project_path.exists() else []) + [".mpa-workspace/", "workspace/ initial skeleton", "docs/ empty user document root", "selected agent entry settings"],
-        "preserve": ["workspace/ existing data", "docs/", "existing agent settings", "general source files"],
+        "create": (["project root/"] if not project_path.exists() else []) + [".mpa-workspace/", "workspace/ initial skeleton", "docs/ empty user document root", "selected agent entry settings"] + ([CONFIG_RELATIVE] if config_plan["status"] == "create" else []),
+        "add": {CONFIG_RELATIVE: config_plan.get("add", [])},
+        "preserve": ["workspace/ existing data", "docs/", CONFIG_RELATIVE, "existing agent settings", "general source files"],
+        "project_config": config_plan,
         "checks": {"python": f"{sys.version_info.major}.{sys.version_info.minor}", "missing": missing},
         "status": "failed" if missing else "ready",
     }
@@ -711,7 +730,7 @@ def main():
     print(f"  모드    : {mode}")
     print(f"  경로    : {project_path}")
     print(f"  agents  : {', '.join(agents)}")
-    print(f"  변경    : .mpa-workspace/, workspace/ 초기 골격, 빈 docs/, 선택 agent 진입 설정")
+    print(f"  변경    : .mpa-workspace/, workspace/ 초기 골격, 빈 docs/, {CONFIG_RELATIVE} 보강, 선택 agent 진입 설정")
     print(f"─────────────────────────────")
 
     if cli.dry_run:

@@ -3,8 +3,8 @@
 생성일: 2026-08-05
 타입: major
 실패비용: major
-상태: 구현 중
-승인해시: 65314c82bbb9876f
+상태: 검증 중
+승인해시: 607ec431e9eae5b9
 ---
 
 # 태스크 계획서: release_deployment_management
@@ -32,6 +32,8 @@
 - source 저장소의 회수함은 `workspace/issues/`다. 명시적 수집 또는 Runtime 업데이트의 수집 단계가 `workspace/issues/inbox/<project-ref>/`에 넣고, 처리 완료 후에는 `workspace/issues/archived/YYYY/MM/<project-ref>/`로 이동한다. 이 경로는 배포·신규 설치 골격에 포함하지 않는다.
 - 기존 `upgrade-candidates`는 폐기하고 issue의 `methodology_improvement` 분류로 이관한다. 새 후보는 `.mpa-workspace/`가 아니라 프로젝트 소유 `workspace/issues/`에 생성하고, source 저장소로의 수집은 명시적 요청일 때만 실행한다.
 - `docs/`는 프로젝트 루트의 사용자 소유 문서 경로다. 단, `docs/INDEX.md`는 agent가 관리하는 색인 예외 파일로, 최초 설치·Runtime 업데이트 시 없으면 생성하고 문서 생성·갱신 후 agent가 갱신한다. 일반 문서 내용·이동·삭제는 사용자 소유이며 배포 자산에 포함하지 않는다.
+- 설치된 프로젝트의 고유 설정은 `.mpa-project/config.yaml`에 둔다. 파일이 없으면 schema에 정의된 기본 프로젝트명·초기화 시각·현재 절대 경로를 생성하고, 파일이 있으면 schema가 요구하는 누락 필드만 추가한다. 기존 값·주석·사용자 설정은 수정·정규화·삭제하지 않으며, 값이 비어 있거나 잘못되어도 경고만 한다.
+- `.mpa-project/config.yaml`의 절대 경로는 설치 로컬 메타데이터다. release asset·manifest checksum·issue·중앙 receipt에는 넣지 않으며, 프로젝트가 이동해도 기존 `project.root_path`를 덮어쓰지 않는다. 새 위치가 필요하면 별도 누적 관찰 필드에만 추가한다.
 - **map-product plane**(`MAP_PRODUCT_RULES.md`, `map-product-rules/`, `release_manager.py`, `install.py`, `agent-specs/`, source `workspace/`, `docs/`)은 이 저장소의 이슈 회수·릴리스·배포·설치 정책을 관리하며 배포하지 않는다. **Runtime/deployment plane**(`.mpa-workspace/` → `dist/.mpa-workspace/`)은 대상 프로젝트에 공통으로 적용할 규칙·정책·실행 소스만 관리한다. 대상 프로젝트의 `workspace/`·`docs/`는 사용자 소유 데이터다.
 - source 저장소의 `AGENTS.md`는 `MAP_PRODUCT_RULES.md`를 Runtime 규칙보다 먼저 로드한다. map-product route가 이슈 회수·review/triage·릴리스 준비·배포·rollback 요청을 먼저 처리하고, 그 밖의 대상 프로젝트 작업만 Runtime `agent_rules.md`에 위임한다.
 - **최초 설치**는 `install.py`가 명시된 빈 대상에 `.mpa-workspace/`, `dist/workspace/`의 초기 골격, agent 진입 설정을 한 번만 설치한다. **Runtime 업데이트**는 준비된 release manifest를 입력으로 `release_manager.py deploy`가 대상 `workspace/issues/`의 수집 후보를 먼저 확인하고, Runtime 검증 성공 후 수집 receipt를 기록하면서 승인된 issue를 source 저장소 `workspace/issues/inbox/<project-ref>/`로 원자 이동해 대상 원본을 정리한 뒤 대상 `.mpa-workspace/`만 backup·교체한다. `install.py --upgrade`의 기존 전체 교체 경로는 Runtime 업데이트에 사용하지 않으며, 설치 도구·agent 설정 변경은 기존 설치본에 자동 적용하지 않는다.
@@ -80,6 +82,7 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 - source 전용 map-product 규칙·프로필과 배포 전용 Runtime 규칙·실행 소스를 분리하고, 어느 파일도 두 영역을 동시에 소유하지 않게 한다.
 - 최초 설치, Runtime 업데이트, installation tooling 갱신을 서로 다른 입력·적용 범위·rollback 책임으로 정의한다.
 - Runtime 업데이트는 대상의 미수집 issue를 수집·원본 정리까지 포함한 하나의 운영 절차로 정의한다. 수집 대상이 없으면 issue 단계는 no-op이며, 수집 실패·검증 실패·사용자 보류 issue는 원본을 보존한다.
+- 설치 고유 설정은 Runtime update와 독립 생명주기로 관리한다. 최초 install은 설정 파일이 없을 때만 생성하고, refresh는 승인된 allowlist에 포함된 설정 보강만 수행한다. deploy/rollback은 설정 파일을 덮어쓰지 않고 보존한다.
 
 ---
 
@@ -100,6 +103,7 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 | Deployment | release receipt, dry-run, backup, verification을 대상별로 기록 | dry-run 만료·대상 map/history 재검증과 상태 전이가 불완전 | apply 전후 asset map과 receipt 관계를 확인한다 |
 | Installation | dependency·launcher·보존 영역을 dry-run에서 판정 | 현재 dry-run은 파일 존재 확인 중심 | 구조화된 계획과 hook smoke, 보존 테스트를 추가한다 |
 | Issue lifecycle | canonical key·발생 정보·검토·archive 근거를 기록 | cross-filesystem 이동/receipt 실패 원복과 정상 전이 증빙 부족 | 원자 이동과 evidence referential integrity를 강제한다 |
+| Installation-local config | schema-versioned 설치별 설정, 기본값과 semantic checksum을 분리 | MPA는 agent 설정 preserve만 하고 프로젝트명·경로 등 고유 설정 계약이 없음 | `.mpa-project/config.yaml`을 additive-only로 초기화·보강하고 설정 오류는 경고·audit으로 알린다 |
 | 운영 문서 | source 정책과 Runtime 정책을 분리 | CLI·profile·사용자 문서의 행 단위 계약 검증 부족 | 한 계약표를 기준으로 문서와 테스트를 대조한다 |
 
 > **의도적 차이:** Circled Wiki의 clean worktree·commit Gate와 intake 원본 Git Gate는 도입하지 않는다. 사용자가 정한 대로 scoped Git 식별은 receipt 보조 정보로만 남기며, 관계없는 dirty 파일은 release/intake를 차단하지 않는다.
@@ -111,6 +115,7 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 | `map-product` (`release_manager.py`, `install.py`, `MAP_PRODUCT_RULES.md`, `map-product-rules/`, source `workspace/`) | 이 저장소 | release·deploy·installation refresh·issue 회수 정책 | 아니오 |
 | Runtime (`.mpa-workspace/` → `dist/.mpa-workspace/`) | 대상 프로젝트 | 공통 규칙·템플릿·hooks | 예, 이 경로만 |
 | 설치 골격 (`dist/workspace/`) | 최초 설치 대상 | 빈 초기 구조만 제공 | 아니오 |
+| 설치 고유 설정 (`.mpa-project/config.yaml`) | 대상 프로젝트·설치 agent | 프로젝트명·초기화 정보·로컬 경로. 파일이 없을 때만 생성, 기존 파일은 additive-only 보강 | 아니오 |
 | 대상 `workspace/`, `docs/`, agent 설정·일반 소스 | 사용자 | 사용자 데이터와 설정. 단 `docs/INDEX.md`는 agent 관리 색인 | 아니오, deploy/rollback은 `docs/INDEX.md`가 없을 때만 생성 가능 |
 
 `docs/`는 사용자가 프로젝트 루트에 준비한다. 이 작업은 `workspace/docs/` 참조를 `docs/`로 바꾸되, 문서를 이동·생성·배포하지 않는다. `upgrade-candidates`는 `methodology_improvement` issue로 이관하며, 새 issue는 프로젝트별 `workspace/issues/`에 만든다.
@@ -126,6 +131,7 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 | Dry-run | dry-run에는 `from_release`, `to_release`, release receipt, target 절대 경로, target asset map, target history 상태, issue collection inventory, 생성 시각, 30분 만료 시각을 기록한다. apply 직전에 이 모든 값을 다시 확인하며 하나라도 달라지면 거부한다. |
 | Target history | `history/releases/`는 대상 관리 이력이며 package asset map에서는 제외한다. deploy는 교체 전 history를 보존해 새 Runtime에 복사하고, history 파싱 실패·release ID 충돌은 apply 전에 중단한다. history와 receipt는 `from_release → to_release`, backup, verification을 함께 기록한다. backup에는 history를 포함한다. |
 | Installation refresh | 별도 `installation-refresh --plan <receipt>`로만 실행한다. plan에는 대상, agent, 변경 allowlist, preserve 목록, backup, 승인 reference가 필수다. 일반 install과 Runtime deploy는 refresh를 호출하지 않는다. |
+| Project-local config | `.mpa-project/config.yaml`이 없으면 `schema_version`, project name, 초기화 시각, 절대 root path를 생성한다. 있으면 schema registry의 누락 필드만 원자적으로 추가하고 기존 값·주석·순서를 보존한다. 잘못된 값·지원하지 않는 미래 schema는 파일을 건드리지 않고 경고한다. semantic checksum은 audit/receipt에만 기록하며 절대 경로 자체는 기록하지 않는다. |
 | Issue 이동 | 동일 파일시스템이면 rename, 다른 파일시스템이면 목적지 임시 파일→fsync→rename→원본 삭제 순서로 이동한다. receipt 기록 실패 시 destination을 원복하고 source 보존을 확인한다. |
 | User review | review receipt에는 `approved_by`, `approval_ref`, `decision`을 기록한다. CLI actor만으로 사용자 확인을 대체하지 않으며 rejected는 archive/triage를 금지하고 inbox에 보존한다. |
 
@@ -135,7 +141,7 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 |---|---|---|---|---|
 | 1 | Versioned release artifact | 단일 release ID 생성·Runtime source/dist 동기화 | release lineage, active/legacy inventory, migration receipt, schema audit | release ID↔manifest↔receipt↔package가 일대일이고 checksum은 무결성만 검증 |
 | 2 | Deployment 상태 | 유효한 versioned release | from/to version dry-run, issue collection inventory, target history, applied/rolled_back/failed receipt | stale dry-run·version/history·issue inventory 충돌·검증 실패가 apply 전에 중단 |
-| 3 | Installation 계약 | 설치 골격·agent spec | 구조화된 dry-run, smoke 결과, refresh plan | 기존 설치와 사용자 영역을 변경하지 않는 테스트 |
+| 3 | Installation 계약 | 설치 골격·agent spec·고유 config schema | 구조화된 dry-run, config additive plan, smoke 결과, refresh plan | 기존 설치·고유 설정·사용자 영역을 변경하지 않는 테스트 |
 | 4 | Issue lifecycle | release/deployment evidence 형식 | canonical issue schema, 원자 이동, review/triage/resolve/archive receipt | 정상 전이와 실패 시 inbox/원본 보존 테스트 |
 | 5 | 운영 정합성 | 1~4 구현 | profile·CLI·문서 계약표, 검증 보고 | source/dist sync, audit, 전체 테스트, dirty/No-Git 검사 |
 
@@ -150,7 +156,11 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 - deployment 승인: `approved_by`, approval reference, rollback owner는 필수 값이며 dry-run 결과의 `from_release`·`to_release`·target·asset map과 실제 apply 입력이 정확히 같아야 한다.
 - update issue collection: update가 지정된 대상 `workspace/issues/`를 검사해 후보 key·상대 경로·checksum을 dry-run 단계에서 사용자에게 고지하고 고정한다. Runtime 검증 후 중앙 `workspace/issues/inbox/<project-ref>/`로 자동 원자 수집하고 receipt가 확정된 항목만 대상 원본을 삭제한다. apply 완료 시 수집 목록·원본 정리 결과 또는 no-op/실패·보류 사유를 사용자에게 고지한다. inventory 변경은 원본을 보존하고 update completion을 실패로 보고한다.
 - docs index ownership: `docs/INDEX.md`는 agent 관리 색인이다. 최초 설치·Runtime update는 파일이 없을 때만 템플릿을 생성하고, agent는 문서 산출물 생성·갱신 뒤 해당 색인을 갱신한다. 기존 INDEX 또는 일반 docs 파일을 배포·rollback이 덮어쓰거나 삭제하지 않는다.
+- installation-local config ownership: `.mpa-project/config.yaml`은 대상 설치의 고유 설정이다. schema registry가 요구하는 기본 필드는 파일이 없을 때 생성하고, 기존 파일에는 누락 필드만 추가한다. 기존 값·주석·순서·사용자 지정 빈 값은 보존하며, invalid/future schema는 warn-only로 둔다.
+- installation path privacy: `project.root_path`는 로컬 운영 편의 정보로만 사용한다. release/package/manifest checksum/issue/중앙 receipt에는 config의 절대 경로를 복사하지 않으며, 프로젝트 이동 시 기존 canonical path를 덮어쓰지 않는다. 배포 dry-run의 `target` 절대 경로는 apply 대상 일치 확인을 위한 기존 운영 필드이며 config 값을 복사하는 동작과 구분한다.
+- config audit: `config-audit`는 schema·필수 필드·경로 안전성·민감정보 패턴·semantic checksum을 검사하고 결과를 경고/receipt로 남긴다. 기본 audit은 사용자의 작업을 차단하지 않는다.
 - 대상 history: source release manifest를 복사하지 않고, `from_release`·`to_release`·manifest/receipt 경로·asset checksum/map·backup·applied/rolled_back 상태와 검증 결과를 `.mpa-workspace/history/releases/`에 기록한다. 이 history는 Runtime update 관리 파일로 배포 자산에는 포함하지 않는다.
+- backup 보존: 성공 receipt/history 기록 뒤에만 대상 `.mpa-backups/`의 Runtime backup 디렉터리를 수정 시각 기준 최신 3개로 정리한다. 실패한 deploy에서는 기존 backup을 정리하지 않으며, 관리자가 둔 일반 파일은 건드리지 않는다.
 - backup 범위: 대상 `.mpa-workspace/`만 보관한다. `workspace/`, agent 설정, 임의 설정, 일반 소스 파일은 backup·읽기·덮어쓰기 대상에서 제외한다.
 - issue 수집: copy 후 delete가 아닌 동일 파일시스템에서는 rename, 다른 파일시스템에서는 임시 목적지+원본 보존 확인을 사용하는 원자적 이동으로 구현한다.
 - 민감정보 검사: credential 형태와 절대 경로를 휴리스틱으로 거부하며, 애매한 경우 자동 마스킹하지 않고 사용자에게 수정 요청한다.
@@ -163,7 +173,8 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 | `AGENTS.md` | map-product → Runtime 순의 source 전용 진입점으로 갱신 |
 | `.mpa-workspace/` 및 `dist/.mpa-workspace/` | `upgrade-candidates` 제거, root `docs/` 참조, issue template 동기화 |
 | `release_manager.py` | release schema/audit, deploy/rollback 상태, issue lifecycle CLI 보완 |
-| `install.py` | 구조화 dry-run, smoke, 최초 설치·refresh 계약 보완 |
+| `install.py` | 구조화 dry-run, 고유 config additive initializer, smoke, 최초 설치·refresh 계약 보완 |
+| `project_config.py` (신규) | `.mpa-project/config.yaml` schema/default/additive merge/audit/semantic checksum |
 | `MAP_PRODUCT_RULES.md` | map-product 운영 불변식 신규 정의 |
 | `map-product-rules/{installation,issue-intake,issue-triage,release-preparation,deployment-coordination}.md` | map-product 전용 설치·업데이트·이슈·릴리스 단계별 운영 프로필 신규 정의 |
 | Runtime 규칙·inject·template | Runtime에는 로컬 issue·root `docs/`만 남기고 source 정책 참조 제거 |
@@ -190,6 +201,9 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 - stale dry-run 또는 손상된 history로 덮어씀 → 만료·asset map·history를 apply 직전에 재검증한다.
 - 업데이트 중 issue를 잃거나 중복 보관함 → 대상 issue inventory를 dry-run/apply에서 재검증하고, 중앙 receipt 확정 뒤에만 원본을 삭제한다. 실패·보류 항목은 대상에 남긴다.
 - installation이 기존 설정을 바꿈 → 기존 설치는 거부하고, refresh는 승인된 plan의 allowlist만 적용한다.
+- 고유 config를 자동 정규화하다가 사용자의 값을 바꿈 → 구조적 additive-only merge와 invalid/future schema warn-only 정책으로 구현 단계에 포함한다.
+- 절대 경로가 저장소·receipt·issue로 유출됨 → config를 Runtime/release 범위에서 제외하고 경로 자체는 manifest/issue/central receipt에 기록하지 않는 검증을 구현 단계에 포함한다.
+- 프로젝트 이동 후 stale `root_path`를 agent가 현재 경로로 오인함 → canonical path는 보존하고 현재 실행 경로와 불일치하면 경고·관찰 기록만 추가한다.
 - issue 이동 중 오류로 원본을 잃음 → rename 또는 임시 파일·fsync·rename·원복 절차와 실패 테스트를 강제한다.
 - release와 무관한 issue를 archive함 → accepted review와 task·release·deployment·verification evidence의 참조 무결성을 확인한다.
 
@@ -201,7 +215,7 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 
 - [ ] Release: 단일 release ID↔manifest↔receipt↔package 일대일성, argv validation의 성공·실패·timeout, active/legacy migration, schema/receipt audit을 검증한다.
 - [ ] Deployment: valid `from_release → to_release` dry-run과 issue collection inventory만 apply하고, 대상 외 파일 보존·post-deploy verification·issue 원자 수집/원본 정리·rollback·실패 history/receipt를 검증한다.
-- [ ] Installation: 구조화 dry-run·hook smoke와 기존 `.mpa-workspace`, `workspace`, `docs`, agent 설정의 무변경을 검증한다. 단 없는 `docs/INDEX.md`의 생성·agent 색인 갱신은 허용하며 기존 INDEX 내용은 보존하는지 검증한다.
+- [ ] Installation: 구조화 dry-run·hook smoke와 기존 `.mpa-workspace`, `.mpa-project/config.yaml`, `workspace`, `docs`, agent 설정의 무변경을 검증한다. 없는 config는 기본 프로젝트명·초기화 시각·절대 root path만 생성하고, 기존 config는 누락 필드만 추가하며 기존 값·주석·사용자 설정을 보존하는지 검증한다. 단 없는 `docs/INDEX.md`의 생성·agent 색인 갱신은 허용하며 기존 INDEX 내용은 보존하는지 검증한다.
 - [ ] Issue: create→collect→review→triage→resolve→archive 정상 경로와 rejected/needs-information/중복/근거 불일치/이동 실패의 보존 경로를 검증한다.
 - [ ] 운영 정합성: profile/CLI/doc matrix, source/dist sync, release audit, 전체 테스트, `git diff --check`, scoped dirty Git·No-Git을 검증한다.
 

@@ -21,4 +21,5 @@
 - Runtime release는 `dist/.mpa-workspace/`만 대상으로 한다.
 - release manifest는 같은 ID의 `workspace/releases/packages/<release-id>/` 불변 스냅샷과 함께 존재해야 한다. 배포는 현재 `dist/`가 아니라 이 스냅샷만 사용한다.
 - 대상 프로젝트의 `workspace/`, `docs/`, agent 설정, 일반 소스는 Runtime deployment와 rollback에서 읽거나 변경하지 않는다. 단, 없는 `workspace/`, `workspace/issues/`, `docs/`, `docs/INDEX.md`는 초기화할 수 있다.
+- 대상 프로젝트의 `.mpa-project/config.yaml`은 설치 고유 설정이다. 최초 설치 시 없으면 기본 프로젝트명·초기화 시각·절대 root path로 만들고, 있으면 누락 필드만 추가한다. Runtime deployment/rollback은 기존 값을 덮어쓰지 않으며, config의 절대 경로를 release asset·manifest checksum·issue·중앙 receipt에 복사하지 않는다.
 - 이슈 수집은 원칙적으로 명시 요청 대상만 처리한다. 단, 승인된 Runtime update는 dry-run에서 후보를 고지한 뒤 검증 성공 시에만 batch를 원자 수집하고 원본 정리 결과를 고지할 수 있다.

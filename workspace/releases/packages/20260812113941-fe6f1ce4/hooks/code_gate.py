@@ -1,0 +1,355 @@
+#!/usr/bin/env python3
+"""
+code_gate.py — 코드 수정 게이트 (PreToolUse / BeforeTool)
+
+plan.md YAML 프론트매터의 '상태' 필드를 기준으로 소스 수정을 제어한다.
+
+GATE 1 — 소스 수정 (Edit/Write):
+  active 태스크 중 상태 = '구현 중'인 것이 있어야 허용.
+  없으면 차단.
+
+GATE 2 — 완료 이동 (Bash mv):
+  tasks/active → tasks/done 이동 시
+  해당 태스크 plan.md 상태 = '완료 승인'이어야 허용.
+  아니면 차단.
+
+동작 강도: MPA_GATE 환경변수
+  - block (명시 설정 시) : 조건 불충족 시 차단 (exit 2)
+  - warn (기본) : 차단하지 않고 경고만 주입
+  - off          : 게이트 비활성
+
+사용법: code_gate.py --agent {claude|codex|gemini}
+입력  : stdin 으로 hook JSON
+"""
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import sys
+
+# 항상 허용하는 경로 접두사 (방법론·프로젝트 데이터·agent 설정)
+ALLOW_PREFIXES = (
+    "workspace/",
+    ".mpa-workspace/",
+    ".claude/",
+    ".codex/",
+    ".gemini/",
+    ".agents/",
+    "CLAUDE.md",
+    "AGENTS.md",
+    "GEMINI.md",
+)
+
+# 소스 수정 도구 (agent별 명칭 차이 흡수)
+EDIT_TOOLS = {
+    "Edit", "Write", "MultiEdit", "NotebookEdit",   # claude
+    "apply_patch", "write_file", "replace", "edit",  # codex / gemini
+}
+
+# Bash 실행 도구
+BASH_TOOLS = {"Bash", "bash", "shell", "run_command"}
+
+
+def read_input():
+    raw = sys.stdin.read()
+    if not raw.strip():
+        return {}
+    try:
+        return json.loads(raw)
+    except Exception:
+        return {}
+
+
+def get(d, *keys):
+    for k in keys:
+        if isinstance(d, dict) and d.get(k):
+            return d[k]
+    return None
+
+
+def extract_path(data):
+    tool_input = get(data, "tool_input", "toolInput", "input") or {}
+    if not isinstance(tool_input, dict):
+        return None
+    return get(tool_input, "file_path", "path", "filePath", "notebook_path", "absolute_path")
+
+
+def relativize(path, cwd):
+    if not path:
+        return None
+    p = os.path.normpath(path)
+    cwd = os.path.normpath(cwd)
+    if os.path.isabs(p):
+        try:
+            p = os.path.relpath(p, cwd)
+        except ValueError:
+            return p
+    return p
+
+
+def is_always_allowed(rel):
+    if rel is None:
+        return True  # 경로 미상 — 막지 않는다
+    norm = rel.replace(os.sep, "/")
+    return any(norm.startswith(pfx) for pfx in ALLOW_PREFIXES)
+
+
+def parse_plan_fields(plan_path):
+    """plan.md YAML 프론트매터에서 필드들을 파싱해 dict로 반환."""
+    fields = {}
+    body = ""
+    try:
+        with open(plan_path, encoding="utf-8") as f:
+            content = f.read()
+        match = re.match(r"^---\n(.*?)\n---\n?(.*)", content, re.DOTALL)
+        if match:
+            for line in match.group(1).splitlines():
+                if ":" in line:
+                    k, v = line.split(":", 1)
+                    fields[k.strip()] = v.strip().strip('"').strip("'")
+            body = match.group(2)
+        else:
+            # 폴백: 프론트매터 없는 구형 plan.md
+            for line in content.splitlines():
+                if "상태" in line and ":" in line:
+                    val = line.split(":", 1)[1].strip()
+                    if val and "상태" not in fields:
+                        fields["상태"] = val
+            body = content
+    except Exception:
+        pass
+    return fields, body
+
+
+def parse_plan_status(plan_path):
+    """plan.md '상태' 필드만 반환 (하위 호환용)."""
+    fields, _ = parse_plan_fields(plan_path)
+    return fields.get("상태")
+
+
+HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
+
+
+def strip_implementation_sections(body):
+    """헤딩 텍스트가 '구현'으로 시작하는 섹션(그 헤딩부터 다음 헤딩 전까지)을 제외한다.
+
+    plan_hash.py의 동일 함수와 정확히 같은 로직을 유지해야 한다 — 어긋나면
+    approve가 기록한 해시를 이 함수가 다른 값으로 재계산해 정상 태스크도
+    GATE 1 재진입 차단에 걸린다.
+    """
+    kept = []
+    excluding = False
+    for line in body.splitlines():
+        m = HEADING_RE.match(line)
+        if m:
+            excluding = m.group(2).strip().startswith("구현")
+        if not excluding:
+            kept.append(line)
+    return "\n".join(kept)
+
+
+def compute_plan_hash(body):
+    """plan.md 본문(프론트매터 제외, '구현'류 섹션 제외)의 해시를 계산한다."""
+    # 공백·줄바꿈 정규화 후 해시 — 사소한 포맷 변경에는 둔감
+    filtered = strip_implementation_sections(body)
+    normalized = re.sub(r"\s+", " ", filtered).strip()
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+
+def find_active_statuses(cwd):
+    """active 태스크의 (태스크명, 상태) 목록을 반환한다."""
+    base = os.path.join(cwd, "workspace", "tasks", "active")
+    if not os.path.isdir(base):
+        return []
+    results = []
+    for name in sorted(os.listdir(base)):
+        task_dir = os.path.join(base, name)
+        if not os.path.isdir(task_dir):
+            continue
+        plan_path = os.path.join(task_dir, "plan.md")
+        if os.path.exists(plan_path):
+            results.append((name, parse_plan_status(plan_path)))
+    return results
+
+
+def check_hash_integrity(cwd, mode, agent):
+    """GATE 1 재진입 — '구현 중' 상태 태스크의 plan.md 해시가 승인해시와 일치하는지 확인."""
+    base = os.path.join(cwd, "workspace", "tasks", "active")
+    if not os.path.isdir(base):
+        return
+    for name in sorted(os.listdir(base)):
+        task_dir = os.path.join(base, name)
+        plan_path = os.path.join(task_dir, "plan.md")
+        if not os.path.exists(plan_path):
+            continue
+        fields, body = parse_plan_fields(plan_path)
+        if fields.get("상태") != "구현 중":
+            continue
+        approved_hash = fields.get("승인해시")
+        if not approved_hash:
+            current_hash = compute_plan_hash(body)
+            msg = (
+                f"⛔ 계획 승인 기록 복구 필요: '{name}' plan.md 상태는 '구현 중'이지만 승인해시가 없습니다.\n"
+                f"  현재해시: {current_hash}\n"
+                "자동 승인해시 등록은 하지 않습니다. 아래 중 하나로 명시적으로 복구하세요:\n"
+                "  1. 사용자 승인 이력이 불명확함 → 상태를 '설계 완료'로 되돌리고 plan.md 검토 후 재승인\n"
+                "  2. 직전 사용자 승인 후 기록만 누락됨 → 누락 사실과 현재 변경 내용을 사용자에게 확인받은 뒤 approve 실행\n"
+                "  3. minor 자동 승인 태스크임 → 최소 plan.md가 사용자 요청과 일치하는지 확인한 뒤 approve 실행\n"
+                "승인해시 갱신 명령:\n"
+                f"  python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/{name}/plan.md"
+            )
+            if mode == "warn":
+                emit_warn(agent, msg)
+            else:
+                emit_block(msg)
+            return
+        current_hash = compute_plan_hash(body)
+        if current_hash != approved_hash:
+            msg = (
+                f"⛔ 계획 재승인 필요: '{name}' plan.md가 승인 후 변경됐습니다.\n"
+                f"  승인해시: {approved_hash}\n"
+                f"  현재해시: {current_hash}\n"
+                "plan.md 변경이 설계에 영향을 주는지 사용자에게 확인하고:\n"
+                "  - 설계 영향 있음 → 상태를 '설계 완료'로 되돌리고 재승인\n"
+                "  - 설계 영향 없음 → 사용자 확인 후 '승인해시'를 새 해시로 갱신"
+            )
+            if mode == "warn":
+                emit_warn(agent, msg)
+            else:
+                emit_block(msg)
+            return  # 차단은 즉시 — 이후 태스크 검사 불필요
+
+
+def check_done_write(rel, cwd, agent):
+    """GATE 2 절차 확인 — Write/Edit로 workspace/tasks/done/ 직접 쓰기 시 경고 주입.
+
+    하드 블록하지 않는다 (교착 방지). 에이전트에게 상태를 알려 절차를 따르도록 유도한다.
+    active/에 같은 이름 태스크가 없으면(이미 이동 완료) 경고 없이 통과.
+    """
+    if rel is None:
+        return
+    norm = rel.replace(os.sep, "/")
+    if not norm.startswith("workspace/tasks/done/"):
+        return
+
+    parts = norm.split("/")
+    if len(parts) < 4:
+        return
+    task_name = parts[3]
+
+    active_plan = os.path.join("workspace", "tasks", "active", task_name, "plan.md")
+    if not os.path.exists(active_plan):
+        return  # 이미 이동됐거나 done/ 원본 파일 — 통과
+
+    status = parse_plan_status(active_plan)
+    if status != "완료 승인":
+        msg = (
+            f"⚠️ 완료 절차 확인: '{task_name}' plan.md 상태가 '완료 승인'이 아닙니다"
+            f" (현재: {status or '미상'}).\n"
+            "done/ 경로 직접 쓰기 전에 사용자 완료 승인 → plan.md 상태 업데이트 순서를 확인하세요.\n"
+            "※ 이 경고는 차단이 아닙니다 — 절차 확인 목적입니다."
+        )
+        emit_warn(agent, msg)
+
+
+def check_bash_mv(data, cwd, mode, agent):
+    """GATE 2 — Bash mv tasks/active → tasks/done 절차 경고 또는 명시적 차단."""
+    tool_input = get(data, "tool_input", "toolInput", "input") or {}
+    command = tool_input.get("command", "") if isinstance(tool_input, dict) else ""
+
+    # mv .../workspace/tasks/active/<task> ... 패턴 감지
+    pat = re.search(r"mv\s+\S*workspace/tasks/active/([^\s/]+)", command)
+    if not pat:
+        return  # 관련 없는 Bash 명령 — 통과
+
+    task_name = pat.group(1)
+    plan_path = os.path.join(cwd, "workspace", "tasks", "active", task_name, "plan.md")
+    status = parse_plan_status(plan_path)
+
+    if status != "완료 승인":
+        msg = (
+            f"⛔ 완료 처리 차단: '{task_name}' plan.md 상태가 '완료 승인'이 아닙니다"
+            f" (현재: {status or '미상'}).\n"
+            "사용자의 명시적 완료 승인 후 plan.md 상태를 '완료 승인'으로 업데이트하세요.\n"
+            "※ mv 이외의 방법(shutil, Python 파일 조작 등)으로 이동해도 동일 규칙이 적용됩니다."
+        )
+        if mode == "warn":
+            emit_warn(agent, msg)
+        else:
+            emit_block(msg)
+
+
+def emit_warn(agent, message):
+    """비차단 경고를 컨텍스트로 주입하고 통과시킨다."""
+    event = "BeforeTool" if agent == "gemini" else "PreToolUse"
+    out = {"hookSpecificOutput": {"hookEventName": event, "additionalContext": message}}
+    print(json.dumps(out, ensure_ascii=False))
+    sys.exit(0)
+
+
+def emit_block(message):
+    """도구 호출을 차단한다 (exit 2 + stderr)."""
+    sys.stderr.write(message + "\n")
+    sys.exit(2)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--agent", default="claude")
+    args = ap.parse_args()
+
+    mode = os.environ.get("MPA_GATE", "warn").strip().lower()
+    if mode == "off":
+        sys.exit(0)
+
+    data = read_input()
+    cwd = get(data, "cwd") or os.getcwd()
+    tool = get(data, "tool_name", "toolName", "tool") or ""
+
+    # ── GATE 2: Bash mv 차단 ──────────────────────────────────────────
+    if tool in BASH_TOOLS:
+        check_bash_mv(data, cwd, mode, args.agent)
+        sys.exit(0)
+
+    # ── GATE 1: 소스 수정 차단 ────────────────────────────────────────
+    if tool and tool not in EDIT_TOOLS:
+        sys.exit(0)
+
+    rel = relativize(extract_path(data), cwd)
+    check_done_write(rel, cwd, args.agent)  # GATE 2 절차 확인: done/ 직접 쓰기 경고
+    if is_always_allowed(rel):
+        sys.exit(0)
+
+    statuses = find_active_statuses(cwd)
+    implementing = [n for n, s in statuses if s == "구현 중"]
+
+    if not implementing:
+        target = rel or "(대상 미상)"
+        if statuses:
+            current = ", ".join(f"{n}:{s or '미상'}" for n, s in statuses)
+            msg = (
+                f"⛔ 구현 차단: '구현 중' 상태인 태스크가 없습니다 (수정 대상: {target}).\n"
+                f"현재 태스크 상태: {current}\n"
+                "plan.md 상태를 '구현 중'으로 업데이트한 뒤 진행하세요.\n"
+                "(MPA_GATE=warn 또는 off 로 완화할 수 있습니다.)"
+            )
+        else:
+            msg = (
+                f"⛔ 구현 차단: active 태스크가 없습니다 (수정 대상: {target}).\n"
+                "workspace/tasks/active/ 에 plan.md를 작성하고 사용자 승인을 받으세요."
+            )
+        if mode == "warn":
+            emit_warn(args.agent, f"⚠️ '구현 중' 상태 태스크 없이 소스 수정 중. {target}")
+        emit_block(msg)
+
+    # ── GATE 1 재진입: 승인해시 검증 ──────────────────────────────────
+    # '구현 중' 상태 태스크의 plan.md가 승인 후 변경됐는지 확인
+    check_hash_integrity(cwd, mode, args.agent)
+
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

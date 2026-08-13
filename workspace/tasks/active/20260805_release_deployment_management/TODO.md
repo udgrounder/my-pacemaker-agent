@@ -62,16 +62,32 @@
   - 완료: deployment receipt와 target history가 `applied`/`rolled_back`/`failed`, backup, verification 결과를 같은 release에 대해 기록한다.
   - 구현: `deploy()`의 `applied`/`failed` receipt/history, `rollback()`의 `rolled_back` receipt/history 및 원자 교체 복구.
   - 검증: `test_deploy_and_rollback_preserve_user_owned_paths`, `test_failed_deploy_restores_runtime_and_records_failed_state` 통과.
+- [x] Runtime backup 보존 개수를 최신 3개로 제한한다.
+  - 완료: 성공 deploy의 receipt/history 기록 뒤에만 `.mpa-backups/`의 Runtime backup 디렉터리를 수정 시각 순으로 정리하며, 실패 deploy와 일반 파일은 보존한다.
+  - 구현/검증: `prune_runtime_backups()`; `test_runtime_backup_retention_keeps_the_newest_three_directories_only` 통과.
 - [x] 보존 end-to-end 테스트를 추가한다.
   - 완료: deploy/rollback 뒤 `workspace`, `docs`, agent 설정, 일반 소스가 바뀌지 않음을 확인한다.
   - 검증: `test_deploy_and_rollback_preserve_user_owned_paths`가 workspace·docs·AGENTS.md·main.py 보존을 확인.
 
 ## 3. Installation 계약
 
-- [ ] `docs/INDEX.md`를 agent 관리 색인으로 보장한다.
+- [x] 설치 고유 설정의 additive-only 계약을 구현한다.
+  - 요구: `.mpa-project/config.yaml`이 없으면 `schema_version`, 프로젝트명, 초기화 시각, 절대 `root_path`를 생성한다.
+  - 보존: 파일이 있으면 schema registry의 누락 필드만 추가하고 기존 값·주석·순서·사용자 지정 빈 값을 변경하지 않는다. invalid/future schema는 경고 후 파일을 보존한다.
+  - 보안: 절대 경로는 대상 로컬 config에만 두고 release asset·manifest checksum·issue·중앙 receipt로 복사하지 않는다.
+  - 구현: `project_config.py`의 schema 1 기본값, 원자적 생성/보강, 기존 값·주석 보존, invalid/future schema warn-only, semantic checksum/audit.
+  - 검증: `test_new_install_creates_root_docs_but_not_workspace_docs`, `test_existing_project_config_only_adds_missing_fields_and_preserves_content`, `test_missing_schema_is_added_but_future_schema_is_preserved`, `test_config_audit_warns_on_moved_root_without_exposing_absolute_path` 통과.
+
+- [x] 고유 설정 audit와 설치/refresh 계약을 연결한다.
+  - 완료: dry-run은 config 생성/추가 예정 필드와 preserve 범위를 고지하고, install/refresh는 기존 config를 덮어쓰지 않는다.
+  - 완료: `config-audit`가 schema·필수 필드·경로 안전성·민감정보·semantic checksum을 검사하되 기본은 warn-only다.
+  - 구현: `install.py` dry-run/initial install/refresh allowlist에 config 계획과 additive 보강을 연결하고 `project_config.py audit` CLI를 추가. command-contract·installation profile·README/install·guidebook을 갱신.
+  - 검증: `test_refresh_can_add_config_fields_only_when_explicitly_allowed`, `test_invalid_schema_is_preserved_without_duplicate_schema_key`, `test_deploy_and_rollback_preserve_user_owned_paths`, 전체 테스트 43건, `python3 project_config.py audit --project /Users/kjkim/Study/my-pacemaker-agent` 통과.
+
+- [x] `docs/INDEX.md`를 agent 관리 색인으로 보장한다.
   - 완료: 최초 설치와 Runtime update는 root `docs/`가 없으면 만들고, `docs/INDEX.md`가 없을 때만 색인 템플릿을 생성한다.
   - 보존: 기존 `docs/INDEX.md`와 일반 문서는 설치·배포·rollback이 덮어쓰거나 삭제하지 않는다.
-  - 검증: 신규 설치의 `docs/INDEX.md` 생성, 기존 사용자 INDEX 보존, Runtime 규칙의 문서 산출물 후 INDEX 갱신 절차를 테스트·점검한다.
+  - 검증: `test_new_install_creates_root_docs_but_not_workspace_docs`, `test_deploy_creates_only_missing_workspace_and_docs_roots`에서 신규 생성과 기존 문서 루트 보존을 확인하고, Runtime 규칙에 문서 산출물 후 INDEX 갱신 절차를 반영했다.
 
 - [x] `install.py --dry-run`을 구조화된 설치 계획으로 출력한다.
   - 완료: 대상, 생성 파일, preserve 목록, dependency·agent 결과, 실패 이유가 machine-readable 출력에 있다.
@@ -81,7 +97,7 @@
   - 검증: `test_codex_hook_commands_and_scripts_smoke`가 Codex hook command의 Runtime 경로와 `session_start.py`·`code_gate.py`·`turn_end.py --help` 실행을 확인.
 - [x] 기존 설치 보호 테스트를 추가한다.
   - 완료: 기존 `.mpa-workspace`, `workspace`, `docs`, agent 설정은 install 실패·dry-run 모두에서 변경되지 않는다.
-  - 검증: `test_existing_install_rejection_preserves_workspace_docs_and_agent_settings`가 기존 `.mpa-workspace` install 거부 뒤 workspace·docs·agent 설정 무변경을 확인.
+  - 검증: `test_existing_install_rejection_preserves_workspace_docs_and_agent_settings`와 고유 config 보존 테스트가 기존 `.mpa-workspace`·workspace·docs·agent 설정·config 값을 보존하는 것을 확인.
 - [x] `installation-refresh --plan` 계약을 CLI·profile·문서에 정의하고 구현한다.
   - 완료: 승인 reference, backup, allowlist, preserve 목록이 없으면 실행되지 않으며 Runtime deploy가 refresh를 호출하지 않는다.
   - 구현: `install.py`의 `run_installation_refresh()`, `--installation-refresh --plan`; `map-product-rules/installation.md`, `install.md`, `README.md`.
@@ -119,7 +135,7 @@
   - 검증: `test_release_allows_scoped_dirty_or_no_git_source` 통과. scoped diff는 manifest `source_git`에 남고, temp No-Git source도 `unavailable` metadata로 release 준비를 계속한다.
 - [x] 종료 검증을 실행한다.
   - 완료: source/dist sync, release audit, 전체 테스트, `git diff --check` 결과를 기록한다.
-  - 검증: `release_manager.py sync-runtime` → 성공, `release_manager.py release-audit` → `release audit passed: 1 manifest(s)`, `python3 -m unittest discover -s tests -v` → 22 tests OK, `git diff --check` → 성공.
+  - 검증: `release_manager.py release-audit` → `release audit passed: 2 manifest(s)`, `python3 -m unittest discover -s tests -v` → 43 tests OK, `git diff --check` → 성공.
 - [x] Definition of Done을 증빙에 연결한다.
   - 완료: plan.md의 각 완료 기준에 테스트 또는 명령 결과가 연결된 뒤 사용자 검토를 요청한다.
   - 증빙 연결: Release는 `test_timeout_and_manifest_write_failure_leave_no_release_artifacts`·`release-audit`; Deployment는 `test_deploy_and_rollback_preserve_user_owned_paths`·`test_failed_deploy_restores_runtime_and_records_failed_state`; Installation은 `tests/test_install.py` 5건; Issue는 lifecycle/실패 lifecycle tests; 운영 정합성은 command contract·sync/audit/test/diff 출력.
@@ -139,3 +155,6 @@
   - 이전 부분 확인: `mpa-9326fb5686135269`을 `/Users/kjkim/Temp/mpa-test`에 dry-run → deploy 했다. 이는 이전 형식 검증이므로, 단일 release key 구현 뒤 `from_release → to_release`과 rollback을 다시 검증한다.
 - [ ] installation refresh plan의 allowlist가 조직의 agent 설정 변경 정책과 맞는지 승인한다.
   - 확인: `AGENTS.md`/agent spec/hook 설정 중 자동 갱신을 허용할 경로를 확정한다.
+- [ ] 설치된 운영 프로젝트의 고유 설정 동작을 사용자 환경에서 확인한다.
+  - 확인: config가 없을 때 프로젝트명·초기화 시각·절대 경로가 생성되는지, 기존 config가 있을 때 기존 내용은 유지되고 누락 필드만 추가되는지 확인한다.
+  - 확인: 프로젝트 이동·잘못된 schema·민감정보 후보가 경고로 안내되고, config의 절대 경로가 release/issue/중앙 receipt로 유출되지 않는지 확인한다.

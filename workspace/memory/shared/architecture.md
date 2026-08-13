@@ -9,9 +9,16 @@
 | map-product | `MAP_PRODUCT_RULES.md`, `map-product-rules/`, `release_manager.py`, `install.py`, source `workspace/` | source 전용이며 배포하지 않음 |
 | Runtime | `.mpa-workspace/` | `sync-runtime`으로만 `dist/.mpa-workspace/`에 동기화하고 release asset으로 포함 |
 | 신규 설치 골격 | `dist/workspace/` | 최초 설치에만 복사, Runtime release에는 제외 |
+| 설치 고유 설정 | 대상 `.mpa-project/config.yaml` | 최초 install에서 없을 때 생성, 기존 파일은 누락 필드만 additive 보강. Runtime release에는 포함하지 않음 |
 | 대상 사용자 데이터 | 대상 `workspace/`, 루트 `docs/`, agent 설정, 일반 소스 | install/deploy/rollback이 보존하며 release에 포함하지 않음 |
 
 release는 immutable package·manifest·receipt로 고정한다. deployment는 dry-run·승인·rollback 책임자 뒤 대상 `.mpa-workspace`만 교체하며, 대상 history와 receipt를 남긴다. Git은 scoped source 식별 보조 정보일 뿐 dirty worktree 차단 Gate가 아니다.
+
+### 설치 고유 설정의 additive-only 관리
+
+설치본의 프로젝트명·초기화 시각·canonical 절대 경로는 `.mpa-project/config.yaml`에 둔다. 파일이 없으면 schema 1 기본값으로 생성하고, 파일이 있으면 지원되는 현재 schema에서 누락 필드만 원자적으로 추가한다. 기존 값·주석·순서·사용자 지정 빈 값은 자동 수정하지 않는다. 잘못된 값이나 미래 schema는 경고·audit 대상으로 보존한다.
+
+`project.root_path`는 설치 로컬 메타데이터다. Runtime package, manifest asset checksum, issue, 중앙 receipt에 절대 경로를 복사하지 않으며 프로젝트 이동 시 기존 canonical path를 덮어쓰지 않는다. Runtime deploy/rollback은 이 파일을 변경하지 않고, config 보강은 명시된 installation refresh allowlist에서만 수행한다.
 
 ### dist/ 가 단일 배포 소스
 `install.py`가 `dist/.mpa-workspace/`를 대상 프로젝트로 복사한다.  

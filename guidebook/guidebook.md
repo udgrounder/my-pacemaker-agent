@@ -1148,12 +1148,13 @@ python3 release_manager.py deploy --manifest workspace/releases/manifests/<relea
 
 `--project`와 `--agents`는 신규 설치에만 **둘 다 필수**다. `install.py --dry-run`으로 template·agent spec·변경 범위를 먼저 확인할 수 있다. 기존 `.mpa-workspace/`가 있으면 `install.py`는 중단하며, Runtime update는 validation을 통과한 immutable release manifest와 recorded dry-run, 승인, rollback 책임자로만 수행한다.
 
-기존 설치에서 agent wiring 또는 agent spec만 갱신할 때에는 Runtime update와 분리된 `installation refresh`를 사용한다. 대상·agent·agent 관리 파일 allowlist·`workspace/`/루트 `docs/`/일반 소스 preserve 목록·대상 `.mpa-installation-backups/` 아래 backup·승인 reference가 담긴 JSON plan 없이는 실행하지 않는다. Runtime deploy와 최초 install은 refresh를 호출하지 않는다.
+기존 설치에서 agent wiring·agent spec 또는 고유 설정의 누락 필드를 갱신할 때에는 Runtime update와 분리된 `installation refresh`를 사용한다. 대상·agent·agent/config 관리 파일 allowlist·`workspace/`/루트 `docs/`/`.mpa-project/config.yaml`/일반 소스 preserve 목록·대상 `.mpa-installation-backups/` 아래 backup·승인 reference가 담긴 JSON plan 없이는 실행하지 않는다. Runtime deploy와 최초 install은 refresh를 호출하지 않으며, config refresh는 누락 필드만 추가한다.
 
 **설치 후 프로젝트 구조:**
 ```
 my-project/
 ├── .mpa-workspace/              ← 체계 파일 (에이전트 행동 규칙)
+├── .mpa-project/config.yaml     ← 설치 고유 설정 (프로젝트명·초기화 시각·로컬 root path)
 ├── workspace/                   ← 프로젝트 데이터 (템플릿 골격만 있는 상태)
 │   ├── memory/ tasks/
 ├── CLAUDE.md / AGENTS.md / GEMINI.md  ← 선택한 agent의 진입점 (기존 파일이면 섹션 추가)
@@ -1161,7 +1162,7 @@ my-project/
 └── .agents/rules/mpa_pacemaker.md     ← codex/antigravity 포함 시
 ```
 
-진입점 파일(`CLAUDE.md` 등)에는 Agents Workspace 섹션이 추가되고, agent별 전용 파일(`mpa_pacemaker.md`)은 해당 agent의 native 폴더에 복사된다(없는 경우만). `workspace/`는 어떤 agent를 쓰든 동일하므로 프로젝트 루트에 한 번만 설치된다.
+진입점 파일(`CLAUDE.md` 등)에는 Agents Workspace 섹션이 추가되고, agent별 전용 파일(`mpa_pacemaker.md`)은 해당 agent의 native 폴더에 복사된다(없는 경우만). `.mpa-project/config.yaml`은 파일이 없을 때 기본값으로 생성하며, 기존 파일에는 누락 필드만 추가한다. `workspace/`는 어떤 agent를 쓰든 동일하므로 프로젝트 루트에 한 번만 설치된다.
 
 지원 agent와 감지 조건:
 
@@ -1174,7 +1175,7 @@ my-project/
 
 **Runtime 업데이트:**
 
-release preparation에서 `dist/.mpa-workspace/` 해시와 불변 package를 고정한다. deployment는 그 package로 프로젝트의 `.mpa-workspace/`만 backup·교체·검증한다. `workspace/`, 루트 `docs/`, agent 설정과 일반 소스는 건드리지 않는다.
+release preparation에서 `dist/.mpa-workspace/` 해시와 불변 package를 고정한다. deployment는 그 package로 프로젝트의 `.mpa-workspace/`만 backup·교체·검증한다. `.mpa-project/config.yaml`, `workspace/`, 루트 `docs/`, agent 설정과 일반 소스는 건드리지 않는다. config audit은 `python3 project_config.py audit --project <경로>`로 실행하며 결과는 경고 수준으로 안내한다.
 
 복사되는 것과 복사 안 되는 것:
 - **복사됨**: 에이전트 행동 규칙, inject 파일, 페르소나, 스킬 등 체계 운영 파일
