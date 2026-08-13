@@ -7,7 +7,7 @@
 
 ## 업그레이드 후보 반영
 
-프로젝트들에서 수집된 `dist/.mpa-workspace/upgrade-candidates/` 파일을 하네스 템플릿에 반영한다.
+프로젝트들에서 수집된 `workspace/issues/inbox/<project-ref>/`의 `methodology_improvement` issue를 검토하고 하네스 템플릿에 반영한다.
 
 ### 원칙
 
@@ -17,14 +17,14 @@
 
 ### 작업 절차
 
-1. `dist/.mpa-workspace/upgrade-candidates/` 파일 목록을 읽고 전체를 사용자에게 제시한다:
+1. source 회수함의 `workspace/issues/inbox/`에서 `methodology_improvement` issue 목록을 읽고 전체를 사용자에게 제시한다:
 
 ```
 ## 하네스 개선 후보 목록
 
 | 파일 | 타입 | 제목 | 발견 상황 | 적용 범위 |
 |------|------|------|---------|---------|
-| [파일명] | 방법론 개선 / 도메인 지식 | [제목] | [발견 상황 요약] | 이 프로젝트 / 모든 프로젝트 |
+| [project-ref/issue.md] | 방법론 개선 / 도메인 지식 | [제목] | [발견 상황 요약] | 이 프로젝트 / 모든 프로젝트 |
 
 → 반영할 항목을 선택해주세요.
 ```
@@ -49,7 +49,7 @@
 ```
 
 3. 사용자 응답 후 다음 후보로 넘어간다. 모든 선택 항목이 처리될 때까지 반복한다.
-4. 반영 완료된 파일을 `dist/.mpa-workspace/upgrade-candidates/` 에서 제거한다.
+4. 반영 완료된 issue는 review·triage·release·deployment 근거를 기록한 뒤 `workspace/issues/archived/YYYY/MM/<project-ref>/`로 이동한다.
 
 ---
 
@@ -57,13 +57,13 @@
 
 - [ ] 후보 전체 목록 사용자에게 제시됨
 - [ ] 선택된 항목이 모두 사용자 확인 후 처리됨
-- [ ] 처리 완료된 upgrade-candidates 파일 제거됨
+- [ ] 처리 완료된 issue가 archive로 이동됨
 
 ---
 
 ## 도메인 지식 라이브러리 관리
 
-upgrade-candidates 중 도메인 지식에 해당하는 것은 `dist/.mpa-workspace/knowledge/`에 반영한다.
+methodology_improvement issue 중 도메인 지식에 해당하는 것은 `dist/.mpa-workspace/knowledge/`에 반영한다.
 
 ### 판단 기준
 

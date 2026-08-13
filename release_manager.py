@@ -11,19 +11,32 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
+import tempfile
 import uuid
+import zipfile
+from contextlib import contextmanager
 from pathlib import Path
+
+import project_config
 
 
 ROOT = Path(__file__).resolve().parent
 RUNTIME_SOURCE = ROOT / ".mpa-workspace"
 RUNTIME_DIST = ROOT / "dist" / ".mpa-workspace"
 WORKSPACE = ROOT / "workspace"
-MANIFESTS = WORKSPACE / "releases" / "manifests"
-PACKAGES = WORKSPACE / "releases" / "packages"
-RELEASE_RECEIPTS = WORKSPACE / "receipts" / "releases"
+RELEASES = WORKSPACE / "releases"
+LEGACY_RELEASES = RELEASES / "legacy"
+LEGACY_ACTIVE_MANIFESTS = RELEASES / "manifests"
+LEGACY_ACTIVE_PACKAGES = RELEASES / "packages"
+LEGACY_ACTIVE_RECEIPTS = WORKSPACE / "receipts" / "releases"
+# Compatibility aliases are kept for integrations that import these constants;
+# active releases are now discovered only under RELEASES/<release-id>/ bundles.
+MANIFESTS = RELEASES
+PACKAGES = RELEASES
+RELEASE_RECEIPTS = RELEASES
 DEPLOYMENT_RECEIPTS = WORKSPACE / "receipts" / "deployments"
 ISSUE_RECEIPTS = WORKSPACE / "receipts" / "issues"
 ISSUES = WORKSPACE / "issues"
@@ -36,6 +49,11 @@ RELEASE_SCHEMA_VERSION = 4
 VALIDATION_TIMEOUT_SECONDS = 120
 RUNTIME_BACKUP_RETENTION = 3
 DOCS_INDEX_TEMPLATE = "# 문서 색인\n\n> 이 파일은 agent가 문서 산출물의 위치와 요약을 관리합니다. 일반 문서 내용은 프로젝트 사용자가 소유합니다.\n\n"
+RELEASE_BUNDLE_SCHEMA_VERSION = 1
+BACKUP_MARKER = "backup-metadata.json"
+LOCK_FILE = ".mpa-deploy.lock"
+RUNTIME_BACKUP_ROOT = "runtime"
+RUNTIME_CONFIG_BACKUP_ROOT = "runtime-config"
 
 
 def now() -> str:
@@ -57,6 +75,10 @@ def sha(path: Path) -> str:
         for block in iter(lambda: file.read(65536), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def sha_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
 def assert_safe_runtime_tree(root: Path) -> None:
@@ -86,9 +108,169 @@ def runtime_ignore(_: str, names: list[str]) -> set[str]:
 
 def write_json(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(path)
+    temporary = path.with_name(f".{path.name}.tmp-{uuid.uuid4().hex[:8]}")
+    try:
+        with temporary.open("w", encoding="utf-8") as stream:
+            stream.write(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _runtime_config_migration(value: object) -> dict[str, object] | None:
+    return project_config.validate_runtime_config_migration(value)
+
+
+def _runtime_config_checksum(root: Path) -> str | None:
+    path = project_config.config_path(root)
+    return sha(path) if path.is_file() else None
+
+
+def _runtime_config_summary(root: Path, migration: object) -> dict[str, object]:
+    normalized = _runtime_config_migration(migration)
+    preview = project_config.preview_runtime_config_migration(root, normalized)
+    return {
+        "schema_version": preview.get("schema_version"),
+        "add": preview.get("add", []),
+        "skipped": preview.get("skipped", []),
+        "status": preview.get("status"),
+        "config_checksum": _runtime_config_checksum(root),
+    }
+
+
+def _safe_relative(path: Path, root: Path) -> str:
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError as error:
+        raise ValueError(f"path escapes release root: {path}") from error
+
+
+def _bundle_paths(release_id: str) -> dict[str, Path]:
+    require_safe_ref(release_id, "release-id")
+    bundle = RELEASES / release_id
+    return {
+        "bundle": bundle,
+        "package": bundle / f"package_{release_id}.zip",
+        "manifest": bundle / f"manifest_{release_id}.json",
+        "note": bundle / f"note_{release_id}.md",
+        "receipt": bundle / f"release-receipt_{release_id}.json",
+    }
+
+
+def _zip_runtime(source: Path, destination: Path) -> None:
+    """Write a deterministic, symlink-free Runtime archive."""
+    assert_safe_runtime_tree(source)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        for path in sorted(source.rglob("*")):
+            relative = path.relative_to(source)
+            if any(part in IGNORED_RUNTIME_NAMES for part in relative.parts):
+                continue
+            if path.is_dir():
+                continue
+            info = zipfile.ZipInfo(relative.as_posix(), date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = (path.stat().st_mode & 0o777) << 16
+            archive.writestr(info, path.read_bytes())
+
+
+def _zip_entries(archive_path: Path) -> list[str]:
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            return archive.namelist()
+    except (OSError, zipfile.BadZipFile) as error:
+        raise ValueError(f"release package is not a valid ZIP: {archive_path.name}") from error
+
+
+def _validate_zip_member(name: str) -> None:
+    path = Path(name)
+    if not name or path.is_absolute() or ".." in path.parts:
+        raise ValueError(f"release package contains an unsafe path: {name}")
+
+
+def _archive_current_release(archive_path: Path) -> str:
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            info = archive.getinfo(".mpa-version")
+            for line in archive.read(info).decode("utf-8").splitlines():
+                if line.startswith("current_release:"):
+                    return line.split(":", 1)[1].strip()
+    except (KeyError, UnicodeDecodeError, OSError, zipfile.BadZipFile) as error:
+        raise ValueError("release package .mpa-version is invalid") from error
+    raise ValueError("release package current_release is missing")
+
+
+def _extract_runtime(archive_path: Path, destination: Path) -> None:
+    destination.mkdir(parents=True, exist_ok=False)
+    names: set[str] = set()
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            for info in archive.infolist():
+                _validate_zip_member(info.filename)
+                if info.filename in names:
+                    raise ValueError(f"release package contains a duplicate path: {info.filename}")
+                names.add(info.filename)
+                mode = (info.external_attr >> 16) & 0xFFFF
+                if stat.S_IFMT(mode) == stat.S_IFLNK:
+                    raise ValueError(f"release package contains a symlink: {info.filename}")
+                target = (destination / info.filename).resolve()
+                if destination.resolve() not in target.parents and target != destination.resolve():
+                    raise ValueError(f"release package path escapes staging: {info.filename}")
+                if info.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with archive.open(info) as source, target.open("wb") as output:
+                    shutil.copyfileobj(source, output)
+                permissions = (info.external_attr >> 16) & 0o777
+                if permissions:
+                    target.chmod(permissions)
+    except (OSError, ValueError, zipfile.BadZipFile) as error:
+        shutil.rmtree(destination, ignore_errors=True)
+        raise ValueError("release package extraction failed") from error
+
+
+def _release_bundle_dirs() -> list[Path]:
+    if not RELEASES.is_dir():
+        return []
+    return sorted(path for path in RELEASES.iterdir()
+                  if path.is_dir() and SAFE_REF.fullmatch(path.name)
+                  and path.name not in {"legacy", "manifests", "packages"})
+
+
+@contextmanager
+def target_lock(root: Path):
+    """Prevent concurrent deploy/rollback for one target without a hard gate elsewhere."""
+    lock_path = root / LOCK_FILE
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    stream = lock_path.open("a+", encoding="utf-8")
+    try:
+        try:
+            import fcntl
+            fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except ImportError:
+            pass
+        except BlockingIOError as error:
+            raise ValueError("target already has a deploy or rollback in progress") from error
+        yield
+    finally:
+        try:
+            import fcntl
+            fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+        except ImportError:
+            pass
+        stream.close()
+
+
+def _remove_created_project_paths(root: Path, created: list[str]) -> None:
+    for relative in sorted(created, key=lambda value: value.count("/"), reverse=True):
+        path = root / relative.rstrip("/")
+        if path.is_file():
+            path.unlink()
+        elif path.is_dir() and not any(path.iterdir()):
+            path.rmdir()
 
 
 def replace_tree(source: Path, destination: Path) -> None:
@@ -165,31 +347,55 @@ def restore_release_version(version_file: Path, original: str | None) -> None:
 
 
 def migrate_legacy_active_releases() -> None:
-    """Keep old hash-only artifacts out of the active versioned release inventory."""
-    legacy_root = WORKSPACE / "releases" / "legacy" / "migrated" / dt.datetime.now().strftime("%Y%m%d")
-    legacy_receipts = WORKSPACE / "receipts" / "legacy" / "migrations" / dt.datetime.now().strftime("%Y%m%d")
+    """Move pre-bundle active artifacts out of the new release inventory."""
+    date_root = dt.datetime.now().strftime("%Y%m%d")
+    legacy_root = LEGACY_RELEASES / "migrated" / date_root
+    legacy_receipts = WORKSPACE / "receipts" / "legacy" / "migrations" / date_root
     legacy_ids = set()
-    for path in MANIFESTS.glob("*.json") if MANIFESTS.exists() else []:
+    records: dict[str, dict[str, list[str] | str]] = {}
+    for path in LEGACY_ACTIVE_MANIFESTS.glob("*.json") if LEGACY_ACTIVE_MANIFESTS.exists() else []:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             data = {}
-        if data.get("schema_version") != RELEASE_SCHEMA_VERSION:
-            legacy_ids.add(path.stem)
-            legacy_root.mkdir(parents=True, exist_ok=True)
-            path.replace(legacy_root / path.name)
+        raw_ident = str(data.get("release_id") or path.stem)
+        ident = raw_ident if SAFE_REF.fullmatch(raw_ident) else f"legacy-{sha_bytes(raw_ident.encode())[:12]}"
+        legacy_ids.add(ident)
+        destination = legacy_root / ident
+        destination.mkdir(parents=True, exist_ok=True)
+        path.replace(destination / path.name)
+        records[ident] = {"source_paths": [relative_to_root(path)],
+                          "destination_root": relative_to_root(destination)}
     for ident in legacy_ids:
-        package = PACKAGES / ident
+        package = LEGACY_ACTIVE_PACKAGES / ident
         if package.exists():
-            legacy_root.mkdir(parents=True, exist_ok=True)
-            package.replace(legacy_root / package.name)
-    for path in RELEASE_RECEIPTS.glob("*.json") if RELEASE_RECEIPTS.exists() else []:
+            destination = legacy_root / ident
+            destination.mkdir(parents=True, exist_ok=True)
+            package.replace(destination / package.name)
+            records.setdefault(ident, {"source_paths": [], "destination_root": relative_to_root(destination)})
+            records[ident]["source_paths"].append(relative_to_root(package))
+    for path in LEGACY_ACTIVE_RECEIPTS.glob("*.json") if LEGACY_ACTIVE_RECEIPTS.exists() else []:
         try:
-            if json.loads(path.read_text(encoding="utf-8")).get("release_id") in legacy_ids:
+            raw_receipt_id = str(json.loads(path.read_text(encoding="utf-8")).get("release_id") or "")
+            receipt_id = raw_receipt_id if SAFE_REF.fullmatch(raw_receipt_id) else f"legacy-{sha_bytes(raw_receipt_id.encode())[:12]}"
+            if receipt_id in legacy_ids:
                 legacy_receipts.mkdir(parents=True, exist_ok=True)
                 path.replace(legacy_receipts / path.name)
+                records.setdefault(receipt_id, {"source_paths": [], "destination_root": relative_to_root(legacy_root / receipt_id)})
+                records[receipt_id]["source_paths"].append(relative_to_root(path))
         except json.JSONDecodeError:
             continue
+    for ident, record in records.items():
+        write_json(legacy_receipts / f"{ident}-bundle-migration-{receipt_suffix()}.json", {
+            "schema_version": 1,
+            "kind": "release_layout_migration",
+            "release_id": ident,
+            "reason": "pre-bundle active manifest/package/receipt moved out of active inventory",
+            "source_paths": record["source_paths"],
+            "destination_root": record["destination_root"],
+            "migrated_at": now(),
+            "verified_by": "release-manager",
+        })
 
 
 def require_safe_ref(value: str, field: str) -> str:
@@ -218,6 +424,22 @@ def run_validation(command: list[str]) -> dict:
     return record
 
 
+def load_runtime_config_migration(value: object) -> dict[str, object] | None:
+    """Load optional release-local Runtime defaults from a JSON file."""
+    if value in (None, ""):
+        return None
+    path = Path(str(value))
+    if not path.is_absolute():
+        path = ROOT / path
+    try:
+        migration = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise ValueError(f"runtime config migration file cannot be read: {path}") from error
+    except json.JSONDecodeError as error:
+        raise ValueError("runtime config migration file is not valid JSON") from error
+    return _runtime_config_migration(migration)
+
+
 def prepare_release(args: argparse.Namespace) -> None:
     if isinstance(args.validation_command, list):  # direct API use in tests/integrations
         validation_command = args.validation_command
@@ -229,6 +451,7 @@ def prepare_release(args: argparse.Namespace) -> None:
     metadata = {field: getattr(args, field) for field in RELEASE_METADATA}
     if any(not value.strip() for value in metadata.values()):
         raise ValueError("release metadata fields must not be empty")
+    runtime_config = load_runtime_config_migration(getattr(args, "runtime_config_json", None))
     migrate_legacy_active_releases()
     version_file = RUNTIME_SOURCE / ".mpa-version"
     original_version = version_file.read_text(encoding="utf-8") if version_file.exists() else None
@@ -243,53 +466,89 @@ def prepare_release(args: argparse.Namespace) -> None:
     assets = asset_map(RUNTIME_DIST)
     if current_release(RUNTIME_DIST) != ident:
         raise ValueError("Runtime release ID does not match prepared release")
-    manifest_path = MANIFESTS / f"{ident}.json"
-    package_path = PACKAGES / ident
-    if manifest_path.exists() or package_path.exists():
+    paths = _bundle_paths(ident)
+    if paths["bundle"].exists():
         raise ValueError("generated release ID already exists")
-    else:
-        package_path.parent.mkdir(parents=True, exist_ok=True)
-        staging = package_path.with_name(f".{package_path.name}.new-{uuid.uuid4().hex[:8]}")
-        receipt_path = RELEASE_RECEIPTS / f"{ident}-{receipt_suffix()}.json"
-        try:
-            shutil.copytree(RUNTIME_DIST, staging, ignore=runtime_ignore)
-            if asset_map(staging) != assets:
-                raise ValueError("release package asset map changed while preparing")
-            staging.replace(package_path)
-            receipt = {
-                "schema_version": RELEASE_SCHEMA_VERSION,
-                "release_id": ident,
-                "manifest": relative_to_root(manifest_path),
-                "created_at": now(),
-                "verified_by": args.verified_by,
-                "validation": validation,
+    staging = RELEASES / f".{ident}.new-{uuid.uuid4().hex[:8]}"
+    final_paths = _bundle_paths(ident)
+    staged_paths = {
+        key: staging / path.name for key, path in final_paths.items() if key != "bundle"
+    }
+    package_checksum = None
+    asset_checksum = hashlib.sha256(json.dumps(assets, sort_keys=True).encode()).hexdigest()
+    runtime_config_checksum = (hashlib.sha256(json.dumps(runtime_config, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+                               if runtime_config is not None else None)
+    try:
+        staging.mkdir(parents=True, exist_ok=False)
+        _zip_runtime(RUNTIME_DIST, staged_paths["package"])
+        package_checksum = sha(staged_paths["package"])
+        note = (
+            f"# Release {ident}\n\n"
+            f"- release_id: `{ident}`\n"
+            f"- verified_by: {args.verified_by}\n"
+            f"- created_at: {now()}\n"
+            f"- package: `package_{ident}.zip`\n\n"
+            "## Release metadata\n\n"
+            + "\n".join(f"- {field}: {metadata[field]}" for field in RELEASE_METADATA)
+            + "\n\n## Validation\n\n"
+            + f"- command: `{json.dumps(validation['command'], ensure_ascii=False)}`\n"
+            + f"- exit_code: `{validation['exit_code']}`\n"
+        )
+        if runtime_config is not None:
+            note += ("\n## Runtime config migration\n\n"
+                     f"- schema_version: `{runtime_config['schema_version']}`\n"
+                     f"- additive keys: `{json.dumps(sorted(runtime_config['additive_defaults']), ensure_ascii=False)}`\n"
+                     "- existing project/user values are preserved; rollback restores the pre-deploy config snapshot.\n")
+        staged_paths["note"].write_text(note, encoding="utf-8")
+        final_manifest = final_paths["manifest"]
+        final_receipt = final_paths["receipt"]
+        final_package = final_paths["package"]
+        final_note = final_paths["note"]
+        receipt = {
+            "schema_version": RELEASE_SCHEMA_VERSION,
+            "bundle_schema_version": RELEASE_BUNDLE_SCHEMA_VERSION,
+            "release_id": ident,
+            "manifest": relative_to_root(final_manifest),
+            "package": relative_to_root(final_package),
+            "note": relative_to_root(final_note),
+            "created_at": now(),
+            "verified_by": args.verified_by,
+            "package_checksum": package_checksum,
+            "asset_checksum": asset_checksum,
+            "validation": validation,
+        }
+        if runtime_config is not None:
+            receipt["runtime_config"] = {
+                "schema_version": runtime_config["schema_version"],
+                "migration_checksum": runtime_config_checksum,
             }
-            write_json(receipt_path, receipt)
-            manifest = {
-                "schema_version": RELEASE_SCHEMA_VERSION,
-                "release_id": ident,
-                "created_at": now(),
-                "asset_root": "dist/.mpa-workspace",
-                "package": relative_to_root(package_path),
-                "assets": assets,
-                "asset_checksum": hashlib.sha256(json.dumps(assets, sort_keys=True).encode()).hexdigest(),
-                "source_snapshot": {"allowlist": sorted(assets), "asset_checksum": hashlib.sha256(json.dumps(assets, sort_keys=True).encode()).hexdigest(), "validation": validation, "metadata": metadata},
-                "source_git": scoped_git(),
-                "metadata": metadata,
-                "validation": validation,
-                "release_receipt": relative_to_root(receipt_path),
-            }
-            write_json(manifest_path, manifest)
-        except Exception:
-            if receipt_path.exists():
-                receipt_path.unlink()
-            if package_path.exists():
-                shutil.rmtree(package_path)
-            restore_release_version(version_file, original_version)
-            raise
-        finally:
-            if staging.exists():
-                shutil.rmtree(staging)
+        write_json(staged_paths["receipt"], receipt)
+        manifest = {
+            "schema_version": RELEASE_SCHEMA_VERSION,
+            "bundle_schema_version": RELEASE_BUNDLE_SCHEMA_VERSION,
+            "release_id": ident,
+            "created_at": now(),
+            "asset_root": "dist/.mpa-workspace",
+            "package": relative_to_root(final_package),
+            "note": relative_to_root(final_note),
+            "assets": assets,
+            "asset_checksum": asset_checksum,
+            "package_checksum": package_checksum,
+            "source_snapshot": {"allowlist": sorted(assets), "asset_checksum": asset_checksum, "validation": validation, "metadata": metadata},
+            "source_git": scoped_git(),
+            "metadata": metadata,
+            "validation": validation,
+            "release_receipt": relative_to_root(final_receipt),
+        }
+        if runtime_config is not None:
+            manifest["runtime_config"] = runtime_config
+        write_json(staged_paths["manifest"], manifest)
+        staging.replace(final_paths["bundle"])
+    except Exception:
+        if staging.exists():
+            shutil.rmtree(staging)
+        restore_release_version(version_file, original_version)
+        raise
     print(ident)
 
 
@@ -298,64 +557,93 @@ def load_manifest(value: str) -> tuple[Path, dict]:
     if not path.is_absolute():
         path = ROOT / path
     path = path.resolve()
-    if MANIFESTS.resolve() not in path.parents:
-        raise ValueError("manifest must be inside workspace/releases/manifests")
+    if RELEASES.resolve() not in path.parents or path.parent.parent != RELEASES.resolve():
+        raise ValueError("manifest must be inside workspace/releases/<release-id>")
     data = json.loads(path.read_text(encoding="utf-8"))
-    if (data.get("schema_version") != RELEASE_SCHEMA_VERSION or not data.get("release_id") or
+    release_id = data.get("release_id")
+    if (data.get("schema_version") != RELEASE_SCHEMA_VERSION or
+            data.get("bundle_schema_version") != RELEASE_BUNDLE_SCHEMA_VERSION or
+            not isinstance(release_id, str) or not SAFE_REF.fullmatch(release_id) or
+            path.parent.name != release_id or path.name != f"manifest_{release_id}.json" or
             not isinstance(data.get("assets"), dict)):
         raise ValueError("invalid release manifest")
-    if data.get("package") != relative_to_root(PACKAGES / data["release_id"]):
+    paths = _bundle_paths(release_id)
+    if data.get("package") != relative_to_root(paths["package"]):
         raise ValueError("manifest package path is invalid")
+    if data.get("note") != relative_to_root(paths["note"]):
+        raise ValueError("manifest note path is invalid")
+    if data.get("release_receipt") != relative_to_root(paths["receipt"]):
+        raise ValueError("manifest release receipt path is invalid")
     if not isinstance(data.get("metadata"), dict) or any(not data["metadata"].get(field) for field in RELEASE_METADATA):
         raise ValueError("manifest release metadata is incomplete")
     if not isinstance(data.get("validation"), dict) or data["validation"].get("exit_code") != 0:
         raise ValueError("manifest validation result is invalid")
-    receipt = (ROOT / data.get("release_receipt", "")).resolve()
-    if RELEASE_RECEIPTS.resolve() not in receipt.parents or not receipt.is_file():
+    receipt = paths["receipt"].resolve()
+    if not receipt.is_file():
         raise ValueError("manifest release receipt is missing")
     receipt_data = json.loads(receipt.read_text(encoding="utf-8"))
+    runtime_config = data.get("runtime_config")
+    if runtime_config is not None:
+        runtime_config = _runtime_config_migration(runtime_config)
+        expected_runtime_receipt = {
+            "schema_version": runtime_config["schema_version"],
+            "migration_checksum": hashlib.sha256(json.dumps(runtime_config, ensure_ascii=False, sort_keys=True).encode()).hexdigest(),
+        }
+    else:
+        expected_runtime_receipt = None
     if (receipt_data.get("schema_version") != RELEASE_SCHEMA_VERSION or
+            receipt_data.get("bundle_schema_version") != RELEASE_BUNDLE_SCHEMA_VERSION or
             receipt_data.get("release_id") != data["release_id"] or
             receipt_data.get("manifest") != relative_to_root(path) or
-            receipt_data.get("validation") != data["validation"]):
+            receipt_data.get("package") != data["package"] or
+            receipt_data.get("note") != data["note"] or
+            receipt_data.get("validation") != data["validation"] or
+            receipt_data.get("package_checksum") != data.get("package_checksum") or
+            receipt_data.get("asset_checksum") != data.get("asset_checksum") or
+            receipt_data.get("runtime_config") != expected_runtime_receipt):
         raise ValueError("manifest release receipt does not match")
     return path, data
 
 
 def release_package(manifest: dict) -> Path:
-    package = (PACKAGES / manifest["release_id"]).resolve()
-    if PACKAGES.resolve() not in package.parents or not package.is_dir():
+    paths = _bundle_paths(manifest["release_id"])
+    package = paths["package"].resolve()
+    if not package.is_file():
         raise ValueError("immutable release package is missing")
-    if asset_map(package) != manifest["assets"]:
-        raise ValueError("immutable release package does not match manifest")
-    if current_release(package) != manifest["release_id"]:
+    if manifest.get("package_checksum") != sha(package):
+        raise ValueError("immutable release package checksum does not match manifest")
+    if _archive_current_release(package) != manifest["release_id"]:
         raise ValueError("immutable release package has a different current_release")
     return package
 
 
 def audit_releases(_: argparse.Namespace) -> None:
     invalid = []
-    manifests = {path.stem for path in MANIFESTS.glob("*.json")}
-    packages = {path.name for path in PACKAGES.iterdir() if path.is_dir()} if PACKAGES.exists() else set()
-    receipt_ids = set()
-    for path in RELEASE_RECEIPTS.glob("*.json") if RELEASE_RECEIPTS.exists() else []:
+    if LEGACY_ACTIVE_MANIFESTS.exists() and any(LEGACY_ACTIVE_MANIFESTS.glob("*.json")):
+        invalid.append("legacy active manifests require migration")
+    if LEGACY_ACTIVE_PACKAGES.exists() and any(LEGACY_ACTIVE_PACKAGES.iterdir()):
+        invalid.append("legacy active packages require migration")
+    bundles = {path.name for path in _release_bundle_dirs()}
+    for bundle in sorted(_release_bundle_dirs()):
+        release_id = bundle.name
+        paths = _bundle_paths(release_id)
+        expected = {path.name for key, path in paths.items() if key != "bundle"}
+        actual = {path.name for path in bundle.iterdir() if path.is_file()}
+        if actual != expected:
+            invalid.append(f"{release_id}: bundle file inventory mismatch")
         try:
-            receipt_ids.add(json.loads(path.read_text(encoding="utf-8")).get("release_id"))
-        except json.JSONDecodeError:
-            invalid.append(f"{path.name}: invalid release receipt JSON")
-    if manifests != packages:
-        invalid.append("active manifest/package inventory does not match")
-    if any(release not in manifests for release in receipt_ids if release):
-        invalid.append("active release receipt has no manifest")
-    for manifest_path in sorted(MANIFESTS.glob("*.json")):
-        try:
-            _, manifest = load_manifest(str(manifest_path))
-            release_package(manifest)
+            _, manifest = load_manifest(str(paths["manifest"]))
+            package = release_package(manifest)
+            with tempfile.TemporaryDirectory(prefix=f"audit-{release_id}-") as directory:
+                extracted = Path(directory) / "runtime"
+                _extract_runtime(package, extracted)
+                if asset_map(extracted) != manifest["assets"]:
+                    raise ValueError("decompressed Runtime asset map does not match manifest")
         except (OSError, ValueError, json.JSONDecodeError) as error:
-            invalid.append(f"{manifest_path.name}: {error}")
+            invalid.append(f"{release_id}: {error}")
     if invalid:
         raise ValueError("invalid release artifacts: " + "; ".join(invalid))
-    print(f"release audit passed: {len(manifests)} manifest(s)")
+    print(f"release audit passed: {len(bundles)} release bundle(s)")
 
 
 def verify_target(target: Path, expected: dict[str, str]) -> None:
@@ -366,32 +654,158 @@ def verify_target(target: Path, expected: dict[str, str]) -> None:
 def ensure_required_project_directories(root: Path) -> list[str]:
     """Create only missing empty user-owned roots required by install/update rules."""
     created = []
-    for name in ("workspace", "workspace/issues", "docs"):
+    required = ("workspace", "workspace/issues", "docs")
+    for name in required:
+        path = root / name
+        if path.exists() and not path.is_dir():
+            raise ValueError(f"required project path is not a directory: {name}")
+    docs_index = root / "docs" / "INDEX.md"
+    if docs_index.exists() and not docs_index.is_file():
+        raise ValueError("required project path is not a file: docs/INDEX.md")
+    for name in required:
         path = root / name
         if not path.exists():
             path.mkdir(parents=True)
             created.append(name + "/")
-        elif not path.is_dir():
-            raise ValueError(f"required project path is not a directory: {name}")
-    docs_index = root / "docs" / "INDEX.md"
     if not docs_index.exists():
-        docs_index.write_text(DOCS_INDEX_TEMPLATE, encoding="utf-8")
+        temporary = docs_index.with_name(f".{docs_index.name}.new-{uuid.uuid4().hex[:8]}")
+        try:
+            temporary.write_text(DOCS_INDEX_TEMPLATE, encoding="utf-8")
+            temporary.replace(docs_index)
+        finally:
+            temporary.unlink(missing_ok=True)
         created.append("docs/INDEX.md")
     return created
 
 
 def prune_runtime_backups(root: Path, keep: int = RUNTIME_BACKUP_RETENTION) -> list[str]:
-    """Retain only the newest successful Runtime backups; leave unknown files untouched."""
+    """Retain only marked successful Runtime backups; leave unknown dirs untouched."""
     backups = root / ".mpa-backups"
     if not backups.is_dir():
         return []
-    candidates = sorted((path for path in backups.iterdir() if path.is_dir()),
-                        key=lambda path: path.stat().st_mtime_ns, reverse=True)
+    candidates = []
+    for path in backups.iterdir():
+        if not path.is_dir():
+            continue
+        marker = path / BACKUP_MARKER
+        if not marker.is_file():
+            continue
+        try:
+            metadata = json.loads(marker.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if metadata.get("kind") != "runtime_backup" or metadata.get("status") != "successful":
+            continue
+        candidates.append(path)
+    candidates.sort(key=lambda path: path.stat().st_mtime_ns, reverse=True)
     removed = []
     for path in candidates[keep:]:
         shutil.rmtree(path)
         removed.append(path.name)
     return removed
+
+
+def _backup_runtime_path(path: Path) -> Path:
+    """Resolve the Runtime tree in a current or legacy backup."""
+    nested = path / RUNTIME_BACKUP_ROOT / ".mpa-workspace"
+    return nested if nested.is_dir() else path
+
+
+def _backup_config_path(path: Path) -> Path:
+    return path / RUNTIME_CONFIG_BACKUP_ROOT / "config.yaml"
+
+
+def _capture_config(root: Path) -> tuple[bool, bytes | None]:
+    path = project_config.config_path(root)
+    return path.is_file(), path.read_bytes() if path.is_file() else None
+
+
+def _restore_config_state(root: Path, state: tuple[bool, bytes | None]) -> None:
+    existed, content = state
+    path = project_config.config_path(root)
+    if existed and content is not None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.restore-{uuid.uuid4().hex[:8]}")
+        try:
+            temporary.write_bytes(content)
+            temporary.replace(path)
+        finally:
+            temporary.unlink(missing_ok=True)
+    elif path.exists():
+        path.unlink()
+
+
+def _backup_runtime(root: Path, target: Path, backup: Path, include_config: bool) -> dict[str, object]:
+    runtime_destination = backup / RUNTIME_BACKUP_ROOT / ".mpa-workspace"
+    runtime_destination.parent.mkdir(parents=True, exist_ok=False)
+    shutil.copytree(target, runtime_destination)
+    config_path = project_config.config_path(root)
+    config_existed = config_path.is_file()
+    config_destination = _backup_config_path(backup)
+    if include_config and config_existed:
+        config_destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(config_path, config_destination)
+    return {"included": include_config, "existed": config_existed,
+            "checksum": sha(config_path) if include_config and config_existed else None}
+
+
+def _restore_config_from_backup(root: Path, backup: Path, metadata: dict[str, object]) -> None:
+    snapshot = metadata.get("config_snapshot") or {}
+    if not snapshot.get("included"):
+        return
+    path = project_config.config_path(root)
+    if snapshot.get("existed"):
+        source = _backup_config_path(backup)
+        if not source.is_file() or (snapshot.get("checksum") and sha(source) != snapshot.get("checksum")):
+            raise ValueError("backup Runtime config snapshot is missing or invalid")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.rollback-{uuid.uuid4().hex[:8]}")
+        try:
+            shutil.copy2(source, temporary)
+            temporary.replace(path)
+        finally:
+            temporary.unlink(missing_ok=True)
+    elif path.exists():
+        path.unlink()
+
+
+def _write_backup_marker(path: Path, release_id: str, assets: dict[str, str], config_snapshot: dict[str, object] | None = None) -> None:
+    backup_assets = asset_map(path)
+    backup_assets.pop(BACKUP_MARKER, None)
+    write_json(path / BACKUP_MARKER, {
+        "schema_version": 2,
+        "kind": "runtime_backup",
+        "status": "successful",
+        "release_id": release_id,
+        "asset_checksum": hashlib.sha256(json.dumps(backup_assets, sort_keys=True).encode()).hexdigest(),
+        "release_asset_checksum": hashlib.sha256(json.dumps(assets, sort_keys=True).encode()).hexdigest(),
+        "runtime_backup": "runtime/.mpa-workspace",
+        "config_snapshot": config_snapshot or {"included": False, "existed": False, "checksum": None},
+        "created_at": now(),
+    })
+
+
+def _validate_backup(path: Path, release_id: str) -> dict:
+    marker = path / BACKUP_MARKER
+    if not marker.is_file():
+        raise ValueError("backup is not a managed Runtime backup")
+    try:
+        metadata = json.loads(marker.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError("backup metadata is invalid") from error
+    if metadata.get("kind") != "runtime_backup" or metadata.get("status") != "successful" or metadata.get("release_id") != release_id:
+        raise ValueError("backup metadata does not match release")
+    assets = asset_map(path)
+    assets.pop(BACKUP_MARKER, None)
+    checksum = hashlib.sha256(json.dumps(assets, sort_keys=True).encode()).hexdigest()
+    if metadata.get("asset_checksum") != checksum:
+        raise ValueError("backup asset checksum does not match metadata")
+    runtime_path = _backup_runtime_path(path)
+    if not runtime_path.is_dir():
+        raise ValueError("backup Runtime tree is missing")
+    if metadata.get("schema_version", 1) >= 2 and metadata.get("runtime_backup") != "runtime/.mpa-workspace":
+        raise ValueError("backup Runtime path metadata is invalid")
+    return metadata
 
 
 def update_issue_inventory(root: Path) -> list[dict[str, str]]:
@@ -401,8 +815,47 @@ def update_issue_inventory(root: Path) -> list[dict[str, str]]:
     return [{"path": path.name, "checksum": sha(path)} for path in sorted(folder.glob("*.md"))]
 
 
-def collect_update_issues(root: Path, project_ref: str, expected: list[dict[str, str]]) -> list[str]:
-    """Collect a verified update batch; restore every source if its receipt cannot be written."""
+def project_fingerprint(root: Path) -> str:
+    return sha_bytes(str(root.resolve()).encode("utf-8"))[:16]
+
+
+def _issue_identity(path: Path) -> dict[str, str]:
+    metadata, _ = read_issue(path)
+    return {
+        key: str(metadata[key])
+        for key in ("source_issue_id", "workspace_issue_id", "canonical_issue_key")
+        if metadata.get(key)
+    }
+
+
+def _existing_issue_identity_matches(identity: dict[str, str]) -> list[str]:
+    matches: list[str] = []
+    for path in list((ISSUES / "inbox").rglob("*.md")) if (ISSUES / "inbox").exists() else []:
+        try:
+            values = _issue_identity(path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        if any(values.get(key) == value for key, value in identity.items()):
+            matches.append(str(path.relative_to(ROOT)))
+    for path in list((ISSUES / "archived").rglob("*.md")) if (ISSUES / "archived").exists() else []:
+        try:
+            values = _issue_identity(path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        if any(values.get(key) == value for key, value in identity.items()):
+            matches.append(str(path.relative_to(ROOT)))
+    return matches
+
+
+def _rollback_issue_moves(moved: list[tuple[Path, Path]]) -> None:
+    for source, destination in reversed(moved):
+        if destination.exists() and not source.exists():
+            move_issue_atomically(destination, source)
+
+
+def collect_update_issues_transaction(root: Path, project_ref: str,
+                                      expected: list[dict[str, str]]) -> tuple[list[str], list[tuple[Path, Path]], Path | None]:
+    """Collect a verified update batch and return rollback handles for the caller."""
     if update_issue_inventory(root) != expected:
         raise ValueError("project issues changed after dry-run")
     project_issues = root / "workspace" / "issues"
@@ -414,24 +867,31 @@ def collect_update_issues(root: Path, project_ref: str, expected: list[dict[str,
         read_issue(source)
         destination = ISSUES / "inbox" / project_ref / source.name
         archived = list((ISSUES / "archived").rglob(source.name)) if (ISSUES / "archived").exists() else []
-        if destination.exists() or archived:
+        identity_matches = _existing_issue_identity_matches(_issue_identity(source))
+        if destination.exists() or archived or identity_matches:
             raise ValueError("update issue already exists in inbox or archive")
         destinations.append((source, destination))
     moved: list[tuple[Path, Path]] = []
+    identities = []
     try:
         for source, destination in destinations:
             destination.parent.mkdir(parents=True, exist_ok=True)
             move_issue_atomically(source, destination)
             moved.append((source, destination))
+            identities.append(_issue_identity(destination))
         receipt_path = ISSUE_RECEIPTS / "update-collections" / f"{receipt_suffix()}.json"
-        write_json(receipt_path, {"project": str(root), "project_ref": project_ref,
-                                  "issues": [str(destination.relative_to(ROOT)) for _, destination in moved], "at": now()})
+        write_json(receipt_path, {"project_ref": project_ref, "project_fingerprint": project_fingerprint(root),
+                                  "issues": [str(destination.relative_to(ROOT)) for _, destination in moved],
+                                  "issue_identities": identities, "at": now()})
     except Exception:
-        for source, destination in reversed(moved):
-            if destination.exists() and not source.exists():
-                move_issue_atomically(destination, source)
+        _rollback_issue_moves(moved)
         raise
-    return [str(destination.relative_to(ROOT)) for _, destination in moved]
+    return [str(destination.relative_to(ROOT)) for _, destination in moved], moved, receipt_path
+
+
+def collect_update_issues(root: Path, project_ref: str, expected: list[dict[str, str]]) -> list[str]:
+    collected, _, _ = collect_update_issues_transaction(root, project_ref, expected)
+    return collected
 
 
 def deployment_dry_run(args: argparse.Namespace) -> None:
@@ -448,6 +908,7 @@ def deployment_dry_run(args: argparse.Namespace) -> None:
               "release_receipt": manifest["release_receipt"],
               "target": str(root), "target_ref": target_ref, "current_assets": asset_map(target),
               "release_assets": manifest["assets"], "history": target_history(target), "issue_inventory": update_issue_inventory(root),
+              "runtime_config": _runtime_config_summary(root, manifest.get("runtime_config")),
               "created_at": created_at.isoformat(),
               "expires_at": (created_at + dt.timedelta(minutes=30)).isoformat()}
     path = DEPLOYMENT_RECEIPTS / target_ref / f"dry-run-{manifest['release_id']}-{receipt_suffix()}.json"
@@ -463,95 +924,138 @@ def deploy(args: argparse.Namespace) -> None:
     target = root / ".mpa-workspace"
     if not target.is_dir():
         raise ValueError("target .mpa-workspace is missing; use install.py for first installation")
-    ensure_required_project_directories(root)
     dry_run = (ROOT / args.dry_run).resolve()
     if DEPLOYMENT_RECEIPTS.resolve() not in dry_run.parents or not dry_run.is_file():
         raise ValueError("deploy requires a recorded deployment dry-run")
-    dry_run_data = json.loads(dry_run.read_text(encoding="utf-8"))
-    if (dry_run_data.get("release_id") != manifest["release_id"] or dry_run_data.get("to_release") != manifest["release_id"] or
-            dry_run_data.get("target") != str(root) or dry_run_data.get("target_ref") != target_ref):
-        raise ValueError("dry-run does not match deployment inputs")
-    if dry_run_data.get("release_receipt") != manifest.get("release_receipt"):
-        raise ValueError("dry-run release receipt does not match manifest")
-    try:
-        expires_at = dt.datetime.fromisoformat(dry_run_data["expires_at"])
-    except (KeyError, ValueError) as error:
-        raise ValueError("dry-run expiry is invalid") from error
-    if dt.datetime.now(dt.timezone.utc) > expires_at:
-        raise ValueError("dry-run has expired")
-    if (dry_run_data.get("current_assets") != asset_map(target) or dry_run_data.get("history") != target_history(target) or
-            dry_run_data.get("from_release") != current_release(target)):
-        raise ValueError("target changed after dry-run")
-    if dry_run_data.get("issue_inventory") != update_issue_inventory(root):
-        raise ValueError("project issues changed after dry-run")
-    if not all(str(getattr(args, field, "")).strip() for field in ("approved_by", "approval_ref", "rollback_owner")):
-        raise ValueError("approved-by, approval-ref, and rollback-owner are required")
-    if target_history(target).get(manifest["release_id"], {}).get("status") == "applied":
-        raise ValueError("target history already contains this release ID")
-    from_release = current_release(target)
-    backup = root / ".mpa-backups" / f"{manifest['release_id']}-{receipt_suffix()}"
-    replacement = None
-    previous = None
-    try:
-        backup.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(target, backup)
-        replacement = target.with_name(f".mpa-workspace.new-{uuid.uuid4().hex[:8]}")
-        previous = target.with_name(f".mpa-workspace.previous-{uuid.uuid4().hex[:8]}")
+    with target_lock(root):
+        dry_run_data = json.loads(dry_run.read_text(encoding="utf-8"))
+        if (dry_run_data.get("release_id") != manifest["release_id"] or dry_run_data.get("to_release") != manifest["release_id"] or
+                dry_run_data.get("target") != str(root) or dry_run_data.get("target_ref") != target_ref):
+            raise ValueError("dry-run does not match deployment inputs")
+        if dry_run_data.get("release_receipt") != manifest.get("release_receipt"):
+            raise ValueError("dry-run release receipt does not match manifest")
         try:
-            shutil.copytree(package, replacement, ignore=runtime_ignore)
-            history = target / "history"
-            if history.exists():
-                shutil.copytree(history, replacement / "history")
-            verify_target(replacement, manifest["assets"])
-            target.replace(previous)
+            expires_at = dt.datetime.fromisoformat(dry_run_data["expires_at"])
+        except (KeyError, ValueError) as error:
+            raise ValueError("dry-run expiry is invalid") from error
+        if dt.datetime.now(dt.timezone.utc) > expires_at:
+            raise ValueError("dry-run has expired")
+        if (dry_run_data.get("current_assets") != asset_map(target) or dry_run_data.get("history") != target_history(target) or
+                dry_run_data.get("from_release") != current_release(target)):
+            raise ValueError("target changed after dry-run")
+        if dry_run_data.get("issue_inventory") != update_issue_inventory(root):
+            raise ValueError("project issues changed after dry-run")
+        runtime_config = manifest.get("runtime_config")
+        dry_runtime_config = dry_run_data.get("runtime_config", {})
+        if runtime_config is not None and dry_runtime_config.get("config_checksum") != _runtime_config_checksum(root):
+            raise ValueError("Runtime project config changed after dry-run")
+        if runtime_config is not None:
+            _runtime_config_migration(runtime_config)
+        if not all(str(getattr(args, field, "")).strip() for field in ("approved_by", "approval_ref", "rollback_owner")):
+            raise ValueError("approved-by, approval-ref, and rollback-owner are required")
+        if target_history(target).get(manifest["release_id"], {}).get("status") == "applied":
+            raise ValueError("target history already contains this release ID")
+        from_release = current_release(target)
+        backup = root / ".mpa-backups" / f"{manifest['release_id']}-{receipt_suffix()}"
+        replacement = None
+        previous = None
+        created_paths: list[str] = []
+        moved_issues: list[tuple[Path, Path]] = []
+        collection_receipt: Path | None = None
+        deployment_receipt: Path | None = None
+        history_path: Path | None = None
+        config_snapshot: dict[str, object] = {"included": False, "existed": False, "checksum": None}
+        with tempfile.TemporaryDirectory(prefix=f"deploy-{manifest['release_id']}-") as directory:
+            extracted = Path(directory) / "runtime"
             try:
-                replacement.replace(target)
-                verify_target(target, manifest["assets"])
-            except Exception:
-                if target.exists():
-                    shutil.rmtree(target)
-                if previous.exists():
+                created_paths = ensure_required_project_directories(root)
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                config_snapshot = _backup_runtime(root, target, backup, runtime_config is not None)
+                replacement = target.with_name(f".mpa-workspace.new-{uuid.uuid4().hex[:8]}")
+                previous = target.with_name(f".mpa-workspace.previous-{uuid.uuid4().hex[:8]}")
+                _extract_runtime(package, extracted)
+                shutil.copytree(extracted, replacement)
+                history = target / "history"
+                if history.exists():
+                    shutil.copytree(history, replacement / "history")
+                verify_target(replacement, manifest["assets"])
+                target.replace(previous)
+                try:
+                    replacement.replace(target)
+                    verify_target(target, manifest["assets"])
+                except Exception:
+                    if target.exists():
+                        shutil.rmtree(target)
+                    if previous.exists():
+                        previous.replace(target)
+                    raise
+                config_migration = {"status": "none", "add": [], "skipped": []}
+                if runtime_config is not None:
+                    config_migration = project_config.apply_runtime_config_migration(root, runtime_config)
+                collected, moved_issues, collection_receipt = collect_update_issues_transaction(
+                    root, target_ref, dry_run_data["issue_inventory"])
+                receipt = {
+                    "status": "applied", "release_id": manifest["release_id"],
+                    "from_release": from_release, "to_release": manifest["release_id"],
+                    "manifest": relative_to_root(manifest_path),
+                    "target_ref": target_ref, "target_fingerprint": project_fingerprint(root),
+                    "backup": str(backup.relative_to(root)), "applied_at": now(), "verified_by": args.verified_by,
+                    "approved_by": args.approved_by, "approval_ref": args.approval_ref,
+                    "rollback_owner": args.rollback_owner, "dry_run": relative_to_root(dry_run),
+                    "assets": manifest["assets"], "verification": {"asset_map": "matched", "verified_at": now()},
+                    "runtime_config": {"migration": config_migration, "config_backup": config_snapshot},
+                    "collected_issues": collected,
+                    "issue_collection": {"status": "collected" if collected else "no-op", "count": len(collected)},
+                }
+                deployment_receipt = DEPLOYMENT_RECEIPTS / target_ref / f"deploy-{manifest['release_id']}-{receipt_suffix()}.json"
+                history_path = target / "history" / "releases" / f"{manifest['release_id']}.json"
+                write_json(deployment_receipt, receipt)
+                write_json(history_path, receipt)
+                _write_backup_marker(backup, manifest["release_id"], manifest["assets"], config_snapshot)
+                if previous and previous.exists():
+                    shutil.rmtree(previous)
+                try:
+                    removed_backups = prune_runtime_backups(root)
+                    if removed_backups:
+                        print(f"pruned runtime backups: {', '.join(removed_backups)}", file=sys.stderr)
+                except OSError as error:
+                    print(f"warning: runtime backup retention deferred: {error}", file=sys.stderr)
+            except Exception as error:
+                if collection_receipt and collection_receipt.exists():
+                    collection_receipt.unlink()
+                _rollback_issue_moves(moved_issues)
+                if previous and previous.exists():
+                    if target.exists():
+                        shutil.rmtree(target)
                     previous.replace(target)
+                try:
+                    _restore_config_from_backup(root, backup, {"config_snapshot": config_snapshot})
+                except Exception:
+                    pass
+                if replacement and replacement.exists():
+                    shutil.rmtree(replacement)
+                if deployment_receipt and deployment_receipt.exists():
+                    deployment_receipt.unlink()
+                if history_path and history_path.exists():
+                    history_path.unlink()
+                _remove_created_project_paths(root, created_paths)
+                failure = {"status": "failed", "release_id": manifest["release_id"], "from_release": from_release,
+                           "to_release": manifest["release_id"], "manifest": relative_to_root(manifest_path),
+                           "target_ref": target_ref, "target_fingerprint": project_fingerprint(root),
+                           "backup": str(backup.relative_to(root)) if backup.exists() else None,
+                           "failed_at": now(), "error": str(error), "dry_run": relative_to_root(dry_run),
+                           "recovery": {"runtime_restored": not previous or target.is_dir(), "issues_restored": not moved_issues}}
+                try:
+                    write_json(DEPLOYMENT_RECEIPTS / target_ref / f"deploy-failed-{manifest['release_id']}-{receipt_suffix()}.json", failure)
+                except OSError:
+                    pass
+                if target.is_dir():
+                    try:
+                        write_json(target / "history" / "releases" / f"{manifest['release_id']}.json", failure)
+                    except OSError:
+                        pass
                 raise
-        finally:
-            if replacement and replacement.exists():
-                shutil.rmtree(replacement)
-        collected = collect_update_issues(root, target_ref, dry_run_data["issue_inventory"])
-        receipt = {
-            "status": "applied", "release_id": manifest["release_id"],
-            "from_release": from_release, "to_release": manifest["release_id"],
-            "manifest": relative_to_root(manifest_path), "target": str(root),
-            "backup": str(backup.relative_to(root)), "applied_at": now(), "verified_by": args.verified_by,
-            "approved_by": args.approved_by, "approval_ref": args.approval_ref,
-            "rollback_owner": args.rollback_owner, "dry_run": relative_to_root(dry_run),
-            "assets": manifest["assets"], "verification": {"asset_map": "matched", "verified_at": now()},
-            "collected_issues": collected,
-        }
-        write_json(DEPLOYMENT_RECEIPTS / target_ref / f"deploy-{manifest['release_id']}-{receipt_suffix()}.json", receipt)
-        write_json(target / "history" / "releases" / f"{manifest['release_id']}.json", receipt)
-        if previous and previous.exists():
-            shutil.rmtree(previous)
-        try:
-            removed_backups = prune_runtime_backups(root)
-            if removed_backups:
-                print(f"pruned runtime backups: {', '.join(removed_backups)}", file=sys.stderr)
-        except OSError as error:
-            # Deployment is already durably recorded; retention failure must not rewrite it as failed.
-            print(f"warning: runtime backup retention deferred: {error}", file=sys.stderr)
-    except Exception as error:
-        if previous and previous.exists():
-            if target.exists():
-                shutil.rmtree(target)
-            previous.replace(target)
-        failure = {"status": "failed", "release_id": manifest["release_id"], "from_release": from_release,
-                   "to_release": manifest["release_id"], "manifest": relative_to_root(manifest_path),
-                   "target": str(root), "backup": str(backup.relative_to(root)) if backup.exists() else None,
-                   "failed_at": now(), "error": str(error), "dry_run": relative_to_root(dry_run)}
-        write_json(DEPLOYMENT_RECEIPTS / target_ref / f"deploy-failed-{manifest['release_id']}-{receipt_suffix()}.json", failure)
-        if target.is_dir():
-            write_json(target / "history" / "releases" / f"{manifest['release_id']}.json", failure)
-        raise
-    print(receipt["backup"])
+        print(json.dumps({"backup": str(backup.relative_to(root)), "issue_collection": receipt["issue_collection"]}, ensure_ascii=False))
 
 
 def target_history(target: Path) -> dict[str, dict]:
@@ -575,71 +1079,96 @@ def target_history(target: Path) -> dict[str, dict]:
 def rollback(args: argparse.Namespace) -> None:
     target_ref = require_safe_ref(args.target_ref, "target-ref")
     root = Path(args.target).resolve()
-    ensure_required_project_directories(root)
-    previous = None
-    target = root / ".mpa-workspace"
-    from_release = None
-    try:
-        backups_root = (root / ".mpa-backups").resolve()
-        backup = (root / args.backup).resolve()
-        if backups_root not in backup.parents or not backup.is_dir():
-            raise ValueError("backup must be inside target .mpa-backups")
-        if not target.is_dir():
-            raise ValueError("target .mpa-workspace is missing")
-        release_id = require_safe_ref(args.release_id, "release-id")
-        if release_id not in target_history(target):
-            raise ValueError("target history does not contain the release to roll back")
-        from_release = current_release(target)
-        replacement = target.with_name(f".mpa-workspace.rollback-{uuid.uuid4().hex[:8]}")
-        previous = target.with_name(f".mpa-workspace.rollback-previous-{uuid.uuid4().hex[:8]}")
+    with target_lock(root):
+        previous = None
+        target = root / ".mpa-workspace"
+        from_release = None
+        created_paths: list[str] = []
+        receipt_path: Path | None = None
+        history_path: Path | None = None
+        release_id = None
+        config_before: tuple[bool, bytes | None] = (False, None)
         try:
-            shutil.copytree(backup, replacement)
-            target.replace(previous)
+            backups_root = (root / ".mpa-backups").resolve()
+            backup = (root / args.backup).resolve()
+            if backups_root not in backup.parents or not backup.is_dir():
+                raise ValueError("backup must be inside target .mpa-backups")
+            if not target.is_dir():
+                raise ValueError("target .mpa-workspace is missing")
+            release_id = require_safe_ref(args.release_id, "release-id")
+            if release_id not in target_history(target):
+                raise ValueError("target history does not contain the release to roll back")
+            _validate_backup(backup, release_id)
+            from_release = current_release(target)
+            created_paths = ensure_required_project_directories(root)
+            config_before = _capture_config(root)
+            replacement = target.with_name(f".mpa-workspace.rollback-{uuid.uuid4().hex[:8]}")
+            previous = target.with_name(f".mpa-workspace.rollback-previous-{uuid.uuid4().hex[:8]}")
             try:
-                replacement.replace(target)
+                shutil.copytree(_backup_runtime_path(backup), replacement)
+                target.replace(previous)
+                try:
+                    replacement.replace(target)
+                    metadata = json.loads((backup / BACKUP_MARKER).read_text(encoding="utf-8"))
+                    _restore_config_from_backup(root, backup, metadata)
+                except Exception:
+                    if previous.exists() and not target.exists():
+                        previous.replace(target)
+                    _restore_config_state(root, config_before)
+                    raise
+            finally:
+                if replacement.exists():
+                    shutil.rmtree(replacement)
+            receipt = {"status": "rolled_back", "release_id": release_id,
+                       "from_release": from_release, "to_release": current_release(root / ".mpa-workspace"),
+                       "target_ref": target_ref, "target_fingerprint": project_fingerprint(root),
+                       "backup": str(backup.relative_to(root)), "rolled_back_at": now(),
+                       "approved_by": args.approved_by, "approval_ref": args.approval_ref,
+                       "rollback_owner": args.rollback_owner, "verified_by": args.verified_by,
+                       "verification": {"asset_map": asset_map(root / ".mpa-workspace"), "verified_at": now()}}
+            receipt_path = DEPLOYMENT_RECEIPTS / target_ref / f"rollback-{receipt_suffix()}.json"
+            history_path = root / ".mpa-workspace" / "history" / "releases" / f"{release_id}.json"
+            write_json(receipt_path, receipt)
+            write_json(history_path, receipt)
+        except Exception as error:
+            if previous and previous.exists():
+                if target.exists():
+                    shutil.rmtree(target)
+                previous.replace(target)
+            try:
+                _restore_config_state(root, config_before)
             except Exception:
-                if previous.exists() and not target.exists():
-                    previous.replace(target)
-                raise
-        finally:
-            if replacement.exists():
-                shutil.rmtree(replacement)
-    except Exception as error:
+                pass
+            if receipt_path and receipt_path.exists():
+                receipt_path.unlink()
+            if history_path and history_path.exists():
+                history_path.unlink()
+            _remove_created_project_paths(root, created_paths)
+            try:
+                write_json(DEPLOYMENT_RECEIPTS / target_ref / f"rollback-failed-{receipt_suffix()}.json",
+                           {"status": "failed", "release_id": release_id, "target_ref": target_ref,
+                            "target_fingerprint": project_fingerprint(root), "backup": args.backup,
+                            "failed_at": now(), "error": str(error),
+                            "recovery": {"runtime_restored": not previous or target.is_dir()}})
+            except OSError:
+                pass
+            raise
         if previous and previous.exists():
-            if target.exists():
-                shutil.rmtree(target)
-            previous.replace(target)
-        write_json(DEPLOYMENT_RECEIPTS / target_ref / f"rollback-failed-{receipt_suffix()}.json",
-                   {"target": str(root), "backup": args.backup, "failed_at": now(), "error": str(error)})
-        raise
-    try:
-        receipt = {"status": "rolled_back", "release_id": release_id, "target": str(root),
-                   "from_release": from_release, "to_release": current_release(root / ".mpa-workspace"),
-                   "backup": str(backup.relative_to(root)), "rolled_back_at": now(),
-                   "approved_by": args.approved_by, "approval_ref": args.approval_ref,
-                   "rollback_owner": args.rollback_owner, "verified_by": args.verified_by,
-                   "verification": {"asset_map": asset_map(root / ".mpa-workspace"), "verified_at": now()}}
-        write_json(DEPLOYMENT_RECEIPTS / target_ref / f"rollback-{receipt_suffix()}.json", receipt)
-        write_json(root / ".mpa-workspace" / "history" / "releases" / f"{release_id}.json", receipt)
-    except Exception as error:
-        if previous and previous.exists():
-            if target.exists():
-                shutil.rmtree(target)
-            previous.replace(target)
-        write_json(DEPLOYMENT_RECEIPTS / target_ref / f"rollback-failed-{receipt_suffix()}.json",
-                   {"target": str(root), "backup": args.backup, "failed_at": now(), "error": str(error)})
-        raise
-    if previous and previous.exists():
-        shutil.rmtree(previous)
-    print("rolled back")
+            shutil.rmtree(previous)
+        print(json.dumps({"status": "rolled_back", "release_id": release_id,
+                          "backup": str(backup.relative_to(root))}, ensure_ascii=False))
 
 
 def issue_text(title: str, summary: str, kind: str, *, key: str = "legacy-issue", occurrence: str = "first_observed",
                area: str = "unspecified", observed_release: str = "unknown",
-               collection_purpose: str = "review") -> str:
+               collection_purpose: str = "review", source_issue_id: str | None = None,
+               workspace_issue_id: str | None = None) -> str:
     return ("---\n" + json.dumps({"type": "issue", "status": "open", "kind": kind,
-            "canonical_key": key, "occurrence": occurrence, "area": area,
+            "canonical_key": key, "canonical_issue_key": key,
+            "occurrence": occurrence, "area": area,
             "observed_release": observed_release, "collection_purpose": collection_purpose,
+            "source_issue_id": source_issue_id or "unknown",
+            "workspace_issue_id": workspace_issue_id or f"workspace-issue-{uuid.uuid4().hex}",
             "created_at": now()}, ensure_ascii=False, indent=2) + "\n---\n\n"
             f"# {title}\n\n{summary}\n")
 
@@ -660,7 +1189,9 @@ def create_issue(args: argparse.Namespace) -> None:
                       occurrence=getattr(args, "occurrence", "first_observed"),
                       area=getattr(args, "area", "unspecified"),
                       observed_release=getattr(args, "observed_release", "unknown"),
-                      collection_purpose=getattr(args, "collection_purpose", "review"))
+                      collection_purpose=getattr(args, "collection_purpose", "review"),
+                      source_issue_id=Path(ident).stem)
+    check_issue_text(text)
     (folder / ident).write_text(text, encoding="utf-8")
     print(ident)
 
@@ -674,15 +1205,22 @@ def collect_issue(args: argparse.Namespace) -> None:
     text = source.read_text(encoding="utf-8")
     check_issue_text(text)
     read_issue(source)
+    identity = _issue_identity(source)
     destination = ISSUES / "inbox" / project_ref / source.name
     archived = list((ISSUES / "archived").rglob(source.name)) if (ISSUES / "archived").exists() else []
-    if destination.exists() or archived:
+    identity_matches = _existing_issue_identity_matches(_issue_identity(source))
+    if destination.exists() or archived or identity_matches:
         raise ValueError("issue already exists in inbox or archive")
     destination.parent.mkdir(parents=True, exist_ok=True)
     move_issue_atomically(source, destination)
     similar = [str(path.relative_to(ROOT)) for path in (ISSUES / "archived").rglob(f"*{source.stem}*")]
     try:
-        issue_receipt("collections", f"{project_ref}/{source.name}", {"project": str(Path(args.project).resolve()), "similar_archives": similar})
+        issue_receipt("collections", f"{project_ref}/{source.name}", {
+            "project_ref": project_ref,
+            "project_fingerprint": project_fingerprint(Path(args.project).resolve()),
+            "issue_identity": identity,
+            "similar_archives": similar,
+        })
     except Exception:
         move_issue_atomically(destination, source)
         raise
@@ -794,12 +1332,15 @@ def resolve_issue(args: argparse.Namespace) -> None:
     metadata, body = read_issue(path)
     if metadata.get("status") != "triaged":
         raise ValueError("issue must be triaged before resolution")
-    manifest = (MANIFESTS / f"{args.release}.json").resolve()
+    manifest = _bundle_paths(args.release)["manifest"].resolve()
     deployment = (ROOT / args.deployment).resolve()
-    if not manifest.is_file() or DEPLOYMENT_RECEIPTS.resolve() not in deployment.parents or not deployment.is_file():
+    if DEPLOYMENT_RECEIPTS.resolve() not in deployment.parents or not deployment.is_file():
         raise ValueError("resolution requires an existing release manifest and deployment receipt")
+    load_manifest(str(manifest))
     deployment_data = json.loads(deployment.read_text(encoding="utf-8"))
-    if deployment_data.get("release_id") != args.release:
+    if (deployment_data.get("release_id") != args.release or
+            deployment_data.get("status") != "applied" or
+            deployment_data.get("manifest") != relative_to_root(manifest)):
         raise ValueError("deployment receipt must belong to the resolved release")
     original = path.read_text(encoding="utf-8")
     metadata.update({"status": "resolved", "resolved_at": now(), "task": args.task,
@@ -820,11 +1361,15 @@ def archive_issue(args: argparse.Namespace) -> None:
     metadata, _ = read_issue(path)
     if metadata.get("status") != "resolved" or not all(metadata.get(key) for key in ("release", "deployment", "verification")):
         raise ValueError("only resolved issues with release, deployment, and verification evidence may be archived")
-    manifest = MANIFESTS / f"{metadata['release']}.json"
+    manifest = _bundle_paths(metadata["release"])["manifest"]
     deployment = (ROOT / metadata["deployment"]).resolve()
-    if not manifest.is_file() or DEPLOYMENT_RECEIPTS.resolve() not in deployment.parents or not deployment.is_file():
+    if DEPLOYMENT_RECEIPTS.resolve() not in deployment.parents or not deployment.is_file():
         raise ValueError("archive evidence no longer exists")
-    if json.loads(deployment.read_text(encoding="utf-8")).get("release_id") != metadata["release"]:
+    load_manifest(str(manifest))
+    deployment_data = json.loads(deployment.read_text(encoding="utf-8"))
+    if (deployment_data.get("release_id") != metadata["release"] or
+            deployment_data.get("status") != "applied" or
+            deployment_data.get("manifest") != relative_to_root(manifest)):
         raise ValueError("archive deployment evidence does not match release")
     project_ref = issue.split("/", 1)[0]
     destination = ISSUES / "archived" / dt.datetime.now(dt.timezone.utc).strftime("%Y/%m") / project_ref / path.name
@@ -850,6 +1395,7 @@ def main() -> int:
     release.add_argument("--compatibility", required=True); release.add_argument("--breaking-change", required=True)
     release.add_argument("--migration", required=True); release.add_argument("--rollback-condition", required=True)
     release.add_argument("--release-note", required=True)
+    release.add_argument("--runtime-config-json", help="optional additive runtime.* defaults JSON file")
     release.add_argument("--validation-command", required=True, help="shell-like command text; executed without a shell")
     release.set_defaults(func=prepare_release)
     deploy_parser = commands.add_parser("deploy")

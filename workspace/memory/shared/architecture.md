@@ -9,16 +9,25 @@
 | map-product | `MAP_PRODUCT_RULES.md`, `map-product-rules/`, `release_manager.py`, `install.py`, source `workspace/` | source 전용이며 배포하지 않음 |
 | Runtime | `.mpa-workspace/` | `sync-runtime`으로만 `dist/.mpa-workspace/`에 동기화하고 release asset으로 포함 |
 | 신규 설치 골격 | `dist/workspace/` | 최초 설치에만 복사, Runtime release에는 제외 |
-| 설치 고유 설정 | 대상 `.mpa-project/config.yaml` | 최초 install에서 없을 때 생성, 기존 파일은 누락 필드만 additive 보강. Runtime release에는 포함하지 않음 |
+| 설치 고유 설정 | 대상 `.mpa-project/config.yaml` | 최초 install에서 없을 때 생성, 기존 파일은 누락 필드만 additive 보강. release의 `runtime.*` migration만 deploy transaction에서 추가하며 release ZIP에는 포함하지 않음 |
 | 대상 사용자 데이터 | 대상 `workspace/`, 루트 `docs/`, agent 설정, 일반 소스 | install/deploy/rollback이 보존하며 release에 포함하지 않음 |
 
-release는 immutable package·manifest·receipt로 고정한다. deployment는 dry-run·승인·rollback 책임자 뒤 대상 `.mpa-workspace`만 교체하며, 대상 history와 receipt를 남긴다. Git은 scoped source 식별 보조 정보일 뿐 dirty worktree 차단 Gate가 아니다.
+release는 `workspace/releases/<release-id>/`의 `package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json` 단일 immutable bundle로 고정한다. deployment는 ZIP을 안전하게 해제한 뒤 dry-run·승인·rollback 책임자 검증을 거쳐 대상 `.mpa-workspace`를 교체하고, manifest에 있는 `runtime.*` migration만 config에 additive 적용하며 대상 history와 receipt를 남긴다. Git은 scoped source 식별 보조 정보일 뿐 dirty worktree 차단 Gate가 아니다.
+
+### 보관·복구 자산의 용도 구분
+
+| 자산 | 생성 위치·주체 | 보관하는 것 | 사용하는 시점 | 보존 정책 |
+|---|---|---|---|---|
+| Runtime release | source `workspace/releases/<release-id>/` · `prepare-release` | 배포할 `.mpa-workspace`의 불변 ZIP과 manifest/note/receipt | `release-audit`, deployment dry-run/deploy의 기준본, 릴리즈 이력·감사 | release ID별 immutable archive. 자동 삭제하지 않으며 별도 archive 정책으로 관리 |
+| Runtime deploy backup | 대상 `.mpa-backups/<release-id>-<timestamp>-<attempt-id>/` · `deploy` | `runtime/.mpa-workspace/` 및 migration 대상 `runtime-config/config.yaml` | 같은 Runtime 프로젝트에서 직전 MPA Runtime과 MPA 관리 설정을 함께 rollback | 성공 marker가 있는 백업 최신 3개. 실패 백업·marker 없는 사용자 snapshot은 보존·미사용 |
+
+두 자산은 서로 대체하지 않는다. release ZIP은 “무엇을 배포했는가”를 보존하고, Runtime backup은 “대상에 배포하기 직전의 MPA Runtime과 MPA 관리 설정이 무엇이었는가”를 보존한다. Runtime 프로젝트의 사용자 설정 변경과 전체 프로젝트 백업은 Runtime 프로젝트 자체의 버전 관리·백업 절차로 처리한다.
 
 ### 설치 고유 설정의 additive-only 관리
 
 설치본의 프로젝트명·초기화 시각·canonical 절대 경로는 `.mpa-project/config.yaml`에 둔다. 파일이 없으면 schema 1 기본값으로 생성하고, 파일이 있으면 지원되는 현재 schema에서 누락 필드만 원자적으로 추가한다. 기존 값·주석·순서·사용자 지정 빈 값은 자동 수정하지 않는다. 잘못된 값이나 미래 schema는 경고·audit 대상으로 보존한다.
 
-`project.root_path`는 설치 로컬 메타데이터다. Runtime package, manifest asset checksum, issue, 중앙 receipt에 절대 경로를 복사하지 않으며 프로젝트 이동 시 기존 canonical path를 덮어쓰지 않는다. Runtime deploy/rollback은 이 파일을 변경하지 않고, config 보강은 명시된 installation refresh allowlist에서만 수행한다.
+`project.root_path`는 설치 로컬 메타데이터다. Runtime package, manifest asset checksum, issue, 중앙 receipt에 절대 경로를 복사하지 않으며 프로젝트 이동 시 기존 canonical path를 덮어쓰지 않는다. release의 `${project.*}` 참조는 deploy 대상의 현재 local config 값으로만 해석한다. Runtime deploy/rollback은 기존 project/user 값과 agent 설정을 변경하지 않고, 배포 전 MPA 관리 설정을 Runtime backup에 함께 보존한다.
 
 ### dist/ 가 단일 배포 소스
 `install.py`가 `dist/.mpa-workspace/`를 대상 프로젝트로 복사한다.  

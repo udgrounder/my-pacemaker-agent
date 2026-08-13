@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Installation-local project configuration initializer and audit.
 
-The file managed here is deliberately outside ``.mpa-workspace``.  Runtime
-releases may replace the latter, but must never replace this installation's
-project identity or local path metadata.
+The file managed here is deliberately outside ``.mpa-workspace``. Runtime
+releases may replace the latter and may apply explicitly declared additive
+``runtime.*`` defaults, but must never replace this installation's project
+identity or user-owned local values.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import math
 import re
 import tempfile
 from pathlib import Path
@@ -29,6 +31,12 @@ TOP_LEVEL_SCHEMA = re.compile(r"^schema_version:\s*(\d+)\s*(?:#.*)?$")
 TOP_LEVEL_SCHEMA_KEY = re.compile(r"^schema_version\s*:")
 TOP_LEVEL_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*:")
 PROJECT_FIELD = re.compile(r"^  ([A-Za-z_][A-Za-z0-9_-]*):(?:\s|$)")
+MAPPING_LINE = re.compile(r"^(?P<indent> *)(?P<key>[A-Za-z_][A-Za-z0-9_-]*):(?:\s*(?P<value>.*))?(?:\r?\n)?$")
+MIGRATION_KEY = re.compile(r"^runtime(?:\.[A-Za-z_][A-Za-z0-9_-]*)+$")
+MIGRATION_SECRET = re.compile(r"(?i)(api[_-]?key|secret|password|token)\s*[:=]")
+MIGRATION_ABSOLUTE_PATH = re.compile(r"(?<![\w.-])/(?:Users|home|var|private|tmp|etc)/")
+PROJECT_REFERENCE = re.compile(r"^\$\{project\.(name|root_path|initialized_at)\}$")
+MIGRATION_SECRET_KEY = re.compile(r"(?i)(api[_-]?key|secret|password|token)")
 
 
 def config_path(project_root: Path) -> Path:
@@ -157,6 +165,9 @@ def inspect_project_config(project_root: Path) -> dict[str, object]:
     """Return a non-mutating plan for config initialization or additive update."""
     root = project_root.resolve()
     path = config_path(root)
+    if path.is_symlink():
+        return {"status": "warning", "schema_version": normalized["schema_version"], "add": [],
+                "skipped": [], "warnings": ["config.yaml symlink is not supported for migration"]}
     if not path.exists():
         return {
             "path": CONFIG_RELATIVE,
@@ -206,6 +217,201 @@ def _atomic_write(path: Path, lines: list[str]) -> None:
         temporary.replace(path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def _migration_scalar(value: object) -> str:
+    """Serialize one safe JSON scalar as a YAML scalar."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, str):
+        return _quoted(value)
+    raise ValueError("runtime config migration values must be scalar")
+
+
+def _resolve_project_reference(value: object, lines: list[str]) -> object:
+    if not isinstance(value, str):
+        return value
+    reference = PROJECT_REFERENCE.fullmatch(value)
+    if not reference:
+        return value
+    known = _known_values(lines)
+    return known.get(reference.group(1), value)
+
+
+def validate_runtime_config_migration(migration: object) -> dict[str, object] | None:
+    """Validate release-provided, additive-only Runtime config defaults.
+
+    The migration is deliberately limited to ``runtime.*`` paths.  This keeps
+    project identity and user-owned config fields outside the release's write
+    authority while still allowing a Runtime release to introduce defaults.
+    """
+    if migration is None:
+        return None
+    if not isinstance(migration, dict):
+        raise ValueError("runtime config migration must be an object")
+    schema_version = migration.get("schema_version")
+    additions = migration.get("additive_defaults")
+    if not isinstance(schema_version, int) or isinstance(schema_version, bool) or schema_version < 1:
+        raise ValueError("runtime config migration schema_version must be a positive integer")
+    if not isinstance(additions, dict):
+        raise ValueError("runtime config migration additive_defaults must be an object")
+    normalized: dict[str, object] = {}
+    for path, value in additions.items():
+        if not isinstance(path, str) or not MIGRATION_KEY.fullmatch(path):
+            raise ValueError("runtime config migration paths must use runtime.<name>[.<name>...]")
+        if MIGRATION_SECRET_KEY.search(path):
+            raise ValueError(f"runtime config migration cannot declare credential-like key: {path}")
+        if isinstance(value, (dict, list, tuple, set)):
+            raise ValueError(f"runtime config migration value must be scalar: {path}")
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError(f"runtime config migration value must be finite: {path}")
+        if isinstance(value, str) and (MIGRATION_SECRET.search(value) or MIGRATION_ABSOLUTE_PATH.search(value)):
+            raise ValueError(f"runtime config migration contains sensitive/path-like value: {path}")
+        _migration_scalar(value)
+        normalized[path] = value
+    return {"schema_version": schema_version, "additive_defaults": normalized}
+
+
+def _mapping_paths(lines: list[str]) -> dict[str, tuple[int, int, bool]]:
+    """Return YAML mapping paths for the intentionally small config format."""
+    stack: list[tuple[int, str]] = []
+    result: dict[str, tuple[int, int, bool]] = {}
+    for index, line in enumerate(lines):
+        raw = line.rstrip("\r\n")
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        match = MAPPING_LINE.fullmatch(raw)
+        if not match:
+            continue
+        indent = len(match.group("indent"))
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        key = match.group("key")
+        path = ".".join([item[1] for item in stack] + [key])
+        value = match.group("value")
+        result[path] = (index, indent, bool(value and not value.startswith("#")))
+        stack.append((indent, key))
+    return result
+
+
+def _section_end(lines: list[str], start: int, indent: int) -> int:
+    for index in range(start + 1, len(lines)):
+        raw = lines[index].rstrip("\r\n")
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        current_indent = len(raw) - len(raw.lstrip(" "))
+        if current_indent <= indent:
+            return index
+    return len(lines)
+
+
+def _insert_runtime_path(lines: list[str], path: str, value: object) -> list[str]:
+    """Insert one missing scalar path while preserving existing lines."""
+    parts = path.split(".")
+    mappings = _mapping_paths(lines)
+    for prefix, (_, _, has_value) in mappings.items():
+        if path.startswith(prefix + ".") and prefix == ".".join(parts[:len(prefix.split("."))]):
+            # A scalar where a mapping parent is required is ambiguous and
+            # should be surfaced instead of producing malformed YAML.
+            if has_value and len(prefix.split(".")) < len(parts):
+                raise ValueError(f"runtime config migration conflicts with scalar path: {prefix}")
+    if path in mappings:
+        return lines
+
+    # Insert below the deepest existing mapping parent.  This avoids creating
+    # a duplicate top-level ``runtime`` block when only a nested key is new.
+    for depth in range(len(parts) - 1, 0, -1):
+        parent_path = ".".join(parts[:depth])
+        parent = mappings.get(parent_path)
+        if parent is None:
+            continue
+        parent_index, parent_indent, parent_has_value = parent
+        if parent_has_value:
+            raise ValueError(f"runtime config migration conflicts with scalar path: {parent_path}")
+        insertion = _section_end(lines, parent_index, parent_indent)
+        additions = []
+        for offset, part in enumerate(parts[depth:-1]):
+            additions.append(" " * (parent_indent + 2 * (offset + 1)) + f"{part}:\n")
+        additions.append(" " * (parent_indent + 2 * (len(parts) - depth)) + f"{parts[-1]}: {_migration_scalar(value)}\n")
+        return lines[:insertion] + additions + lines[insertion:]
+
+    # Build missing mapping parents at the end of the document.  Existing
+    # paths are handled above, so this creates a single unambiguous subtree.
+    result = list(lines)
+    if result and not result[-1].endswith("\n"):
+        result[-1] += "\n"
+    if result and result[-1].strip():
+        result.append("\n")
+    for depth, part in enumerate(parts[:-1]):
+        result.append("  " * depth + f"{part}:\n")
+    result.append("  " * (len(parts) - 1) + f"{parts[-1]}: {_migration_scalar(value)}\n")
+    return result
+
+
+def preview_runtime_config_migration(project_root: Path, migration: object) -> dict[str, object]:
+    """Return an additive migration plan without modifying the project."""
+    normalized = validate_runtime_config_migration(migration)
+    if normalized is None:
+        return {"status": "none", "schema_version": None, "add": [], "skipped": []}
+    root = project_root.resolve()
+    path = config_path(root)
+    if path.is_symlink():
+        raise ValueError("runtime config migration does not follow config.yaml symlinks")
+    if not path.exists():
+        base = [
+            f"schema_version: {CONFIG_SCHEMA_VERSION}\n",
+            "project:\n",
+            f"  name: {_quoted(_default_values(root)['name'])}\n",
+            f"  root_path: {_quoted(_default_values(root)['root_path'])}\n",
+            f"  initialized_at: {_quoted(_default_values(root)['initialized_at'])}\n",
+        ]
+    else:
+        base = _read_lines(path)
+    schema, schema_present = _schema_version(base)
+    if schema_present and schema != CONFIG_SCHEMA_VERSION:
+        return {"status": "warning", "schema_version": normalized["schema_version"], "add": [],
+                "skipped": [], "warnings": ["unsupported schema_version"]}
+    mappings = _mapping_paths(base)
+    additions = normalized["additive_defaults"]
+    add = [key for key in additions if key not in mappings]
+    skipped = [key for key in additions if key in mappings]
+    return {"status": "update" if add else "unchanged", "schema_version": normalized["schema_version"],
+            "add": add, "skipped": skipped, "warnings": []}
+
+
+def apply_runtime_config_migration(project_root: Path, migration: object, *, write: bool = True) -> dict[str, object]:
+    """Apply only missing ``runtime.*`` values; never overwrite existing values."""
+    normalized = validate_runtime_config_migration(migration)
+    if normalized is None:
+        return {"status": "none", "schema_version": None, "add": [], "skipped": []}
+    root = project_root.resolve()
+    path = config_path(root)
+    if path.is_symlink():
+        raise ValueError("runtime config migration does not follow config.yaml symlinks")
+    if not path.exists():
+        ensure_project_config(root, write=write)
+    original = _read_lines(path)
+    schema, schema_present = _schema_version(original)
+    if schema_present and schema != CONFIG_SCHEMA_VERSION:
+        raise ValueError("runtime config migration requires a supported schema_version")
+    result = list(original)
+    added: list[str] = []
+    skipped: list[str] = []
+    for key, value in normalized["additive_defaults"].items():
+        before = _mapping_paths(result)
+        if key in before:
+            skipped.append(key)
+            continue
+        result = _insert_runtime_path(result, key, _resolve_project_reference(value, result))
+        added.append(key)
+    if write and result != original:
+        _atomic_write(path, result)
+    return {"status": "updated" if added else "unchanged", "schema_version": normalized["schema_version"],
+            "add": added, "skipped": skipped, "semantic_checksum": _semantic_checksum(result)}
 
 
 def ensure_project_config(project_root: Path, *, write: bool = True) -> dict[str, object]:

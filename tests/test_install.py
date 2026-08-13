@@ -42,6 +42,26 @@ class InstallDryRunTest(unittest.TestCase):
             self.assertIn('name: "' + target.name + '"', config)
             self.assertIn('root_path: "' + str(target.resolve()) + '"', config)
 
+    def test_new_install_applies_runtime_config_defaults_and_project_references(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "runtime-project"
+            migration = Path(directory) / "runtime-config.json"
+            migration.write_text(json.dumps({"schema_version": 2, "additive_defaults": {
+                "runtime.project_name": "${project.name}",
+                "runtime.root_path": "${project.root_path}",
+                "runtime.enabled": True,
+            }}), encoding="utf-8")
+            result = subprocess.run(
+                ["python3", "install.py", "--project", str(target), "--agents", "codex",
+                 "--runtime-config-json", str(migration)],
+                cwd=ROOT, text=True, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            config = (target / ".mpa-project" / "config.yaml").read_text(encoding="utf-8")
+            self.assertIn(f'project_name: "{target.name}"', config)
+            self.assertIn(f'root_path: "{target.resolve()}"', config)
+            self.assertIn("enabled: true", config)
+
     def test_new_install_creates_missing_explicit_project_root(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "new-project"
@@ -73,58 +93,13 @@ class InstallDryRunTest(unittest.TestCase):
             self.assertIn("docs/", plan["preserve"])
             self.assertEqual(marker.read_text(encoding="utf-8"), "user data")
 
-    def test_installation_refresh_requires_approved_allowlist_and_preserves_data(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory)
-            (target / ".mpa-workspace").mkdir()
-            (target / "workspace").mkdir()
-            (target / "docs").mkdir()
-            (target / "workspace" / "keep.txt").write_text("workspace", encoding="utf-8")
-            (target / "docs" / "keep.md").write_text("docs", encoding="utf-8")
-            plan = {
-                "schema_version": 1, "target": str(target), "agent": "codex",
-                "changes": ["AGENTS.md"],
-                "preserve": ["workspace/", "docs/", "general source files"],
-                "backup": str(target / ".mpa-installation-backups" / "refresh-1"),
-                "approval_ref": "test-approval",
-            }
-            plan_path = target / "refresh.json"
-            plan_path.write_text(json.dumps(plan), encoding="utf-8")
-            install.run_installation_refresh(plan_path)
-            self.assertTrue((target / "AGENTS.md").is_file())
-            self.assertTrue((target / ".mpa-installation-backups" / "refresh-1" / "refresh-receipt.json").is_file())
-            self.assertEqual((target / "workspace" / "keep.txt").read_text(encoding="utf-8"), "workspace")
-            self.assertEqual((target / "docs" / "keep.md").read_text(encoding="utf-8"), "docs")
-
-    def test_refresh_copies_only_approved_agent_spec_file(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory)
-            (target / ".mpa-workspace").mkdir()
-            spec_root = ROOT / "agent-specs" / "codex" / "files"
-            candidates = [path.relative_to(spec_root).as_posix() for path in spec_root.rglob("*") if path.is_file()]
-            self.assertGreaterEqual(len(candidates), 2)
-            plan = {"schema_version": 1, "target": str(target), "agent": "codex", "changes": [candidates[0]],
-                    "preserve": ["workspace/", "docs/", "general source files"],
-                    "backup": str(target / ".mpa-installation-backups" / "refresh-1"), "approval_ref": "test"}
-            plan_path = target / "refresh.json"
-            plan_path.write_text(json.dumps(plan), encoding="utf-8")
-            install.run_installation_refresh(plan_path)
-            self.assertTrue((target / candidates[0]).is_file())
-            self.assertFalse((target / candidates[1]).exists())
-
-    def test_installation_refresh_rejects_missing_preserve_contract(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory)
-            (target / ".mpa-workspace").mkdir()
-            plan = {
-                "schema_version": 1, "target": str(target), "agent": "codex", "changes": ["AGENTS.md"],
-                "preserve": ["workspace/"], "backup": str(target / ".mpa-installation-backups" / "refresh-1"),
-                "approval_ref": "test-approval",
-            }
-            plan_path = target / "refresh.json"
-            plan_path.write_text(json.dumps(plan), encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "preserve"):
-                install.run_installation_refresh(plan_path)
+    def test_removed_installation_refresh_cli_is_not_available(self):
+        result = subprocess.run(
+            ["python3", "install.py", "--installation-refresh", "--plan", "refresh.json"],
+            cwd=ROOT, text=True, capture_output=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unrecognized arguments", result.stderr)
 
     def test_existing_project_config_only_adds_missing_fields_and_preserves_content(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -198,30 +173,6 @@ class InstallDryRunTest(unittest.TestCase):
             rendered = json.dumps(result, ensure_ascii=False)
             self.assertIn("differs from configured root_path", rendered)
             self.assertNotIn("/old/private/project", rendered)
-
-    def test_refresh_can_add_config_fields_only_when_explicitly_allowed(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory)
-            (target / ".mpa-workspace").mkdir()
-            config = target / ".mpa-project" / "config.yaml"
-            config.parent.mkdir()
-            config.write_text("schema_version: 1\nproject:\n  name: \"owned\"\n", encoding="utf-8")
-            plan = {
-                "schema_version": 1, "target": str(target), "agent": "codex",
-                "changes": [".mpa-project/config.yaml"],
-                "preserve": ["workspace/", "docs/", "general source files"],
-                "backup": str(target / ".mpa-installation-backups" / "config-refresh"),
-                "approval_ref": "config-test",
-            }
-            plan_path = target / "refresh.json"
-            plan_path.write_text(json.dumps(plan), encoding="utf-8")
-
-            install.run_installation_refresh(plan_path)
-
-            updated = config.read_text(encoding="utf-8")
-            self.assertIn('name: "owned"', updated)
-            self.assertIn("root_path:", updated)
-            self.assertTrue((target / ".mpa-installation-backups" / "config-refresh" / ".mpa-project" / "config.yaml").is_file())
 
     def test_existing_install_rejection_preserves_workspace_docs_and_agent_settings(self):
         with tempfile.TemporaryDirectory() as directory:

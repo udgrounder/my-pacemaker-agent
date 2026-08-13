@@ -6,15 +6,15 @@
 
 ## Input
 
-Runtime asset, 검증 명령, compatibility·breaking change·migration·rollback condition·release note.
+Runtime asset, 검증 명령, compatibility·breaking change·migration·rollback condition·release note. 필요한 경우 `runtime_config.json`의 `schema_version`과 `runtime.*` additive defaults를 선택적으로 입력한다.
 
 ## Allowed Actions
 
-`sync-runtime`, validation 실행, immutable package·manifest·receipt 생성, `release-audit` 실행.
+`sync-runtime`, validation 실행, 선택적 Runtime config migration 검증, immutable ZIP·manifest·note·release receipt 생성, `release-audit` 실행.
 
 ## Checks
 
-validation exit code, asset checksum, manifest/package 대응, scoped Git 식별자를 확인한다.
+validation exit code, asset checksum, manifest/package 대응, Runtime config migration의 additive-only·민감정보·경로 규칙, scoped Git 식별자를 확인한다.
 
 ## Gates
 
@@ -22,7 +22,17 @@ validation exit code, asset checksum, manifest/package 대응, scoped Git 식별
 
 ## Output
 
-불변 release ID, package, manifest, release receipt.
+불변 release ID와 다음 단일 번들:
+
+```text
+workspace/releases/<release-id>/
+├── package_<release-id>.zip
+├── manifest_<release-id>.json
+├── note_<release-id>.md
+└── release-receipt_<release-id>.json
+```
+
+manifest와 receipt는 기계 검증용이고 note는 사람이 읽는 변경 설명이다. 대상별 배포 receipt/history는 번들 밖 `workspace/receipts/deployments/<target-ref>/`에 둔다.
 
 ## Failure State
 
@@ -30,4 +40,4 @@ package·manifest·receipt를 만들지 않고 validation 또는 metadata 오류
 
 ## Prohibited
 
-`workspace/`, `docs/`, agent 설정, `__pycache__`, `.DS_Store`, symlink를 release 자산에 포함하지 않는다.
+`workspace/`, `docs/`, agent 설정, 사용자 config 원문, `__pycache__`, `.DS_Store`, symlink를 release 자산에 포함하지 않는다. migration metadata에는 `runtime.*` scalar 기본값만 허용하며 기존 값을 덮어쓰지 않는다.

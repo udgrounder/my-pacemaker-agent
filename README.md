@@ -72,11 +72,11 @@ agent가 진행하는 절차:
 
 **지원 agent:** `claude`(CLAUDE.md) · `codex`(AGENTS.md) · `antigravity`(GEMINI.md) · `openagent`
 
-설치되면 프로젝트에 `.mpa-workspace/`(방법론 파일), `workspace/`(프로젝트 데이터 골격), 빈 루트 `docs/`, 설치 고유 설정 `.mpa-project/config.yaml`이 준비되고, 선택한 agent의 진입점이 루트 설정 파일에 추가된다. config가 없으면 기본 프로젝트명·초기화 시각·절대 root path를 기록하며, 기존 config가 있으면 누락 필드만 보강한다. 기존 값과 사용자 파일은 변경하지 않는다. 자세한 절차와 옵션은 [`install.md`](install.md), 운영 맥락은 가이드북 9장을 참조한다.
+설치되면 프로젝트에 `.mpa-workspace/`(방법론 파일), `workspace/`(프로젝트 데이터 골격), 빈 루트 `docs/`, 설치 고유 설정 `.mpa-project/config.yaml`이 준비되고, 선택한 agent의 진입점이 루트 설정 파일에 추가된다. config가 없으면 기본 프로젝트명·초기화 시각·절대 root path를 기록하며, 기존 config가 있으면 누락 필드만 보강한다. Runtime이 사용할 초기 `runtime.*` 값이 필요하면 신규 설치에서 `--runtime-config-json`으로 additive defaults를 제공할 수 있다. 기존 값과 사용자 파일은 변경하지 않는다. 자세한 절차와 옵션은 [`install.md`](install.md), 운영 맥락은 가이드북 9장을 참조한다.
 
-기존 설치본의 Runtime update는 `install.py`가 아니라 source 저장소의 `release_manager.py`를 사용한다. `prepare-release → release-audit → deployment-dry-run → deploy` 순서이며, `prepare-release`가 UTC `YYYYMMDDHHMMSS-uuid8` 단일 release ID를 생성하고 source/dist에 기록한다. deploy에는 명시 승인과 rollback 책임자가 필요하다. 대상의 `workspace/`·루트 `docs/`가 없으면 빈 폴더만 생성하고, 이미 존재하는 폴더·agent 설정은 변경하지 않는다.
+기존 설치본의 Runtime update는 `install.py`가 아니라 source 저장소의 `release_manager.py`를 사용한다. `prepare-release → release-audit → deployment-dry-run → deploy` 순서이며, `prepare-release`가 UTC `YYYYMMDDHHMMSS-uuid8` 단일 release ID를 생성하고 source/dist에 기록한다. 필요한 경우 `--runtime-config-json`으로 `runtime.*` additive 기본값을 release manifest에 포함할 수 있다. deploy는 `${project.name}`, `${project.root_path}`, `${project.initialized_at}`를 대상 `.mpa-project/config.yaml`의 현재 값으로 해석하고 누락값만 추가한다. 산출물은 `workspace/releases/<release-id>/` 아래 `package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json` 한 묶음으로 보관한다. deploy에는 명시 승인과 rollback 책임자가 필요하고, update 중 발견된 issue 후보는 dry-run에서 고지한 뒤 검증 성공 시 원자 수집하며 실패하면 원본을 보존한다. 대상의 `workspace/`·루트 `docs/`가 없으면 빈 폴더만 생성하고, 이미 존재하는 폴더·agent 설정은 변경하지 않는다.
 
-설치 도구·agent wiring 또는 고유 config의 누락 필드를 기존 설치본에 반영해야 하면 Runtime deploy와 분리된 `installation refresh`를 쓴다. 승인 reference, agent/config 관리 파일 allowlist, `workspace/`·루트 `docs/`·`.mpa-project/config.yaml`·일반 소스 preserve 목록, 대상 `.mpa-installation-backups/` 아래 backup을 담은 JSON plan을 `install.py --installation-refresh --plan <파일>`로 적용한다. config의 기존 값은 refresh가 변경하지 않는다.
+release ZIP은 릴리즈 상태를 장기 보존하는 기준본이며, deploy의 `.mpa-backups/`는 대상별 즉시 rollback snapshot이다. 둘은 같은 파일을 보관하더라도 용도가 다르므로 release ZIP을 대상 backup 대신 사용하지 않는다. deploy backup에는 `runtime/.mpa-workspace/`와 migration이 있는 경우 `runtime-config/config.yaml`을 함께 보존하고, 성공 백업 최신 3개를 유지한다. rollback은 두 snapshot을 함께 복원하며, 기존 사용자 설정 값은 migration에서도 덮어쓰지 않는다.
 
 ---
 

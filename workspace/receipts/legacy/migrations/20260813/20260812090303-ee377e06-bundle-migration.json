@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "kind": "release_layout_migration",
+  "release_id": "20260812090303-ee377e06",
+  "reason": "pre-bundle active manifest/package/receipt moved out of active inventory",
+  "source_paths": [
+    "workspace/releases/manifests/20260812090303-ee377e06.json",
+    "workspace/releases/packages/20260812090303-ee377e06",
+    "workspace/receipts/releases/20260812090303-ee377e06-20260812T090304Z-4841e6ff.json"
+  ],
+  "destination_root": "workspace/releases/legacy/migrated/20260813/20260812090303-ee377e06",
+  "migrated_at": "2026-08-13T05:43:56Z",
+  "verified_by": "release-manager"
+}

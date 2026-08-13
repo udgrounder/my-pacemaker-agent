@@ -247,7 +247,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 - `.mpa-workspace/knowledge/[도메인명].md`
 ```
 
-> local issue는 `workspace/issues/issue-*.md`에 기록한다. map-product source 저장소로의 수집·review·triage·archive는 사용자 명시 요청에서만 수행한다.
+> local issue는 프로젝트 `workspace/issues/`에 기록한다. map-product source 저장소로의 수집·review·triage·archive는 사용자가 지정한 요청 또는 승인된 Runtime update의 dry-run에서 후보·원본 정리 계획을 고지한 경우에만 수행한다. 검증·receipt 기록이 실패하면 대상 원본을 보존한다.
 
 ---
 

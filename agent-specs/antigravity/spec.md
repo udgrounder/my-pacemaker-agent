@@ -24,7 +24,7 @@ tool: Antigravity (Gemini)
    - `.agents/rules/mpa_pacemaker.md` → native rules/ 폴더에 규칙 파일 등록
    - `.agents/workspace/memory/` → 프로젝트 메모리 — codex와 공유, 이미 있으면 건너뜀
    - `.agents/workspace/tasks/` → 태스크 관리 — codex와 공유, 이미 있으면 건너뜀
-   - `.agents/workspace/docs/` → 문서 — codex와 공유, 이미 있으면 건너뜀
+   - 루트 `docs/` → 사용자 문서 — 설치/업데이트에서는 이미 있으면 건너뛰고, 없을 때만 생성
 
 ## Hooks (설치 시 질의)
 
