@@ -4,7 +4,7 @@
 타입: major
 실패비용: major
 상태: 구현 중
-승인해시: d3e57a1924bf8077
+승인해시: 7d724251b99ae0a6
 ---
 
 # 태스크 계획서: release_deployment_management
@@ -88,6 +88,7 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 - 최초 설치와 Runtime 업데이트를 서로 다른 입력·적용 범위·rollback 책임으로 정의한다. 설치 도구는 최초 설치에만 사용한다.
 - Runtime 업데이트는 대상의 미수집 issue를 수집·원본 정리까지 포함한 하나의 운영 절차로 정의한다. 수집 대상이 없으면 issue 단계는 no-op이며, 수집 실패·검증 실패·사용자 보류 issue는 원본을 보존한다.
 - 설치 고유 설정은 Runtime 프로젝트 자체의 생명주기로 관리하되, 별도 refresh 없이 release deploy의 명시된 `runtime.*` additive migration만 허용한다. 최초 install은 설정 파일이 없을 때 생성하고, 이후 deploy는 기존 값을 보존한 채 누락 MPA 기본값만 추가하며 rollback은 Runtime과 config snapshot을 함께 복원한다.
+- 구현 완료 판정은 단위 테스트만으로 하지 않고, 격리된 임시 Runtime 대상에서 신규 설치→migration deploy→Runtime/config rollback을 독립 실행해 확인한다. 실제 운영 대상의 deploy·rollback은 사용자 확인 항목으로 별도 분리한다.
 
 ---
 
@@ -223,6 +224,7 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 - [x] Installation: 구조화 dry-run·hook smoke와 기존 `.mpa-workspace`, `.mpa-project/config.yaml`, `workspace`, `docs`, agent 설정의 무변경을 검증한다. 없는 config는 기본 프로젝트명·초기화 시각·절대 root path만 생성하고, 기존 config는 누락 필드만 추가하며 기존 값·주석·사용자 설정을 보존하는지 검증한다. 단 없는 `docs/INDEX.md`의 생성·agent 색인 갱신은 허용하며 기존 INDEX 내용은 보존하는지 검증한다.
 - [x] Issue: create→collect→review→triage→resolve→archive 정상 경로와 rejected/needs-information/중복/근거 불일치/이동 실패의 보존 경로를 검증한다.
 - [x] 운영 정합성: profile/CLI/doc matrix, source/dist sync, release audit, 전체 테스트, `git diff --check`, scoped dirty Git·No-Git을 검증한다.
+- [x] 독립 시행: `/private/tmp` 격리 대상에서 신규 설치의 Runtime 초기값 주입, release migration deploy, `runtime/.mpa-workspace`·`runtime-config/config.yaml` backup, Runtime/config 동시 rollback을 실제 명령 흐름으로 검증한다. 실제 운영 대상의 apply·rollback은 사용자 확인 없이는 완료 처리하지 않는다.
 
 ### 완료 시 갱신할 문서
 
@@ -234,6 +236,8 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 | 항목 | 유형 | 발견 맥락 | 처리 경로 |
 |---|---|---|---|
 | (구현 후 채움) | 조정 / 계획 확장 / 신규 태스크 | 왜 보기 전에는 보이지 않았는가 | plan.md 수정 / INDEX.md 등록 |
+| legacy Runtime 대상의 `.mpa-project/config.yaml` 부재 | 사용자 확인 필요 | 독립 migration 검증에서는 config가 있었지만 실제 `/Users/kjkim/Temp/mpa-test`에는 기존 설치 형식으로 config가 없음. 코드·회귀 테스트는 migration 시 기본 config 생성 및 rollback 시 제거를 확인함 | 다음 migration release를 적용해 baseline config를 생성할지 사용자 결정 후 TODO와 release 계획에 반영 |
+| `prepare-release --help`의 validation 입력 설명 불일치 | 문서·CLI 정합성 | parser는 argv JSON 배열만 허용하지만 help가 shell-like command로 설명되어 독립 CLI 검증에서 발견 | CLI help와 TODO 계약을 argv JSON 배열로 통일 |
 
 **파생된 태스크:**
 - (신규 태스크 생성 시 여기에 추가됨)

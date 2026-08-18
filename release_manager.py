@@ -1396,7 +1396,7 @@ def main() -> int:
     release.add_argument("--migration", required=True); release.add_argument("--rollback-condition", required=True)
     release.add_argument("--release-note", required=True)
     release.add_argument("--runtime-config-json", help="optional additive runtime.* defaults JSON file")
-    release.add_argument("--validation-command", required=True, help="shell-like command text; executed without a shell")
+    release.add_argument("--validation-command", required=True, help="argv JSON array; executed without a shell")
     release.set_defaults(func=prepare_release)
     deploy_parser = commands.add_parser("deploy")
     deploy_parser.add_argument("--manifest", required=True); deploy_parser.add_argument("--target", required=True)

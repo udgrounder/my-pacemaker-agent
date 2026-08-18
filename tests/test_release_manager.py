@@ -163,6 +163,40 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertEqual(config.read_text(encoding="utf-8"), original)
         self.assertEqual((target / ".mpa-workspace" / "rule.md").read_text(encoding="utf-8"), "old")
 
+    def test_runtime_config_migration_bootstraps_missing_config_and_rollback_removes_it(self):
+        migration = {"schema_version": 2, "additive_defaults": {
+            "runtime.project_name": "${project.name}",
+            "runtime.root_path": "${project.root_path}",
+        }}
+        manifest = self.prepare(migration)
+        release_id = json.loads(manifest.read_text(encoding="utf-8"))["release_id"]
+        target = self.root / "legacy-target"
+        self.write_runtime(target / ".mpa-workspace", "legacy")
+        config = target / ".mpa-project" / "config.yaml"
+        self.assertFalse(config.exists())
+
+        release_manager.deployment_dry_run(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="legacy-target"))
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "legacy-target").glob("dry-run-*.json"))
+        release_manager.deploy(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="legacy-target", verified_by="test",
+            dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+
+        self.assertTrue(config.is_file())
+        self.assertIn('project_name: "legacy-target"', config.read_text(encoding="utf-8"))
+        backup = next((target / ".mpa-backups").iterdir())
+        metadata = json.loads((backup / "backup-metadata.json").read_text(encoding="utf-8"))
+        self.assertTrue(metadata["config_snapshot"]["included"])
+        self.assertFalse(metadata["config_snapshot"]["existed"])
+        self.assertFalse((backup / "runtime-config" / "config.yaml").exists())
+
+        release_manager.rollback(argparse.Namespace(
+            target=str(target), target_ref="legacy-target", backup=str(backup.relative_to(target)),
+            release_id=release_id, verified_by="test", approved_by="test", approval_ref="unit",
+            rollback_owner="test"))
+        self.assertFalse(config.exists())
+        self.assertEqual((target / ".mpa-workspace" / "rule.md").read_text(encoding="utf-8"), "legacy")
+
     def test_deploy_creates_only_missing_workspace_and_docs_roots(self):
         manifest = self.prepare()
         target = self.root / "target"

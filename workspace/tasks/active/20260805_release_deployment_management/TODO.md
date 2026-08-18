@@ -8,6 +8,7 @@
   - 요구: `workspace/releases/<release-id>/package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json`을 생성한다.
   - 보존: JSON manifest/receipt는 기계 검증용으로 유지하고 note는 사람용 설명으로 둔다. deployment receipt는 대상별 경로에 분리한다.
   - 검증: bundle 폴더명·파일명·manifest ID·ZIP 내부 `.mpa-version`이 일치하고, 압축 해제 후 asset map이 manifest와 일치한다.
+  - 최신 검증: `20260818093645-79cd0298` bundle의 4개 파일·59개 Runtime asset·package checksum·manifest/receipt 상호 참조를 `RELEASE_BUNDLE_VERIFICATION=PASS`로 확인했다. `/Users/kjkim/Temp/mpa-test`에는 read-only deployment dry-run(`from_release=legacy-2026-08-12-12-06-00`, `to_release=20260818093645-79cd0298`, issue inventory empty)까지 통과했다.
 
 - [x] 단일 release ID를 release의 primary identity로 만든다.
   - 완료: `prepare-release`가 UTC `YYYYMMDDHHMMSS-uuid8`을 생성해 `.mpa-version`의 `current_release`, manifest, release receipt, deployment dry-run, target history, rollback receipt, backup 이름에 같은 값으로 기록한다.
@@ -97,7 +98,7 @@
   - 완료: dry-run은 config 생성/추가 예정 필드와 preserve 범위를 고지하고, 최초 설치 이후에도 기존 config 값은 Runtime 프로젝트가 소유하며 명시된 `runtime.*` 누락값만 migration한다.
   - 완료: `config-audit`가 schema·필수 필드·경로 안전성·민감정보·semantic checksum을 검사하되 기본은 warn-only다.
   - 구현: `install.py` dry-run/initial install에 config 계획과 additive 보강을 연결하고 `project_config.py audit` CLI를 추가. command-contract·installation profile·README/install·guidebook을 갱신.
-  - 검증: `test_invalid_schema_is_preserved_without_duplicate_schema_key`, `test_deploy_and_rollback_preserve_user_owned_paths`, `test_new_install_applies_runtime_config_defaults_and_project_references`, 전체 테스트 49건 통과.
+  - 검증: `test_invalid_schema_is_preserved_without_duplicate_schema_key`, `test_deploy_and_rollback_preserve_user_owned_paths`, `test_new_install_applies_runtime_config_defaults_and_project_references`, `test_runtime_config_migration_bootstraps_missing_config_and_rollback_removes_it`, 전체 테스트 통과.
 
 - [x] Runtime 프로젝트 refresh 절차를 제거하고 release-bound config migration으로 대체한다.
   - 요구/완료: 별도 refresh plan·backup·receipt는 만들지 않는다. 필요한 Runtime 초기값은 `prepare-release --runtime-config-json`의 `runtime.*` additive migration으로 선언하고, deploy transaction에서 `${project.*}` 참조를 대상 local config 값으로 해석해 누락값만 추가한다.
@@ -106,7 +107,7 @@
 - [x] Runtime version config migration의 백업·복구 경계를 구현한다.
   - 요구: migration이 있는 deploy는 `.mpa-workspace`와 `.mpa-project/config.yaml`을 함께 backup하고 rollback/실패 시 함께 복원한다. 사용자 소유 config 값·agent 설정·workspace·docs·일반 소스는 변경하지 않는다.
   - 구현: `project_config.py` additive scalar merge/참조 해석, `release_manager.py` manifest `runtime_config`, dry-run checksum 재검증, `.mpa-backups/<id>/runtime/` 및 `runtime-config/`, marker schema 2.
-  - 검증: 전체 49개 테스트 통과, migration manifest/receipt 정합성 및 legacy backup 호환 경로 확인.
+  - 검증: 전체 50개 테스트 통과, migration manifest/receipt 정합성 및 legacy backup 호환 경로 확인.
 
 - [x] issue identity·민감정보·receipt 경계를 보강한다.
   - 요구: 생성 시 sensitivity scan, stable source/workspace issue ID와 occurrence를 기록하고 중앙 receipt에서 대상 절대 경로를 제거한다.
@@ -150,15 +151,21 @@
 - [x] CLI/profile 계약표를 만든다.
   - 완료: 각 CLI 명령의 Trigger, Input, Checks, Gates, Output, Failure State, Prohibited가 profile과 일치한다.
   - 구현: `map-product-rules/command-contract.md`에 install/release/deploy/rollback/issue 명령별 계약을 정리하고 각 profile과 대조.
+  - 보완: `prepare-release --validation-command`의 CLI help를 실제 계약인 argv JSON 배열 입력으로 정정했다.
+  - 검증: `python3 release_manager.py prepare-release --help`가 `argv JSON array; executed without a shell`을 표시한다.
 - [x] 사용자 문서를 갱신한다.
   - 완료: README, install.md, guidebook이 최초 설치·release·dry-run·deploy·rollback·issue 흐름과 비범위(Git Gate 없음, docs 미배포)를 설명한다.
   - 구현: `README.md`, `install.md`, `guidebook/guidebook.md`에 설치·배포 계약·rollback 승인 입력·root docs 비배포를 반영.
+  - 검증: `rg -n "release|deploy|rollback|issue|Git|docs" README.md install.md guidebook/guidebook.md`로 각 문서의 운영 흐름·비범위 설명을 확인했다.
 - [x] Git 비차단성을 테스트한다.
   - 완료: scoped dirty와 No-Git 모두 release를 막지 않으며 receipt에는 가능한 식별 정보만 남는다.
   - 검증: `test_release_allows_scoped_dirty_or_no_git_source` 통과. scoped diff는 manifest `source_git`에 남고, temp No-Git source도 `unavailable` metadata로 release 준비를 계속한다.
 - [x] 종료 검증을 실행한다.
   - 완료: source/dist sync, release audit, 전체 테스트, `git diff --check` 결과를 기록한다.
-  - 검증: `python3 release_manager.py release-audit` → `release audit passed: 2 release bundle(s)`, `PYTHONPYCACHEPREFIX=/private/tmp/mpa-pycache python3 -m unittest discover -s tests -q` → 49 tests OK, `git diff --check` → 성공.
+  - 검증: `python3 release_manager.py release-audit` → `release audit passed: 2 release bundle(s)`, `PYTHONPYCACHEPREFIX=/private/tmp/mpa-pycache python3 -m unittest discover -s tests -q` → 50 tests OK, `git diff --check` → 성공.
+- [x] 격리된 독립 시행으로 신규 설치·Runtime config migration·backup·rollback을 검증한다.
+  - 완료: `/private/tmp` 격리 대상에서 신규 설치로 `runtime.*` 초기값을 주입하고, migration release를 deploy한 뒤 `runtime/.mpa-workspace`와 `runtime-config/config.yaml`을 backup하고 Runtime/config를 함께 rollback했다.
+  - 검증: 독립 harness와 저장소 복사본에서 실제 CLI subprocess 흐름 결과 `INDEPENDENT_CLI_VERIFICATION=PASS` (release `20260818091533-da7006c3`); backup layout에 `backup-metadata.json`, `runtime/.mpa-workspace/`, `runtime-config/config.yaml`이 포함되고 rollback 후 Runtime·config 원문이 복원됐다.
 - [x] Definition of Done을 증빙에 연결한다.
   - 완료: plan.md의 각 완료 기준에 테스트 또는 명령 결과가 연결된 뒤 사용자 검토를 요청한다.
   - 증빙 연결: Release는 `test_timeout_and_manifest_write_failure_leave_no_release_artifacts`·`release-audit`; Deployment는 `test_deploy_and_rollback_preserve_user_owned_paths`·`test_failed_deploy_restores_runtime_and_records_failed_state`; Installation은 `tests/test_install.py` 설치·config·hook 테스트; Issue는 lifecycle/실패 lifecycle tests; 운영 정합성은 command contract·sync/audit/test/diff 출력.
@@ -176,10 +183,13 @@
   - 확인: 선택한 agent의 실제 hook 설정이 실행되고, 사용자 기존 파일을 보존하는지 확인한다.
   - 2026-08-12 부분 확인: `/Users/kjkim/Temp/mpa-test`에 Codex Runtime·AGENTS.md·agent spec·3개 hook이 설치됐고 SessionStart command는 exit 0으로 실행됐다. 다만 과거 template의 `workspace/docs/`가 생성됐고, 당시 정책상 필요했던 루트 `docs/`는 없었다.
   - 보완 및 재확인: 신규 install/update는 없는 `workspace/`·루트 `docs/`만 빈 폴더로 만들고, 이미 존재하는 내용은 건드리지 않도록 변경했다. `test_new_install_creates_root_docs_but_not_workspace_docs`, `test_deploy_creates_only_missing_workspace_and_docs_roots` 통과. `mpa-test`는 upgrade 과정에서 root `docs/`가 생성됐고 기존 사용자 문서·AGENTS.md·hook 설정은 보존됐다.
+  - 검증: 위 설치 보존 테스트와 실제 SessionStart exit 0 결과를 확인했으며, 이후 실제 운영 대상에는 read-only dry-run만 수행한다.
 - [ ] 실제 대상 프로젝트에 승인된 Runtime release를 dry-run → deploy → rollback으로 적용한다.
   - 이전 부분 확인: `mpa-9326fb5686135269`을 `/Users/kjkim/Temp/mpa-test`에 dry-run → deploy 했다. 이는 이전 형식 검증이므로, 단일 release key 구현 뒤 `from_release → to_release`과 rollback을 다시 검증한다.
+  - 현재 확인: `/Users/kjkim/Temp/mpa-test`에는 최신 release에 대한 read-only `deployment-dry-run`만 실행했고 receipt는 `workspace/receipts/deployments/mpa-test/dry-run-20260813054826-9696cd2d-20260818T090436Z-5fa34324.json`에 남겼다. 실제 deploy·rollback은 사용자 승인 후 수행한다.
   - 확인: `AGENTS.md`/agent spec/hook 설정 중 자동 갱신을 허용할 경로를 확정한다.
 - [ ] 설치된 운영 프로젝트의 고유 설정 동작을 사용자 환경에서 확인한다.
   - 확인: config가 없을 때 프로젝트명·초기화 시각·절대 경로가 생성되는지, 기존 config가 있을 때 기존 내용은 유지되고 누락 필드만 추가되는지 확인한다.
   - 확인: 프로젝트 이동·잘못된 schema·민감정보 후보가 경고로 안내되고, config의 절대 경로가 release/issue/중앙 receipt로 유출되지 않는지 확인한다.
   - 추가 확인: `runtime.*` migration에서 `${project.name}`·`${project.root_path}`가 대상 local 값으로 해석되고, 기존 값은 유지되며 rollback 후 원문이 복원되는지 확인한다.
+  - 현재 확인: 실제 `/Users/kjkim/Temp/mpa-test`는 기존 설치 형식의 legacy Runtime이며 `.mpa-project/config.yaml`이 없다. read-only `project_config.py audit --json` 결과는 `status: create`이며 기본 필드 추가 예정만 보고했다. 다음 migration release를 적용해 baseline config를 생성할지 사용자 결정이 필요하다.
