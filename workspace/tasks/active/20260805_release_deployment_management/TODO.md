@@ -162,7 +162,7 @@
   - 검증: `test_release_allows_scoped_dirty_or_no_git_source` 통과. scoped diff는 manifest `source_git`에 남고, temp No-Git source도 `unavailable` metadata로 release 준비를 계속한다.
 - [x] 종료 검증을 실행한다.
   - 완료: source/dist sync, release audit, 전체 테스트, `git diff --check` 결과를 기록한다.
-  - 검증: `python3 release_manager.py release-audit` → `release audit passed: 2 release bundle(s)`, `PYTHONPYCACHEPREFIX=/private/tmp/mpa-pycache python3 -m unittest discover -s tests -q` → 50 tests OK, `git diff --check` → 성공.
+  - 검증: `python3 release_manager.py release-audit` → `release audit passed: 3 release bundle(s)`, `PYTHONPYCACHEPREFIX=/private/tmp/mpa-pycache python3 -m unittest discover -s tests -q` → 50 tests OK, `git diff --check` → 성공.
 - [x] 격리된 독립 시행으로 신규 설치·Runtime config migration·backup·rollback을 검증한다.
   - 완료: `/private/tmp` 격리 대상에서 신규 설치로 `runtime.*` 초기값을 주입하고, migration release를 deploy한 뒤 `runtime/.mpa-workspace`와 `runtime-config/config.yaml`을 backup하고 Runtime/config를 함께 rollback했다.
   - 검증: 독립 harness와 저장소 복사본에서 실제 CLI subprocess 흐름 결과 `INDEPENDENT_CLI_VERIFICATION=PASS` (release `20260818091533-da7006c3`); backup layout에 `backup-metadata.json`, `runtime/.mpa-workspace/`, `runtime-config/config.yaml`이 포함되고 rollback 후 Runtime·config 원문이 복원됐다.
@@ -188,6 +188,11 @@
   - 이전 부분 확인: `mpa-9326fb5686135269`을 `/Users/kjkim/Temp/mpa-test`에 dry-run → deploy 했다. 이는 이전 형식 검증이므로, 단일 release key 구현 뒤 `from_release → to_release`과 rollback을 다시 검증한다.
   - 현재 확인: `/Users/kjkim/Temp/mpa-test`에는 최신 release에 대한 read-only `deployment-dry-run`만 실행했고 receipt는 `workspace/receipts/deployments/mpa-test/dry-run-20260813054826-9696cd2d-20260818T090436Z-5fa34324.json`에 남겼다. 실제 deploy·rollback은 사용자 승인 후 수행한다.
   - 확인: `AGENTS.md`/agent spec/hook 설정 중 자동 갱신을 허용할 경로를 확정한다.
+- [x] `/Users/kjkim/Temp/mpa-test2`에 승인된 Runtime release 업그레이드 테스트를 수행한다.
+  - dry-run: `workspace/receipts/deployments/mpa-test2/dry-run-20260818093645-79cd0298-20260818T095101Z-8774cc00.json`에서 legacy `2026-08-12 12:06:00` → `20260818093645-79cd0298` 전환 계획과 59개 자산을 확인했다.
+  - deploy: `workspace/receipts/deployments/mpa-test2/deploy-20260818093645-79cd0298-20260818T095127Z-b260787e.json`이 `status: applied`를 기록했고 issue 수집은 `no-op`(0건)이다.
+  - 검증: 대상 자산 59개가 manifest와 일치하고, `.mpa-backups/20260818093645-79cd0298-20260818T095127Z-b2df337b/`의 `runtime/.mpa-workspace` 59개 및 backup marker checksum을 확인했다. 기존 `workspace/`, `docs/`, `.agents/`, `.codex`는 보존됐다.
+  - 설정: 이번 release에는 `runtime_config` migration이 없어 `.mpa-project/config.yaml`은 생성하지 않고 기존 부재 상태를 유지했다.
 - [ ] 설치된 운영 프로젝트의 고유 설정 동작을 사용자 환경에서 확인한다.
   - 확인: config가 없을 때 프로젝트명·초기화 시각·절대 경로가 생성되는지, 기존 config가 있을 때 기존 내용은 유지되고 누락 필드만 추가되는지 확인한다.
   - 확인: 프로젝트 이동·잘못된 schema·민감정보 후보가 경고로 안내되고, config의 절대 경로가 release/issue/중앙 receipt로 유출되지 않는지 확인한다.
