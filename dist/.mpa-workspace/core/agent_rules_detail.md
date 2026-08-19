@@ -292,7 +292,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
    - "major로 변경" → major 흐름으로 전환 (계획 승인 포함)
 2. **plan.md 작성** — 사용자 응답 반영 후 반드시 `templates/minor_plan_template.md`를 Read하여 작성한다. minor 태스크는 에이전트 보고(사용자 결정·암묵적 결정·에이전트 가정·minor 판단 근거)·핵심 기능·구현 항목·`### 실행 TODO` 체크리스트를 기록한다. 실행 TODO에는 이번 태스크 종료 전 증빙으로 완료 처리할 수 있는 항목만 두고, 운영 영향은 마지막 체크리스트 아래의 `운영 시 안내 사항`에 기록한다. 사용자·운영자가 수행할 후속 행동은 안내 사항에 둘 수 있지만, 구현·설계·검증이 추가로 필요한 후속 작업은 새 태스크로 분리한다. 반례·검증 체크리스트·문서 업데이트 대상·구현 후 발견은 생략한다.
    - 작성 완료 후 파일 경로를 사용자에게 고지한다: `계획서: workspace/tasks/active/yyyymmdd_[태스크명]/plan.md`
-3. **INDEX 등록** — `workspace/tasks/INDEX.md`에 새 태스크 행을 `상태: active`, `완료일: -`로 추가한 뒤 `agent_rules.md`의 "INDEX.md 유지보수 원칙"을 수행한다.
+3. **INDEX 등록** — `workspace/tasks/INDEX.md`에 새 태스크 행을 `상태: active`로 추가한 뒤 `agent_rules.md`의 "INDEX.md 유지보수 원칙"을 수행한다.
 4. **`approve` 실행**:
    ```bash
    python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/yyyymmdd_[태스크명]/plan.md

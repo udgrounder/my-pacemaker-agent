@@ -893,7 +893,7 @@ Layer 2는 개별 작업 검증(Layer 1 루프)과 별개로, 전체 정합성�
 - 주요 기능 단위 완성 시
 - Layer 1 피드백에서 "Layer 2 확인 필요" 항목이 누적될 때
 
-> **주기 추적 방법:** Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-MM-DD` 한 줄을 추가한다. 에이전트는 태스크 완료 시 이 마커 이후 done 태스크를 집계해, **major가 1개 이상 포함되거나 minor만 5개 이상**이면 Layer 2를 제안한다(단순 개수가 아니라 영향 규모로 가중한다). 최종 판단은 사용자가 한다.
+> **주기 추적 방법:** Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-MM-DD` 한 줄을 추가한다. INDEX는 active·hold 작업만 담고 완료 이력은 `workspace/tasks/done/`에 보존한다. 에이전트는 여러 변경의 상호작용을 확인할 필요가 있으면 done 이력·문서·실제 코드를 직접 대조하는 Layer 2 점검을 제안하며, 최종 판단은 사용자가 한다.
 
 **확인할 것:**
 - 지금까지 구현된 코드 중 아키텍처 규칙을 위반한 부분

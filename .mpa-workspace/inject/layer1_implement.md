@@ -132,7 +132,7 @@ plan.md YAML 프론트매터의 `실패비용`이 `minor`이면 아래만 처리
    ```
 3. 사용자(또는 위임 에이전트)가 완료를 확인하면:
    - plan.md 상태를 `완료 승인`으로 업데이트한다.
-   - `workspace/tasks/INDEX.md`의 해당 항목을 `done`, `완료일: 완료 승인 처리 시의 현재 날짜`, `점검: -`로 갱신한 뒤 `agent_rules.md`의 "INDEX.md 유지보수 원칙"을 수행한다.
+   - `workspace/tasks/INDEX.md`에서 해당 active/hold 항목을 제거한 뒤 `agent_rules.md`의 "INDEX.md 유지보수 원칙"을 수행한다.
    - `workspace/tasks/active/yyyymmdd_[태스크명]/`을 `workspace/tasks/done/yyyymmdd_[태스크명]/`으로 이동한다.
 
 minor에서는 changelog.md, 에이전트 검증, 사용자 테스트 단계, 역할 메모리, docs 업데이트, Layer 2 제안을 생략한다. 구현 중 외부 동작·아키텍처·계약 변경이 발생하면 fast-path를 중단하고 major 전환 여부를 사용자에게 보고한다.
