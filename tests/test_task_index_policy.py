@@ -17,10 +17,12 @@ class TaskIndexPolicyTest(unittest.TestCase):
 
         self.assertIn("active/hold 폴더에 맞는 행만 남기고", rules)
         self.assertIn("해당 active/hold 행을 제거", rules)
+        self.assertIn("`tasks/done/`은 과거 결정의 근거가 현재 기준만으로 불명확할 때만 선택적으로 참조", rules)
         self.assertIn("새 태스크 행을 `상태: active`로 추가", detail)
         self.assertIn("INDEX는 현재 처리할 **생명주기 상태**(`active`/`hold`)만", design)
         self.assertIn("해당 active/hold 항목을 제거", implement)
         self.assertIn("done 태스크를 INDEX에 등록하지 않는다", checkpoint)
+        self.assertIn("현재 점검의 기본 입력이 아니며", checkpoint)
 
     def assert_index_policy(self, index):
         text = index.read_text(encoding="utf-8")

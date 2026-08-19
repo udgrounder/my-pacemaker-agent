@@ -67,21 +67,21 @@
 - 문서에는 있지만 실제로는 사용되지 않는 규칙은?
 
 ### 6. 요청 / 문서 동기화 점검
-- `tasks/done/`의 완료 태스크 중 문서 업데이트가 미처리된 항목이 있는가?
+- 현재 소스·Runtime 규칙·`docs/INDEX.md`가 서로 일치하는가?
 - `tasks/active/`에 오래 방치된 요청이 있는가?
 - `docs/INDEX.md`에서 관련 요청이 없는 문서가 있는가?
 
 ### 7. INDEX vs 태스크 폴더 동기화
 
-`active/` 및 `hold/` 태스크가 INDEX.md에 모두 등록됐는지 확인한다. `done/` 폴더는 이력 원본이고 INDEX는 현재 작업 캐시이므로, done 태스크를 INDEX에 등록하지 않는다.
+`active/` 및 `hold/` 태스크가 INDEX.md에 모두 등록됐는지 확인한다. `done/` 폴더는 선택적 이력 참조이고 INDEX는 현재 작업 캐시이므로, done 태스크를 INDEX에 등록하지 않는다.
 
 ```bash
-ls workspace/tasks/active/ workspace/tasks/done/
+ls workspace/tasks/active/ workspace/tasks/hold/
 ```
 
 - active/hold 폴더에 있는데 INDEX에 없는 항목 → INDEX에 추가 (타입·상태·요약·생성일 채움)
 - INDEX의 active/hold 행인데 폴더에 없는 항목 → INDEX에서 제거 또는 경로 확인
-- done 폴더 → 완료 이력 원본으로 간주한다. 재등록하지 않는다.
+- done 폴더 → 현재 점검의 기본 입력이 아니며, 과거 결정 근거가 불명확할 때만 선택적으로 참조한다. 재등록하지 않는다.
 - 동기화 뒤 `agent_rules.md`의 "INDEX.md 유지보수 원칙"을 수행한다. `[Layer 2 완료]` 마커는 태스크 행 정렬 대상이 아니다.
 
 > 이 검사는 매 태스크마다 하지 않는다. Layer 2 시 일괄로 처리해 인지 부담을 분산한다.
