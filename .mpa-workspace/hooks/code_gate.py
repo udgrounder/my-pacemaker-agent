@@ -23,11 +23,11 @@ GATE 2 — 완료 이동 (Bash mv):
 """
 
 import argparse
-import hashlib
 import json
 import os
 import re
 import sys
+from plan_hash import compute_for_plan
 
 # 항상 허용하는 경로 접두사 (방법론·프로젝트 데이터·agent 설정)
 ALLOW_PREFIXES = (
@@ -129,35 +129,6 @@ def parse_plan_status(plan_path):
     return fields.get("상태")
 
 
-HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
-
-
-def strip_implementation_sections(body):
-    """헤딩 텍스트가 '구현'으로 시작하는 섹션(그 헤딩부터 다음 헤딩 전까지)을 제외한다.
-
-    plan_hash.py의 동일 함수와 정확히 같은 로직을 유지해야 한다 — 어긋나면
-    approve가 기록한 해시를 이 함수가 다른 값으로 재계산해 정상 태스크도
-    GATE 1 재진입 차단에 걸린다.
-    """
-    kept = []
-    excluding = False
-    for line in body.splitlines():
-        m = HEADING_RE.match(line)
-        if m:
-            excluding = m.group(2).strip().startswith("구현")
-        if not excluding:
-            kept.append(line)
-    return "\n".join(kept)
-
-
-def compute_plan_hash(body):
-    """plan.md 본문(프론트매터 제외, '구현'류 섹션 제외)의 해시를 계산한다."""
-    # 공백·줄바꿈 정규화 후 해시 — 사소한 포맷 변경에는 둔감
-    filtered = strip_implementation_sections(body)
-    normalized = re.sub(r"\s+", " ", filtered).strip()
-    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
-
-
 def find_active_statuses(cwd):
     """active 태스크의 (태스크명, 상태) 목록을 반환한다."""
     base = os.path.join(cwd, "workspace", "tasks", "active")
@@ -189,7 +160,10 @@ def check_hash_integrity(cwd, mode, agent):
             continue
         approved_hash = fields.get("승인해시")
         if not approved_hash:
-            current_hash = compute_plan_hash(body)
+            try:
+                current_hash = compute_for_plan("\n".join(f"{k}: {v}" for k, v in fields.items()), body)
+            except ValueError as error:
+                current_hash = f"오류: {error}"
             msg = (
                 f"⛔ 계획 승인 기록 복구 필요: '{name}' plan.md 상태는 '구현 중'이지만 승인해시가 없습니다.\n"
                 f"  현재해시: {current_hash}\n"
@@ -205,15 +179,24 @@ def check_hash_integrity(cwd, mode, agent):
             else:
                 emit_block(msg)
             return
-        current_hash = compute_plan_hash(body)
+        try:
+            current_hash = compute_for_plan("\n".join(f"{k}: {v}" for k, v in fields.items()), body)
+        except ValueError as error:
+            msg = f"⛔ 요구사항 명세 형식 오류: '{name}' plan.md — {error}"
+            if mode == "warn":
+                emit_warn(agent, msg)
+            else:
+                emit_block(msg)
+            return
         if current_hash != approved_hash:
             msg = (
                 f"⛔ 계획 재승인 필요: '{name}' plan.md가 승인 후 변경됐습니다.\n"
                 f"  승인해시: {approved_hash}\n"
                 f"  현재해시: {current_hash}\n"
-                "plan.md 변경이 설계에 영향을 주는지 사용자에게 확인하고:\n"
-                "  - 설계 영향 있음 → 상태를 '설계 완료'로 되돌리고 재승인\n"
-                "  - 설계 영향 없음 → 사용자 확인 후 '승인해시'를 새 해시로 갱신"
+                "요구사항 명세가 변경됐는지 확인하고:\n"
+                "  - 새 형식의 명세 변경 → 사용자 승인 후 renew-spec으로 승인 기록 갱신\n"
+                "  - 명세 밖 실행 계획 변경 → 변경 기록에 남기고 계속 진행\n"
+                "  - 구형 plan의 요구사항 변경 → 상태를 '설계 완료'로 되돌리고 재승인"
             )
             if mode == "warn":
                 emit_warn(agent, msg)

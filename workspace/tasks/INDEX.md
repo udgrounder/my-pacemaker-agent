@@ -2,9 +2,11 @@
 
 | 태스크명 | 타입 | 상태 | 요약 | 생성일 | 완료일 | 점검 |
 |---------|------|------|------|--------|--------|------|
+| 20260819_adaptive_plan_governance | major | done | 요구사항 명세 체크섬 보호와 실행 계획의 적응형 보완·누적 보고 절차 도입 | 2026-08-19 | 2026-08-19 | - |
+| 20260819_next_action_terminology | major | done | 다음 행동 제안 절차의 용어와 사용자 대면 문구 정렬 | 2026-08-19 | 2026-08-19 | - |
 | 20260805_release_deployment_management | major | active | Git 선택 보조 기반 release·deployment receipt 및 issue 생성·수집·분류 lifecycle 도입 | 2026-08-05 | - | - |
 | 20260729_task_index_maintenance | major | active | 설치 대상 태스크 INDEX 보존 기간·완료일·정렬 정책 도입 | 2026-07-29 | - | - |
-| 20260716_mpa_glossary_and_layering | major | active | MPA 용어 정리·용어집 신설·agent_rules 온디맨드 분리·plan.md 표준 템플릿화 | 2026-07-16 | - | - |
+| 20260716_mpa_glossary_and_layering | major | done | MPA 용어 정리·용어집 신설·agent_rules 온디맨드 분리·plan.md 표준 템플릿화 | 2026-07-16 | 2026-08-19 | - |
 | 20260604_MPA시스템개선 | minor | done | 비평 도출 구조적 문제 9개 수정 + "놀라움 필터" → "자가 개선 필터" 명칭 변경 | 2026-06-04 | 2026-07-29 | - |
 | 20260604_code_gate_scope | minor | done | 코드 게이트 태스크 범위 강화 — .approved 경로 명시 시 범위 이탈 경고 | 2026-06-04 | 2026-07-29 | ✅ |
 | 20260604_context_loading | minor | done | 2단계 컨텍스트 선택 로딩 — 태스크 확정 후 필요 파일만 읽도록 I/O 최적화 | 2026-06-04 | 2026-07-29 | ✅ |

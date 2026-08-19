@@ -6,7 +6,9 @@ GATE 1 재진입 검증용. code_gate.py와 같은 알고리즘을 사용한다.
 
 사용법:
   plan_hash.py compute <plan_path>      현재 본문 해시 출력
-  plan_hash.py approve <plan_path>      현재 해시를 '승인해시' 필드에 기록 (in-place)
+  plan_hash.py approve <plan_path>      현재 승인 대상 해시를 '승인해시' 필드에 기록 (in-place)
+  plan_hash.py renew-spec <plan_path> --summary <변경 요약>
+                                        진행 중 요구사항 명세의 승인 기록을 갱신
   plan_hash.py check   <plan_path>      승인해시 vs 현재해시 비교 (일치: exit 0, 불일치: exit 1)
   plan_hash.py audit   <plan_path>      프론트매터 필드 검사 (누락 필드를 stdout JSON으로 출력)
   plan_hash.py init    <plan_path> --field key=value [--field ...]
@@ -14,17 +16,22 @@ GATE 1 재진입 검증용. code_gate.py와 같은 알고리즘을 사용한다.
 
 에이전트 사용 시점:
   - 설계 완료 시점 (상태: '설계 완료' 또는 '구현 중'으로 전환 시): approve
-  - 사용자 재승인 후: approve
+  - 사용자 명세 변경 승인 후: renew-spec
   - 해시만 확인할 때: check
   - 구버전 plan.md 발견 시: audit → 본문 읽고 추론 → 사용자 확인 → init
 """
 
 import hashlib
 import json
+import os
 import re
 import sys
+from datetime import datetime, timezone
 
 REQUIRED_FIELDS = ["태스크", "생성일", "타입", "실패비용", "상태", "승인해시"]
+SPEC_FORMAT_FIELD = "승인대상"
+SPEC_FORMAT_VALUE = "요구사항 명세"
+SPEC_HASH_PREFIX = "reqspec-v1:"
 VALID_STATUS = {"작성 중", "설계 중", "설계 완료", "구현 중", "검증 중", "테스트 중", "검토 완료", "완료 승인"}
 VALID_TYPE = {"major", "minor"}
 VALID_COST = {"critical", "major", "minor"}
@@ -60,10 +67,67 @@ def strip_implementation_sections(body):
     return "\n".join(kept)
 
 
-def compute(body):
-    filtered = strip_implementation_sections(body)
-    normalized = re.sub(r"\s+", " ", filtered).strip()
+def extract_specification(body):
+    """새 plan 형식의 `## 요구사항 명세` 본문만 반환한다.
+
+    None은 구형 plan으로, 빈 문자열은 새 형식이지만 비어 있는 명세로 구분한다.
+    """
+    lines = body.splitlines()
+    start = None
+    for index, line in enumerate(lines):
+        if re.match(r"^##\s+요구사항 명세\s*$", line.strip()):
+            start = index + 1
+            break
+    if start is None:
+        return None
+    end = len(lines)
+    for index in range(start, len(lines)):
+        if re.match(r"^##\s+", lines[index]):
+            end = index
+            break
+    return "\n".join(lines[start:end])
+
+
+def compute_legacy(body):
+    """구형 plan의 기존 본문 해시를 계산한다."""
+    normalized = re.sub(r"\s+", " ", strip_implementation_sections(body)).strip()
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+
+def compute_specification(body):
+    """요구사항 명세 블록의 원시 체크섬을 계산한다."""
+    specification = extract_specification(body)
+    if specification is None:
+        raise ValueError("`## 요구사항 명세` 섹션이 누락됐습니다")
+    normalized = re.sub(r"\s+", " ", specification).strip()
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+
+def compute(body):
+    """본문만 제공되는 기존 호출자의 호환 함수.
+
+    plan 전체의 형식 판별은 반드시 compute_for_plan을 사용한다.
+    """
+    return compute_specification(body) if extract_specification(body) is not None else compute_legacy(body)
+
+
+def compute_for_plan(front_matter, body):
+    """승인해시 버전과 형식 표지로 구형·최신 plan을 명시적으로 판별한다."""
+    approved_hash = get_field(front_matter, "승인해시")
+    format_is_spec = get_field(front_matter, SPEC_FORMAT_FIELD) == SPEC_FORMAT_VALUE
+    hash_is_spec = bool(approved_hash and approved_hash.startswith(SPEC_HASH_PREFIX))
+
+    if approved_hash and ":" in approved_hash and not hash_is_spec:
+        raise ValueError(f"지원하지 않는 승인해시 형식입니다: {approved_hash.split(':', 1)[0]}")
+    if hash_is_spec and not format_is_spec:
+        raise ValueError("reqspec-v1 승인해시에는 `승인대상: 요구사항 명세`가 필요합니다")
+    if format_is_spec:
+        if extract_specification(body) is None:
+            raise ValueError("요구사항 명세 형식 plan에서 `## 요구사항 명세` 섹션이 누락됐습니다")
+        return SPEC_HASH_PREFIX + compute_specification(body)
+    if hash_is_spec:
+        raise ValueError("요구사항 명세 형식 plan에서 `## 요구사항 명세` 섹션이 누락됐습니다")
+    return compute_legacy(body)
 
 
 def get_field(front_matter, key):
@@ -73,6 +137,14 @@ def get_field(front_matter, key):
         if line.startswith(f"{key}:"):
             return line.split(":", 1)[1].strip().strip('"').strip("'")
     return None
+
+
+def write_plan(plan_path, front_matter, body):
+    new_content = f"---\n{front_matter}\n---\n{body}"
+    tmp_path = plan_path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        f.write(new_content)
+    os.replace(tmp_path, plan_path)
 
 
 def set_field(plan_path, key, value):
@@ -91,9 +163,39 @@ def set_field(plan_path, key, value):
     if not found:
         new_lines.append(f"{key}: {value}")
     new_front = "\n".join(new_lines)
-    new_content = f"---\n{new_front}\n---\n{body}"
-    with open(plan_path, "w", encoding="utf-8") as f:
-        f.write(new_content)
+    write_plan(plan_path, new_front, body)
+
+
+def renew_spec(plan_path, summary):
+    front_matter, body, _ = parse(plan_path)
+    if front_matter is None or extract_specification(body) is None:
+        raise ValueError("renew-spec은 `## 요구사항 명세`가 있는 plan.md에서만 사용할 수 있습니다")
+    if not summary.strip():
+        raise ValueError("renew-spec에는 사용자에게 제시한 변경 요약이 필요합니다 (--summary)")
+    old_hash = get_field(front_matter, "승인해시")
+    if not old_hash:
+        raise ValueError("기존 승인해시가 없습니다. 최초 승인은 approve로 처리하세요")
+    history_match = re.search(r"(?m)^##\s+명세 변경 이력\s*$", body)
+    if history_match is None:
+        raise ValueError("`## 명세 변경 이력` 섹션이 없어 승인 이력을 기록할 수 없습니다")
+    new_hash = compute_for_plan(front_matter, body)
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    row = f"| {timestamp} | {old_hash} | {new_hash} | {summary.strip()} |"
+    start = history_match.end()
+    next_heading = body.find("\n## ", start)
+    end = len(body) if next_heading < 0 else next_heading
+    history = body[start:end]
+    header = "| 승인 시각 | 이전 체크섬 | 새 체크섬 | 변경 요약 |\n|---|---|---|---|"
+    if header not in history:
+        history = "\n\n" + header + "\n" + history.strip() + "\n"
+    if not history.endswith("\n"):
+        history += "\n"
+    body = body[:start] + history + row + "\n" + body[end:]
+    lines = []
+    for line in front_matter.splitlines():
+        lines.append(f"승인해시: {new_hash}" if line.startswith("승인해시:") else line)
+    write_plan(plan_path, "\n".join(lines), body)
+    return old_hash, new_hash, timestamp
 
 
 def audit(plan_path):
@@ -187,8 +289,8 @@ def main():
     cmd, plan_path = sys.argv[1], sys.argv[2]
 
     if cmd == "compute":
-        _, body, _ = parse(plan_path)
-        print(compute(body))
+        front_matter, body, _ = parse(plan_path)
+        print(compute_for_plan(front_matter, body))
     elif cmd == "approve":
         front_matter, body, _ = parse(plan_path)
         status = get_field(front_matter, "상태") if front_matter else None
@@ -201,15 +303,34 @@ def main():
                 "이미 '구현 중'이라면 승인해시가 이미 기록된 상태입니다.\n"
             )
             sys.exit(2)
-        h = compute(body)
+        try:
+            h = compute_for_plan(front_matter, body)
+        except ValueError as error:
+            sys.stderr.write(f"⛔ approve 거부: {error}\n")
+            sys.exit(2)
         # 상태를 '구현 중'으로 전환하고 해시를 원자적으로 기록
         set_field(plan_path, "상태", "구현 중")
         set_field(plan_path, "승인해시", h)
         print(f"계획 승인됨: 상태 → 구현 중 / 승인해시: {h}")
+    elif cmd == "renew-spec":
+        args = sys.argv[3:]
+        summary = ""
+        if len(args) >= 2 and args[0] == "--summary":
+            summary = args[1]
+        try:
+            old_hash, new_hash, timestamp = renew_spec(plan_path, summary)
+        except ValueError as error:
+            sys.stderr.write(f"⛔ 명세 승인 기록 갱신 실패: {error}\n")
+            sys.exit(2)
+        print(f"요구사항 명세 승인 기록 갱신됨: {old_hash} → {new_hash} / {timestamp}")
     elif cmd == "check":
         front_matter, body, _ = parse(plan_path)
         approved = get_field(front_matter, "승인해시")
-        current = compute(body)
+        try:
+            current = compute_for_plan(front_matter, body)
+        except ValueError as error:
+            print(f"불일치 — {error}")
+            sys.exit(1)
         if approved == current:
             print(f"일치: {current}")
             sys.exit(0)
