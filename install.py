@@ -29,11 +29,11 @@ AGENT_CONFIG_MAP = {
     "claude":       "CLAUDE.md",
     "codex":        "AGENTS.md",
     "antigravity":  "GEMINI.md",
-    "openagent":    None,   # spec.md 질의로 결정 — 파일 주입은 AI agent가 처리
+    "openagent":    None,   # 실험적·수동 설정 지원 — 자동 진입점 주입 없음
 }
 
 # hook 자동 와이어링이 확인된 agent와 설정 파일 경로 (프로젝트 루트 기준)
-# antigravity / openagent 는 hook 지원이 확인되지 않아 설치 시 agent 질의로 처리한다.
+# antigravity는 hook 지원 확인이 필요하고, openagent는 실험적·수동 설정 지원이다.
 HOOK_SETTINGS_PATH = {
     "claude": (".claude", "settings.json"),
     "codex":  (".codex", "hooks.json"),
@@ -445,9 +445,13 @@ def run_install(project_path: Path, agents: list, upgrade: bool, runtime_config=
         copy_agent_spec_files(agent, project_path)
         if agent in HOOK_SETTINGS_PATH:
             wire_hooks(agent, project_path)
-        elif agent in ("antigravity", "openagent"):
+        elif agent == "antigravity":
             print(f"  [안내] {agent} — hook 지원 확인 필요. "
                   f"agent-specs/{agent}/spec.md 질의 절차에 따라 설정하세요.")
+        elif agent == "openagent":
+            print("  [제한] openagent — 실험적·수동 설정 지원입니다. "
+                  "자동 진입점·규칙 파일·hook 연결은 수행하지 않습니다. "
+                  "agent-specs/openagent/spec.md의 확인 절차를 따라 별도로 설정하세요.")
 
 
 # ──────────────────────────────────────────────
@@ -472,7 +476,7 @@ def prompt_agents(project_path: Path) -> list:
     print("\n사용 중인 agent:")
     for i, (key, filename) in enumerate(AGENT_CONFIG_MAP.items(), 1):
         mark = "✓" if key in detected else " "
-        label = filename if filename else "spec.md 질의"
+        label = filename if filename else "실험적·수동 설정 (spec.md)"
         print(f"  [{mark}] {i}. {key} ({label})")
 
     print("\n설정할 agent를 입력하세요.")
@@ -509,7 +513,7 @@ def parse_args():
     parser.add_argument(
         "--agents",
         nargs="+",
-        help="사용 중인 agent (claude, codex, antigravity, openagent). "
+        help="사용 중인 agent (claude, codex, antigravity, openagent[실험적·수동 설정]). "
         "공백 또는 콤마로 여러 개 지정: --agents claude codex 또는 --agents claude,codex",
     )
     parser.add_argument(

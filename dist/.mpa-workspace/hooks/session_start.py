@@ -2,7 +2,7 @@
 """
 session_start.py — 세션 시작 루틴 주입 (SessionStart)
 
-매 세션 시작 시 진행 중 태스크 목록과 핵심 라우팅 규칙을 컨텍스트에 주입한다.
+매 세션 시작 시 진행 중 작업 항목 목록과 핵심 라우팅 규칙을 컨텍스트에 주입한다.
 agent 가 agent_rules.md 를 "안 읽는" 경우를 없애기 위한 기계적 보장 — 차단은 하지 않는다.
 
 사용법: session_start.py --agent {claude|codex|gemini}
@@ -100,7 +100,7 @@ def active_tasks(cwd):
         return None  # workspace 자체가 없음
     base = os.path.join(cwd, "workspace", "tasks", "active")
     if not os.path.isdir(base):
-        return []  # active 디렉터리가 아직 없음 = 진행 중 태스크 없음
+        return []  # active 디렉터리가 아직 없음 = 진행 중 작업 항목 없음
     rows = []
     for name in sorted(os.listdir(base)):
         task_dir = os.path.join(base, name)
@@ -134,25 +134,25 @@ def build_message(cwd):
         return "\n".join(lines)
 
     if rows:
-        lines.append("진행 중인 태스크가 있습니다. 번호로 선택해 주세요:")
+        lines.append("진행 중인 작업 항목이 있습니다. 번호로 선택해 주세요:")
         for i, row in enumerate(rows, 1):
             lines.append(f"  {i}.{row.lstrip()}")
-        lines.append(f"  {len(rows) + 1}. 새 태스크 시작")
-        lines.append("→ 번호를 말씀해 주시면 해당 태스크의 상태에 따라 진행합니다.")
+        lines.append(f"  {len(rows) + 1}. 새 작업 항목 시작")
+        lines.append("→ 번호를 말씀해 주시면 해당 작업 항목의 상태에 따라 진행합니다.")
         # 프론트매터 누락 항목이 있으면 처리 지시 추가
         if any("⚠️" in row for row in rows):
             lines.append("")
             lines.append("⚠️ 일부 plan.md의 프론트매터가 누락됐습니다.")
-            lines.append("해당 태스크 진입 시 다음 절차를 따르세요:")
+            lines.append("해당 작업 항목 진입 시 다음 절차를 따르세요:")
             lines.append("  1. plan.md 본문을 읽고 누락 필드를 추론 (`plan_hash.py audit <path>`로 정확한 누락 목록 확인)")
             lines.append("  2. 추론한 값과 근거를 사용자에게 짧게 보여주고 확인")
             lines.append("  3. 확인 후 `plan_hash.py init <path> --field key=value ...` 로 주입")
             lines.append("  4. 추론 기준은 agent_rules.md '프론트매터 누락 처리' 섹션 참조")
     else:
-        lines.append("진행 중인 태스크 없음.")
+        lines.append("진행 중인 작업 항목 없음.")
         lines.append(
-            "→ 진행 중 태스크가 없으니, 사용자에게 두 경로를 한 줄로 안내하세요: "
-            "**작업**(\"○○ 만들어줘/고쳐줘\") 또는 **논의**(\"○○ 논의하자\" — 토론 모드)."
+            "→ 진행 중 작업 항목이 없으니, 사용자에게 두 경로를 한 줄로 안내하세요: "
+            "**요청**(\"○○ 만들어줘/고쳐줘\") 또는 **논의**(\"○○ 논의하자\" — 토론 모드)."
         )
 
     lines.append(
@@ -160,8 +160,8 @@ def build_message(cwd):
         "해당 inject 파일을 로드해 작업하세요."
     )
     lines.append(
-        f"코드 수정 안내: MPA_GATE={mode}. '구현 중' 상태 태스크가 없거나 계획이 달라지면 "
-        "기본은 경고로 안내합니다. agent rule을 따라 태스크·계획을 정리하세요."
+        f"코드 수정 안내: MPA_GATE={mode}. '구현 중' 상태 작업 항목이 없거나 계획이 달라지면 "
+        "기본은 경고로 안내합니다. agent rule을 따라 작업 항목·계획을 정리하세요."
     )
     return "\n".join(lines)
 

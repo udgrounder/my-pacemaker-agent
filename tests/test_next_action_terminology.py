@@ -20,7 +20,7 @@ class NextActionTerminologyTest(unittest.TestCase):
         combined = "\n".join(path.read_text(encoding="utf-8") for path in files)
         self.assertIn("다음 행동 제안", combined)
         self.assertNotIn("다음 작업 예측", combined)
-        self.assertIn("새 태스크 생성은 가능한 다음 행동 중 하나", combined)
+        self.assertIn("새 작업 항목 등록은 가능한 선택지 중 하나", combined)
 
 
 if __name__ == "__main__":

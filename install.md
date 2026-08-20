@@ -17,7 +17,7 @@ install.py
 | 파라메터 | 필수 | 설명 |
 |---------|------|------|
 | `--project` | ✅ | 설치 대상 프로젝트 경로 (절대 경로 권장) |
-| `--agents` | ✅ | 사용할 agent (claude, codex, antigravity, openagent). 여러 개는 공백 또는 콤마로 구분: `--agents claude codex` 또는 `--agents claude,codex` |
+| `--agents` | ✅ | 사용할 agent (claude, codex, antigravity, openagent). `openagent`는 실험적·수동 설정 지원이며 자동 연결하지 않는다. 여러 개는 공백 또는 콤마로 구분: `--agents claude codex` 또는 `--agents claude,codex` |
 | `--upgrade` | ❌ | 지원하지 않음 — 기존 설치본 Runtime 업데이트에는 `release_manager.py deploy` 사용 |
 | `--dry-run` | ❌ | 최초 설치의 dependency·template·agent spec·변경 범위만 확인하고 파일은 변경하지 않음 |
 
@@ -40,7 +40,7 @@ agent-specs/
 | `claude` | `CLAUDE.md` | `CLAUDE.md` 또는 `.claude/` 존재 |
 | `codex` | `AGENTS.md` | `AGENTS.md` 또는 `.codex/` 존재 |
 | `antigravity` | `GEMINI.md` | `GEMINI.md` 또는 `.gemini/` 존재 |
-| `openagent` | 미정 | 감지 불가 → 사용자에게 확인 |
+| `openagent` | 미정 | 감지 불가 → 사용자 확인, 실험적·수동 설정 |
 
 ---
 
@@ -74,7 +74,7 @@ agent-specs/
 > (감지된 경우) "다음 agent가 감지됩니다: [목록]. 이대로 진행할까요, 아니면 변경하시겠어요? (claude / codex / antigravity / openagent 또는 조합)"
 > (감지 안 됨) "어떤 agent를 사용하시나요? (claude / codex / antigravity / openagent 또는 조합)"
 
-**openagent가 포함된 경우:** `agent-specs/openagent/spec.md` 를 읽고 질의 절차에 따라 사용자와 대화하여 설정을 결정한다. 확인된 내용으로 `spec.md`를 업데이트한다.
+**openagent가 포함된 경우:** `install.py`는 Runtime만 설치한다. 자동 진입점·규칙 파일·hook 연결은 하지 않으며, `agent-specs/openagent/spec.md`를 읽고 확인 절차에 따라 사용자가 별도로 수동 설정한다. 확인된 내용만 `spec.md`에 업데이트한다.
 
 ---
 
@@ -91,7 +91,7 @@ agent가 결정되면 각 agent의 `agent-specs/{agent}/spec.md` 를 읽어 설�
 | `claude` | `.claude/agents/mpa_pacemaker.md` |
 | `codex` | `.agents/rules/mpa_pacemaker.md`, `.codex/agents/mpa_pacemaker.toml` |
 | `antigravity` | `.agents/rules/mpa_pacemaker.md` (codex와 공유) |
-| `openagent` | spec.md 질의 결과에 따름 |
+| `openagent` | 자동 복사 없음 — spec.md 확인 뒤 수동 설정 |
 
 workspace는 어떤 agent를 사용하든 동일하므로 프로젝트 루트에 한 번만 설치한다.
 
@@ -101,9 +101,10 @@ workspace는 어떤 agent를 사용하든 동일하므로 프로젝트 루트에
 - **hook 등록** → `claude`/`codex`는 settings 파일(`.claude/settings.json` / `.codex/hooks.json`)에 안전 병합 (기존 설정 보존, 멱등)
   - `codex`의 `PreToolUse` matcher는 `apply_patch`, `write_file`, `replace`, `edit` 등 Codex 편집 도구명을 포함해 등록
 
-**hook 미확인 agent (`antigravity` / `openagent`):**
-install.py는 hook을 자동 등록하지 않는다. 실행 중인 agent가 `agent-specs/{agent}/spec.md` 의 hook 질의 절차에 따라
-지원 여부를 확인하고 설정한 뒤 spec.md를 갱신한다. (antigravity는 Gemini CLI 기준 기본값이 spec.md에 준비돼 있다.)
+**hook 미확인 agent:**
+
+- `antigravity`: install.py는 hook을 자동 등록하지 않는다. 실행 중인 agent가 `agent-specs/antigravity/spec.md`의 절차로 지원 여부를 확인하고 설정한다.
+- `openagent`: 실험적·수동 설정 지원이다. install.py는 Runtime만 설치하며, OpenAgent의 진입점·규칙 파일·hook을 자동 구성하지 않는다. 확인된 계약이 있을 때만 `agent-specs/openagent/spec.md` 절차에 따라 사용자가 별도로 설정한다.
 
 **install.py 실행 전 안내:**
 - 어떤 파일이 어느 폴더에 설치되는지, hook이 어느 settings에 등록되는지 사용자에게 요약하여 알린다

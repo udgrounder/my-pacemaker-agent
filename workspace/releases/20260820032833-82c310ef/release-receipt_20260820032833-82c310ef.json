@@ -1,0 +1,26 @@
+{
+  "schema_version": 4,
+  "bundle_schema_version": 1,
+  "release_id": "20260820032833-82c310ef",
+  "manifest": "workspace/releases/20260820032833-82c310ef/manifest_20260820032833-82c310ef.json",
+  "package": "workspace/releases/20260820032833-82c310ef/package_20260820032833-82c310ef.zip",
+  "note": "workspace/releases/20260820032833-82c310ef/note_20260820032833-82c310ef.md",
+  "created_at": "2026-08-20T03:28:34+00:00",
+  "verified_by": "codex",
+  "package_checksum": "bfd93005a3d8f18118ec81b2b5ea123e9a7d0d2abcbe1dd35379d7a3e0f05373",
+  "asset_checksum": "bdb250602f19a115197cc4fb2d07383e6ec8b9c7168179491186ddc7ddb4e437",
+  "validation": {
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests"
+    ],
+    "exit_code": 0,
+    "stdout": "s/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpeiu4bxw6/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpeiu4bxw6/dist/.mpa-workspace\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpeiu4bxw6/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpeiu4bxw6/dist/.mpa-workspace\n20260820032834-279b8d8e\nworkspace/receipts/deployments/legacy-target/dry-run-20260820032834-279b8d8e-20260820T032834Z-33d7391f.json\n{\"backup\": \".mpa-backups/20260820032834-279b8d8e-20260820T032834Z-956e0076\", \"issue_collection\": {\"status\": \"no-op\", \"count\": 0}}\n{\"status\": \"rolled_back\", \"release_id\": \"20260820032834-279b8d8e\", \"backup\": \".mpa-backups/20260820032834-279b8d8e-20260820T032834Z-956e0076\"}\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpagqzcav7/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpagqzcav7/dist/.mpa-workspace\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpagqzcav7/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpagqzcav7/dist/.mpa-workspace\n20260820032834-014df2fd\nworkspace/receipts/deployments/target/dry-run-20260820032834-014df2fd-20260820T032834Z-6b83c77a.json\n{\"backup\": \".mpa-backups/20260820032834-014df2fd-20260820T032834Z-e5e95bf6\", \"issue_collection\": {\"status\": \"no-op\", \"count\": 0}}\n{\"status\": \"rolled_back\", \"release_id\": \"20260820032834-014df2fd\", \"backup\": \".mpa-backups/20260820032834-014df2fd-20260820T032834Z-e5e95bf6\"}\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp6g7ygdd1/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp6g7ygdd1/dist/.mpa-workspace\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmplru5n86i/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmplru5n86i/dist/.mpa-workspace\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmplru5n86i/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmplru5n86i/dist/.mpa-workspace\n20260820032834-0155e9c1\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpqzh7x8sm/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpqzh7x8sm/dist/.mpa-workspace\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpqzh7x8sm/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpqzh7x8sm/dist/.mpa-workspace\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpqzh7x8sm/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpqzh7x8sm/dist/.mpa-workspace\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpqzh7x8sm/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpqzh7x8sm/dist/.mpa-workspace\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpqzh7x8sm/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpqzh7x8sm/dist/.mpa-workspace\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp5d4yndhu/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp5d4yndhu/dist/.mpa-workspace\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp5d4yndhu/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp5d4yndhu/dist/.mpa-workspace\n20260820032834-710382ae\nworkspace/receipts/deployments/target/dry-run-20260820032834-710382ae-20260820T032834Z-474b19ea.json\n{\"backup\": \".mpa-backups/20260820032834-710382ae-20260820T032834Z-461402dc\", \"issue_collection\": {\"status\": \"collected\", \"count\": 1}}\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpf1jagt_d/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpf1jagt_d/dist/.mpa-workspace\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpf1jagt_d/.mpa-workspace -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpf1jagt_d/dist/.mpa-workspace\n20260820032834-52c26467\nworkspace/receipts/deployments/target/dry-run-20260820032834-52c26467-20260820T032834Z-b2a5df72.json\n",
+    "stderr": "....................................................................\n----------------------------------------------------------------------\nRan 68 tests in 1.568s\n\nOK\n",
+    "executed_at": "2026-08-20T03:28:34+00:00"
+  }
+}

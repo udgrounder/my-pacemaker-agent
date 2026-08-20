@@ -29,7 +29,7 @@
             └── 단일 세션만 명시적으로 시작할 때 → inject/ 직접 사용
                 ├── 기능 설계 / 계획 수립                       → @inject/layer1_design.md
                 ├── 계획 독립 비평 (서브에이전트로 실행)         → @inject/layer1_critique.md
-                ├── 설계 완료된 태스크 구현                     → @inject/layer1_implement.md
+                ├── 설계 완료된 작업 항목 구현                  → @inject/layer1_implement.md
                 ├── 에이전트 검증 (`검증 중` 단계, 서브에이전트)     → @inject/layer1_review.md
                 ├── 결과물을 보고 수정·추가 사항이 생겼을 때    → @inject/layer1_discovery.md
                 └── 정합성 점검                                 → @inject/layer2_checkpoint.md
@@ -42,11 +42,11 @@
 | 세션 | 페르소나 | 주입 컨텍스트 | 산출물 |
 |------|---------|-------------|--------|
 | layer0_init | Architect | 없음 (첫 세션) | memory 초안 전체 + tasks/INDEX.md |
-| layer1_design | Task Designer | shared/ 전체 | 태스크 계획 (plan.md) |
+| layer1_design | Task Designer | shared/ 전체 | 작업 항목 계획 (plan.md) |
 | layer1_critique | Plan Critic | shared/ + plan.md만 | 비평 결과 (권장 기준 → layer1_critique.md 참조) |
-| layer1_implement | Implementer | shared/ + 도메인/ + 태스크 계획 | 구현 코드 + 결정 목록 |
-| layer1_review | Result Reviewer | shared/ + 태스크 계획 | 검토 리포트 |
-| layer1_discovery | Task Designer | shared/ + 태스크 계획 | plan.md 업데이트 + INDEX.md 등록 |
+| layer1_implement | Implementer | shared/ + 도메인/ + 작업 항목 계획 | 구현 코드 + 결정 목록 |
+| layer1_review | Result Reviewer | shared/ + 작업 항목 계획 | 검토 리포트 |
+| layer1_discovery | Task Designer | shared/ + 작업 항목 계획 | plan.md 업데이트 + INDEX.md 등록 |
 | layer2_checkpoint | Integration Auditor | memory 전체 | 충돌 목록 + memory 업데이트 |
 
 ---
@@ -65,8 +65,8 @@
 
 ## 세션 재개 (중단된 세션 이어가기)
 
-> 새 세션 시작 시 `agent_rules.md`의 세션 시작 루틴이 자동으로 진행 중 태스크를 감지하고 재개를 제안한다.  
-> 수동으로 이어가고 싶다면 "이어서 해줘" 또는 "[태스크명] 계속해줘"라고 말한다.
+> 새 세션 시작 시 `agent_rules.md`의 세션 시작 루틴이 자동으로 진행 중 작업 항목을 감지하고 재개를 제안한다.
+> 수동으로 이어가고 싶다면 "이어서 해줘" 또는 "[작업 항목명] 계속해줘"라고 말한다.
 
 ```
 plan.md 상태 확인
@@ -80,13 +80,13 @@ plan.md 상태 확인
 
 **세션 시작 전, 먼저 실패 비용을 추정하라 (T6):**
 
-세부 판단 기준: `core/agent_rules.md` "minor 태스크 경량 처리" 섹션의 실패 비용 추정 절차(①②③) 참조 — 이것이 정본이다.
+세부 판단 기준: `core/agent_rules.md` "minor 작업 항목 경량 처리" 섹션의 실패 비용 추정 절차(①②③) 참조 — 이것이 정본이다.
 
 | 등급 | 조건 | 사용자 개입 (Zone) |
 |------|------|-----------------|
 | `critical` | 보안·외부 연동·비가역 변경 | Zone 1 — 하드 게이트, 명시적 확인 필수 |
 | `major` | 그 외 기본값 | Zone 2 — 핵심 항목 확인 요청 |
-| `minor` | 단일 관심사·자명한 방법·즉시 복구 가능 | Zone 3 — 자동 처리 후 간략 고지 |
+| `minor` | 단일 관심사·자명한 방법·즉시 복구 가능 | Zone 3 — 완료 전 가역적 실행·기록은 자동 처리 후 간략 고지. 완료는 사용자(또는 위임 에이전트) 확인 후 처리 |
 
 ---
 

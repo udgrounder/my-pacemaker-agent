@@ -193,6 +193,18 @@ class InstallDryRunTest(unittest.TestCase):
             self.assertEqual((target / "workspace" / "keep.txt").read_text(encoding="utf-8"), "workspace")
             self.assertEqual((target / "docs" / "keep.md").read_text(encoding="utf-8"), "docs")
 
+    def test_openagent_install_discloses_manual_wiring(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            result = subprocess.run(
+                ["python3", "install.py", "--project", str(target), "--agents", "openagent"],
+                cwd=ROOT, text=True, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("실험적·수동 설정 지원", result.stdout)
+            self.assertIn("자동 진입점·규칙 파일·hook 연결은 수행하지 않습니다", result.stdout)
+            self.assertFalse((target / "OPENAGENT.md").exists())
+
     def test_codex_hook_commands_and_scripts_smoke(self):
         block = install.build_hook_block("codex")
         commands = [entries[0]["hooks"][0]["command"] for entries in block.values()]

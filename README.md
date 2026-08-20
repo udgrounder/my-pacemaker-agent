@@ -70,9 +70,9 @@ agent가 진행하는 절차:
 3. `.mpa-workspace/` 존재 여부로 신규 설치 또는 Runtime 배포 절차 판단
 4. 신규 설치일 때만 수집한 정보를 요약해 설치 실행
 
-**지원 agent:** `claude`(CLAUDE.md) · `codex`(AGENTS.md) · `antigravity`(GEMINI.md) · `openagent`
+**지원 agent:** `claude`(CLAUDE.md) · `codex`(AGENTS.md) · `antigravity`(GEMINI.md) · `openagent`(실험적·수동 설정 — 자동 진입점·hook 연결 없음)
 
-설치되면 프로젝트에 `.mpa-workspace/`(방법론 파일), `workspace/`(프로젝트 데이터 골격), 빈 루트 `docs/`, 설치 고유 설정 `.mpa-project/config.yaml`이 준비되고, 선택한 agent의 진입점이 루트 설정 파일에 추가된다. config가 없으면 기본 프로젝트명·초기화 시각·절대 root path를 기록하며, 기존 config가 있으면 누락 필드만 보강한다. Runtime이 사용할 초기 `runtime.*` 값이 필요하면 신규 설치에서 `--runtime-config-json`으로 additive defaults를 제공할 수 있다. 기존 값과 사용자 파일은 변경하지 않는다. 자세한 절차와 옵션은 [`install.md`](install.md), 운영 맥락은 가이드북 9장을 참조한다.
+설치되면 프로젝트에 `.mpa-workspace/`(방법론 파일), `workspace/`(프로젝트 데이터 골격), 빈 루트 `docs/`, 설치 고유 설정 `.mpa-project/config.yaml`이 준비되고, 자동 연결이 확인된 선택 agent의 진입점이 루트 설정 파일에 추가된다. `openagent`는 예외로 Runtime만 설치하며, 연결은 [OpenAgent spec](agent-specs/openagent/spec.md)의 확인 절차 뒤 수동으로 설정한다. config가 없으면 기본 프로젝트명·초기화 시각·절대 root path를 기록하며, 기존 config가 있으면 누락 필드만 보강한다. Runtime이 사용할 초기 `runtime.*` 값이 필요하면 신규 설치에서 `--runtime-config-json`으로 additive defaults를 제공할 수 있다. 기존 값과 사용자 파일은 변경하지 않는다. 자세한 절차와 옵션은 [`install.md`](install.md), 운영 맥락은 가이드북 9장을 참조한다.
 
 기존 설치본의 Runtime update는 `install.py`가 아니라 source 저장소의 `release_manager.py`를 사용한다. `prepare-release → release-audit → deployment-dry-run → deploy` 순서이며, `prepare-release`가 UTC `YYYYMMDDHHMMSS-uuid8` 단일 release ID를 생성하고 source/dist에 기록한다. 필요한 경우 `--runtime-config-json`으로 `runtime.*` additive 기본값을 release manifest에 포함할 수 있다. deploy는 `${project.name}`, `${project.root_path}`, `${project.initialized_at}`를 대상 `.mpa-project/config.yaml`의 현재 값으로 해석하고 누락값만 추가한다. 산출물은 `workspace/releases/<release-id>/` 아래 `package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json` 한 묶음으로 보관한다. deploy에는 명시 승인과 rollback 책임자가 필요하고, update 중 발견된 issue 후보는 dry-run에서 고지한 뒤 검증 성공 시 원자 수집하며 실패하면 원본을 보존한다. 대상의 `workspace/`·루트 `docs/`가 없으면 빈 폴더만 생성하고, 이미 존재하는 폴더·agent 설정은 변경하지 않는다.
 
@@ -85,7 +85,7 @@ release ZIP은 릴리즈 상태를 장기 보존하는 기준본이며, deploy�
 설치된 프로젝트에서 agent에게 자연어로 작업을 요청하면 된다.
 
 ```
-[하고싶은 작업] 태스크 생성해줘
+[하고싶은 요청] 작업 항목으로 등록해줘
 ```
 
 Agent가 요청의 실패 비용을 먼저 판단한 뒤 작업 흐름을 고른다.
@@ -93,7 +93,7 @@ Agent가 요청의 실패 비용을 먼저 판단한 뒤 작업 흐름을 고른
 - `minor`: 최소 `plan.md`를 만들고 `plan_hash.py approve`를 자동 실행한다(계획 승인 자동 처리). approve가 상태를 `구현 중`으로 전환하고 `승인해시`를 기록한다. 구현 완료 후 보고하고, 사용자 확인(완료 승인 확인)을 거쳐 `done` 처리한다 — 자동 완료는 없다.
 - `major` 또는 `critical`: `plan.md`를 작성해 사용자 검토를 요청한다. 사용자가 승인하면 `plan_hash.py approve`를 실행한다 — 이 명령이 상태를 `설계 완료 → 구현 중`으로 원자적으로 전환하고 `승인해시`를 기록한다.
 
-소스 수정 게이트는 별도 승인 파일을 쓰지 않는다. `workspace/tasks/active/[태스크명]/plan.md`의 YAML 프론트매터가 기준이다.
+소스 수정 게이트는 별도 승인 파일을 쓰지 않는다. `workspace/tasks/active/[작업 항목명]/plan.md`의 YAML 프론트매터가 기준이다. `tasks/`는 호환을 위해 유지하는 경로명이며, 관리 단위의 정식 명칭은 작업 항목이다.
 
 새 plan 형식에서는 사용자와 확정한 **요구사항 명세**만 승인해시로 보호한다. 구현 순서·조사·테스트·검증 기록은 목표와 범위를 바꾸지 않는 한 개발 중 보완하며, 변경 내용은 다음 진행 보고에 누적해 알린다. 요구사항 명세를 바꿔야 할 때만 변경분을 사용자에게 승인받고 새 체크섬을 기록한다.
 
@@ -102,13 +102,13 @@ Agent가 요청의 실패 비용을 먼저 판단한 뒤 작업 흐름을 고른
 승인해시: [새 형식: reqspec-v1:<요구사항 명세 해시> / 구형 형식: 접두사 없는 기존 plan.md 본문 해시]
 ```
 
-`구현 중` 상태인 active 태스크가 있어야 소스 수정이 허용되고, `완료 승인` 상태가 되어야 `active/`에서 `done/`으로 이동할 수 있다.
+`구현 중` 상태인 active 작업 항목이 있어야 소스 수정이 허용되고, `완료 승인` 상태가 되어야 `active/`에서 `done/`으로 이동할 수 있다.
 
 **예시:**
 ```
-로그인 기능 태스크 생성해줘
-결제 API 연동 버그 수정 태스크 생성해줘
-사용자 목록 페이지 리팩토링 태스크 생성해줘
+로그인 기능 요청을 작업 항목으로 등록해줘
+결제 API 연동 버그 수정을 작업 항목으로 등록해줘
+사용자 목록 페이지 리팩터링을 작업 항목으로 등록해줘
 ```
 
 ### 작업 재개
@@ -116,10 +116,10 @@ Agent가 요청의 실패 비용을 먼저 판단한 뒤 작업 흐름을 고른
 중단된 작업을 다시 시작할 때는 작업명을 언급하거나, 진행 중인 작업이 하나뿐이면 그냥 이어달라고 하면 된다.
 
 ```
-[태스크명] 이어서 진행해줘
+[작업 항목명] 이어서 진행해줘
 ```
 
-Agent가 `workspace/tasks/active/`에서 해당 태스크의 `plan.md`와 `changelog.md`를 읽고 중단된 지점부터 재개한다.
+Agent가 `workspace/tasks/active/`에서 해당 작업 항목의 `plan.md`와 `changelog.md`를 읽고 중단된 지점부터 재개한다.
 
 **예시:**
 ```
@@ -145,7 +145,7 @@ Agent가 `workspace/tasks/active/`에서 해당 태스크의 `plan.md`와 `chang
   ↓ 템플릿 제공            변경: 방법론이 개선될 때 (모든 프로젝트에 영향)
 
 레벨 2: 무엇을 (What)   ← 이 프로젝트의 실제 데이터
-  workspace/               메모리·태스크·문서
+  workspace/               메모리·작업 항목·문서
                            변경: 프로젝트가 진행될 때 (이 프로젝트에만 영향)
 ```
 
@@ -205,7 +205,7 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 
 ```
 [project]/
-├── .mpa-workspace/    ← 방법론 (승인된 Runtime release로 최신화, 직접 수정 금지)
+├── .mpa-workspace/    ← 방법론 (승인된 Runtime release로 최신화; 원칙적 issue→review, 승인된 MPA 작업 항목에서만 직접 수정)
 │   ├── core/, personas/, skills/, workflows/, inject/
 │   ├── hooks/, templates/, knowledge/
 │
@@ -228,7 +228,7 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 
 | 스크립트 | 이벤트 | 차단 | 하는 일 |
 |---------|--------|------|--------|
-| `session_start.py` | SessionStart | ❌ | 진행 태스크 + 라우팅 규칙 주입 |
+| `session_start.py` | SessionStart | ❌ | 진행 작업 항목 + 라우팅 규칙 주입 |
 | `code_gate.py` | PreToolUse(편집 도구) | ✅ | `구현 중` plan 없이 소스 수정 시 차단 |
 | `turn_end.py` | Stop | ❌ | changelog/memory 갱신 리마인드 |
 
@@ -260,7 +260,7 @@ MPA_GATE=off claude     # 또는 codex / gemini — 잠시 끄기
 ### 알려진 한계 (정직하게)
 
 - **Bash 우회:** matcher가 편집 도구(Edit/Write 등)에만 걸리므로 `bash -c 'sed ... > file'` 같은 셸 파일 수정은 걸리지 않는다. (이 프로젝트엔 "shell로 파일 내용 수정 금지" 규칙이 있어 정상 워크플로우에선 Edit/Write를 쓴다.)
-- **태스크 범위 판정 한계:** `구현 중` 태스크가 있으면 수정 대상 파일이 그 태스크 범위 안인지까지 완전히 증명하지는 못한다. 에어타이트 봉쇄가 아니라 가드레일이다.
+- **작업 항목 범위 판정 한계:** `구현 중` 작업 항목이 있으면 수정 대상 파일이 그 작업 항목 범위 안인지까지 완전히 증명하지는 못한다. 에어타이트 봉쇄가 아니라 가드레일이다.
 - **승인해시 갱신은 agent가 한다:** 완전한 강제는 아니다. 다만 승인해시가 비어 있으면 자동 복구하지 않고 차단하므로, 사용자 승인 없이 사후 승인하는 우회를 줄인다.
 
 > 게이트 조건(계획 승인·완료 승인 확인)·승인해시 복구 절차의 상세는 `.mpa-workspace/core/agent_rules.md`·`agent_rules_detail.md`를 따른다.
