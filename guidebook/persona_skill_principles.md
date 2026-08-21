@@ -54,11 +54,11 @@
 
 | 저장소 | 내용 |
 |--|--|
-| `.mpa-workspace/skills/<도메인>/` | 도메인 **방법·패턴**(MPA 배포, 재사용) |
-| `.mpa-workspace/knowledge/[도메인].md` | 승격된 **검증 사실**(크로스 프로젝트) |
+| `.mpa/runtime/skills/<도메인>/` | 도메인 **방법·패턴**(MPA 배포, 재사용) |
+| `.mpa/runtime/knowledge/[도메인].md` | 승격된 **검증 사실**(크로스 프로젝트) |
 | `workspace/memory/domains/<도메인>/` | 이 프로젝트의 **규칙·레지스트리**(=기억) |
 
-skills=방법 / knowledge=검증 사실 / memory/domains=프로젝트 기억. 프로젝트 고유 주제 도메인이 생기면 `.mpa-workspace/skills/`(재사용)와 분리. 가용 도메인 목록은 `project_identity.md`에 선언.
+skills=방법 / knowledge=검증 사실 / memory/domains=프로젝트 기억. 프로젝트 고유 주제 도메인이 생기면 `.mpa/runtime/skills/`(재사용)와 분리. 가용 도메인 목록은 `project_identity.md`에 선언.
 
 **원칙 9 — 역할-면(role-facet), 기본은 단일 면.** 스킬은 역할 무관이라 전 역할이 합성한다. 기본은 단일 면(공통 사실). 같은 사실을 *쓰는 방식*이 역할별로 갈릴 때만 `[설계자/구현자/리뷰어 면]`으로 표시. (예: springboot.md "모르면 물어볼 것"이 이미 암묵적 설계/구현 면.) (R12~14)
 

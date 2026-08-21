@@ -41,14 +41,14 @@ Antigravity 자체의 hook 지원은 공식 확인 불가다. **install.py는 ho
 {
   "hooks": {
     "SessionStart": [
-      { "hooks": [{ "type": "command", "command": "python3 .mpa-workspace/hooks/session_start.py --agent gemini" }] }
+      { "hooks": [{ "type": "command", "command": "python3 .mpa/runtime/hooks/session_start.py --agent gemini" }] }
     ],
     "BeforeTool": [
       { "matcher": "write_file|replace|edit",
-        "hooks": [{ "type": "command", "command": "python3 .mpa-workspace/hooks/code_gate.py --agent gemini" }] }
+        "hooks": [{ "type": "command", "command": "python3 .mpa/runtime/hooks/code_gate.py --agent gemini" }] }
     ],
     "AfterAgent": [
-      { "hooks": [{ "type": "command", "command": "python3 .mpa-workspace/hooks/turn_end.py --agent gemini" }] }
+      { "hooks": [{ "type": "command", "command": "python3 .mpa/runtime/hooks/turn_end.py --agent gemini" }] }
     ]
   }
 }

@@ -21,4 +21,4 @@ AI agent와의 협업 구조를 파일 시스템으로 인코딩한 재사용 �
 ## 사용 대상
 
 AI agent(Claude Code 등)와 함께 소프트웨어를 개발하는 프로젝트.  
-설치 후 대상 프로젝트의 `.mpa-workspace/`와 `workspace/`에 체계가 적용된다.
+설치 후 대상 프로젝트의 `.mpa/runtime/`와 `workspace/`에 체계가 적용된다.

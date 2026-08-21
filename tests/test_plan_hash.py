@@ -8,10 +8,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("plan_hash", ROOT / ".mpa-workspace/hooks/plan_hash.py")
+SPEC = importlib.util.spec_from_file_location("plan_hash", ROOT / ".mpa/runtime/hooks/plan_hash.py")
 plan_hash = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(plan_hash)
-HOOK_DIR = ROOT / ".mpa-workspace/hooks"
+HOOK_DIR = ROOT / ".mpa/runtime/hooks"
 sys.path.insert(0, str(HOOK_DIR))
 GATE_SPEC = importlib.util.spec_from_file_location("code_gate", HOOK_DIR / "code_gate.py")
 code_gate = importlib.util.module_from_spec(GATE_SPEC)

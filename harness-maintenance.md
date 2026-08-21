@@ -63,7 +63,7 @@
 
 ## 도메인 지식 라이브러리 관리
 
-methodology_improvement issue 중 도메인 지식에 해당하는 것은 `dist/.mpa-workspace/knowledge/`에 반영한다.
+methodology_improvement issue 중 도메인 지식에 해당하는 것은 `dist/.mpa/runtime/knowledge/`에 반영한다.
 
 ### 판단 기준
 

@@ -6,8 +6,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / ".mpa-workspace"
-RUNTIME = ROOT / "dist/.mpa-workspace"
+SOURCE = ROOT / ".mpa/runtime"
+RUNTIME = ROOT / "dist/.mpa/runtime"
 
 
 class TodoPolicyTest(unittest.TestCase):
@@ -41,7 +41,7 @@ class TodoPolicyTest(unittest.TestCase):
                 cwd=ROOT, text=True, capture_output=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assert_policy(target / ".mpa-workspace")
+            self.assert_policy(target / ".mpa/runtime")
 
 
 if __name__ == "__main__":

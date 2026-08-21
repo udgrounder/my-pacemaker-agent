@@ -135,7 +135,7 @@
       "release_id": "mpa-2026-08-12-11-49-30-cd63477e7b04",
       "manifest": "workspace/releases/manifests/mpa-2026-08-12-11-49-30-cd63477e7b04.json",
       "target": "/Users/kjkim/Temp/mpa-test",
-      "backup": ".mpa-backups/mpa-2026-08-12-11-49-30-cd63477e7b04-20260812T024951Z-60587f6b",
+      "backup": ".mpa/backups/mpa-2026-08-12-11-49-30-cd63477e7b04-20260812T024951Z-60587f6b",
       "failed_at": "2026-08-12T02:49:51+00:00",
       "error": "target runtime asset map does not match release manifest",
       "dry_run": "workspace/receipts/deployments/mpa-test/dry-run-mpa-2026-08-12-11-49-30-cd63477e7b04-20260812T024933Z-cca752c2.json"
@@ -145,7 +145,7 @@
       "release_id": "mpa-9326fb5686135269",
       "manifest": "workspace/releases/manifests/mpa-9326fb5686135269.json",
       "target": "/Users/kjkim/Temp/mpa-test",
-      "backup": ".mpa-backups/mpa-9326fb5686135269-20260812T021312Z-48c0526a",
+      "backup": ".mpa/backups/mpa-9326fb5686135269-20260812T021312Z-48c0526a",
       "applied_at": "2026-08-12T02:13:12+00:00",
       "verified_by": "codex",
       "approved_by": "kjkim",

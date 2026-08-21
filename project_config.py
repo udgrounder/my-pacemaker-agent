@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Installation-local project configuration initializer and audit.
 
-The file managed here is deliberately outside ``.mpa-workspace``. Runtime
+The file managed here is deliberately outside ``.mpa/runtime``. Runtime
 releases may replace the latter and may apply explicitly declared additive
 ``runtime.*`` defaults, but must never replace this installation's project
 identity or user-owned local values.
@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 
 
-CONFIG_RELATIVE = ".mpa-project/config.yaml"
+CONFIG_RELATIVE = ".mpa/config/config.yaml"
 CONFIG_SCHEMA_VERSION = 1
 REQUIRED_PROJECT_FIELDS = ("name", "root_path", "initialized_at")
 FIELD_LABELS = {

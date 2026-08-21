@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class NextActionTerminologyTest(unittest.TestCase):
     def test_runtime_uses_next_action_proposal_not_task_prediction(self):
-        runtime = ROOT / ".mpa-workspace"
+        runtime = ROOT / ".mpa/runtime"
         files = [
             runtime / "core/agent_rules.md",
             runtime / "core/agent_rules_detail.md",

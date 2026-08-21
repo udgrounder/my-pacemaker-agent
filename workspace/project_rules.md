@@ -1,7 +1,7 @@
 # 프로젝트 규칙 (my-pacemaker-agent)
 
 > MPA 시스템 자체를 개발하는 프로젝트의 고유 규칙.  
-> `.mpa-workspace/`를 수정하지 않고 이 파일에 확장한다.
+> `.mpa/runtime/`를 수정하지 않고 이 파일에 확장한다.
 
 ---
 
@@ -15,7 +15,7 @@
 
 ## 프로젝트 고유 행동 규칙
 
-- 이 프로젝트는 MPA 시스템 자체다. `.mpa-workspace/`를 수정한 후 반드시 `dist/.mpa-workspace/`에도 동기화한다.
+- 이 프로젝트는 MPA 시스템 자체다. `.mpa/runtime/`를 수정한 후 반드시 `dist/.mpa/runtime/`에도 동기화한다.
 - `workspace/project_rules.md` 자체를 수정할 때는 MPA 시스템 파일 수정 규칙을 따르지 않는다 (이 파일은 프로젝트 소유).
 
 ---
@@ -31,6 +31,6 @@
 사용자가 수집 issue의 검토 결과를 결정하면:
 
 1. `workspace/issues/inbox/`의 지정 issue와 현재 MPA 규칙을 대조한 검토 내용을 사용자에게 제시한다
-2. 사용자가 채택하면 `methodology_improvement`는 MPA 시스템 파일 수정 태스크로, `knowledge_promotion`은 `.mpa-workspace/knowledge/[도메인].md` 반영 태스크로 등록하고 plan.md를 만든다
+2. 사용자가 채택하면 `methodology_improvement`는 MPA 시스템 파일 수정 태스크로, `knowledge_promotion`은 `.mpa/runtime/knowledge/[도메인].md` 반영 태스크로 등록하고 plan.md를 만든다
 3. 채택 이슈에는 새 task plan 경로와 판단 근거를 기록한 뒤 바로 archive한다. 사용자가 기각하면 판단 근거를 기록한 뒤 바로 archive한다
-4. 채택된 Runtime 변경은 구현·검증 뒤 `release_manager.py sync-runtime`으로 `dist/.mpa-workspace/`에 동기화한다
+4. 채택된 Runtime 변경은 구현·검증 뒤 `release_manager.py sync-runtime`으로 `dist/.mpa/runtime/`에 동기화한다

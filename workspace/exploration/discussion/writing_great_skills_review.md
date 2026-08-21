@@ -5,7 +5,7 @@
 
 ## 테제 / 물음
 
-Matt Pocock의 AI Engineer 강연 "The Missing Manual: How to Write Great Skills"(및 이를 해설한 AgentOS 채널 영상, https://youtu.be/YLq04CDeOTE)가 제시하는 "좋은 스킬(에이전트 지침) 작성법" 프레임워크를 검토한다. 이 프레임워크가 my-pacemaker-agent(MPA)가 이미 확립한 철학(`discussion_log.md`의 테제 1~10)·구조(`.mpa-workspace/`의 persona/skill/inject 체계)와 어디서 겹치고, 어디서 MPA가 놓친 것을 보완하며, 어디서 실제로 충돌하는지 평가한다.
+Matt Pocock의 AI Engineer 강연 "The Missing Manual: How to Write Great Skills"(및 이를 해설한 AgentOS 채널 영상, https://youtu.be/YLq04CDeOTE)가 제시하는 "좋은 스킬(에이전트 지침) 작성법" 프레임워크를 검토한다. 이 프레임워크가 my-pacemaker-agent(MPA)가 이미 확립한 철학(`discussion_log.md`의 테제 1~10)·구조(`.mpa/runtime/`의 persona/skill/inject 체계)와 어디서 겹치고, 어디서 MPA가 놓친 것을 보완하며, 어디서 실제로 충돌하는지 평가한다.
 
 **자료 확보 경위(근거):**
 - 원 영상(9분짜리 한국어 해설, 자동 더빙)은 YouTube 스크립트 패널이 로드되지 않아(스피너 무한 로딩) 전사(transcript)를 직접 뽑지 못함 — 대신 영상 설명란(4단계 체크리스트 요약)과 화면 슬라이드 일부(예: "Leading Word: Vertical Slice", SKILL.md/TEMPLATE.md 2계층 다이어그램)를 스크린샷으로 확인.
@@ -85,7 +85,7 @@ Matt Pocock의 AI Engineer 강연 "The Missing Manual: How to Write Great Skills
 
 ### 라운드 11 — 에이전트 (2026-07-16)
 
-세 갈래 구분 제시: 리딩워드(강한 외부 prior 재활용, 좋음) / 조어(새로 만듦, 중립) / 일상어의 은밀한 협소화(나쁨 — "작업"이 해당). Pocock README의 Eric Evans "ubiquitous language" 인용과 연결. 용어집 위치(`.mpa-workspace/core/` vs `workspace/memory/shared/`) 질문 제기. 실제 과거 전례 발견: `workspace/tasks/done/20260604_term_replace_harness/` — "하네스"를 `dist/.mpa-workspace/`에서 "MPA 시스템"으로 이미 교체한 완료 태스크가 있음. 탐구 언어(`workspace/exploration/`)에는 여전히 "하네스"가 남아있어, 실제 경계는 "MPA-레벨 vs 프로젝트-레벨"이 아니라 "탐구 언어 vs 배포되는 운영 언어"임을 지적. 3단 구조(탐구/MPA 운영/프로젝트 도메인) 제안.
+세 갈래 구분 제시: 리딩워드(강한 외부 prior 재활용, 좋음) / 조어(새로 만듦, 중립) / 일상어의 은밀한 협소화(나쁨 — "작업"이 해당). Pocock README의 Eric Evans "ubiquitous language" 인용과 연결. 용어집 위치(`.mpa/runtime/core/` vs `workspace/memory/shared/`) 질문 제기. 실제 과거 전례 발견: `workspace/tasks/done/20260604_term_replace_harness/` — "하네스"를 `dist/.mpa/runtime/`에서 "MPA 시스템"으로 이미 교체한 완료 태스크가 있음. 탐구 언어(`workspace/exploration/`)에는 여전히 "하네스"가 남아있어, 실제 경계는 "MPA-레벨 vs 프로젝트-레벨"이 아니라 "탐구 언어 vs 배포되는 운영 언어"임을 지적. 3단 구조(탐구/MPA 운영/프로젝트 도메인) 제안.
 
 ### 라운드 12 — 사용자 (2026-07-16)
 
@@ -99,7 +99,7 @@ Matt Pocock의 AI Engineer 강연 "The Missing Manual: How to Write Great Skills
 - **Negation 경고는 영상 자체의 주장이 아니라 에이전트가 GLOSSARY.md에서 추가로 가져온 것**임을 에이전트가 자인 — 이 주장 자체를 MPA에 적용할지는 이번 토론 범위에서 제외(별도 열린 질문으로 이월).
 - **"작업"이라는 단어가 `agent_rules.md` 안에서 최소 3가지 의미(태스크 동의어/비-태스크 활동/산출물)로 충돌**하고 있음을 실증(grep) — 리딩워드(강한 prior 재활용)와 구별되는 "일상어의 은밀한 협소화" 실패 사례로 확정.
 - **"하네스"→"MPA 시스템" 교체(2026-06-04 완료 태스크)는 리딩워드 원칙 위반이 아니라, 애초에 서로 다른 두 개념의 정확한 재명명**이었음을 사용자가 확인 — 이 두 용어는 앞으로도 각자의 자리에서 계속 구분해서 쓴다.
-- **용어집은 MPA(방법론 공통)와 프로젝트(고유) 양쪽에 각각 필요**하다는 데 사용자 동의. 다만 실제 구조는 2단(MPA/프로젝트)이 아니라 이미 존재하는 3단(탐구 언어 `workspace/exploration/` / 배포되는 MPA 운영 언어 `.mpa-workspace/` / 프로젝트 고유 도메인 언어 `workspace/memory/domains/`)에 대응시키는 쪽으로 정리됨.
+- **용어집은 MPA(방법론 공통)와 프로젝트(고유) 양쪽에 각각 필요**하다는 데 사용자 동의. 다만 실제 구조는 2단(MPA/프로젝트)이 아니라 이미 존재하는 3단(탐구 언어 `workspace/exploration/` / 배포되는 MPA 운영 언어 `.mpa/runtime/` / 프로젝트 고유 도메인 언어 `workspace/memory/domains/`)에 대응시키는 쪽으로 정리됨.
 
 ## 열린 질문
 
@@ -108,4 +108,4 @@ Matt Pocock의 AI Engineer 강연 "The Missing Manual: How to Write Great Skills
 
 ## 결론
 
-토론은 여기서 종료하고 실행으로 핸드오프했다. 파생된 개발 태스크: [`workspace/tasks/active/20260716_mpa_glossary_and_layering/plan.md`](../../tasks/active/20260716_mpa_glossary_and_layering/plan.md) — `.mpa-workspace/core/glossary.md` 신설(태스크/작업/계획서/GATE/Zone/Tier 정의 확정) + `agent_rules.md`의 판단-로직/절차-서술 경계에 따른 온디맨드 재분리. 계획 승인 완료 후 구현 진행 중 — 독립 서브에이전트 1차 검증(2026-07-21)에서 일부 잔여 항목(전역 범위 파일 누락·`dist/` 동기화·문서 표기 미반영)이 발견돼 수정 중이다. 완료 시 이 문단을 갱신한다.
+토론은 여기서 종료하고 실행으로 핸드오프했다. 파생된 개발 태스크: [`workspace/tasks/active/20260716_mpa_glossary_and_layering/plan.md`](../../tasks/active/20260716_mpa_glossary_and_layering/plan.md) — `.mpa/runtime/core/glossary.md` 신설(태스크/작업/계획서/GATE/Zone/Tier 정의 확정) + `agent_rules.md`의 판단-로직/절차-서술 경계에 따른 온디맨드 재분리. 계획 승인 완료 후 구현 진행 중 — 독립 서브에이전트 1차 검증(2026-07-21)에서 일부 잔여 항목(전역 범위 파일 누락·`dist/` 동기화·문서 표기 미반영)이 발견돼 수정 중이다. 완료 시 이 문단을 갱신한다.

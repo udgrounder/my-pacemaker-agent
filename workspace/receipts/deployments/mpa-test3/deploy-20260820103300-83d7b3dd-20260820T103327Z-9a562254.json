@@ -6,7 +6,7 @@
   "manifest": "workspace/releases/20260820103300-83d7b3dd/manifest_20260820103300-83d7b3dd.json",
   "target_ref": "mpa-test3",
   "target_fingerprint": "7a2be79d5e8f63fe",
-  "backup": ".mpa-backups/20260820103300-83d7b3dd-20260820T103327Z-9db52d1a",
+  "backup": ".mpa/backups/20260820103300-83d7b3dd-20260820T103327Z-9db52d1a",
   "applied_at": "2026-08-20T10:33:27+00:00",
   "verified_by": "deployment-dry-run + release-audit + unittest",
   "approved_by": "kjkim",

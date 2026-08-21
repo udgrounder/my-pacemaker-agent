@@ -36,7 +36,7 @@
 명시적 완료 버튼이 있는 UI는 원본 상태와 draft 상태를 분리할 수 있는지 먼저 검토한다. 가능하면 draft만 편집하고 완료 시점에만 원본에 반영해, 복원 이벤트·배경 표시 분기를 줄인다.
 
 ## 적용 대상 파일
-- `.mpa-workspace/core/agent_rules.md`
+- `.mpa/runtime/core/agent_rules.md`
 
 ## 처리 결과
 

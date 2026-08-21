@@ -27,4 +27,4 @@ discussion_partner 페르소나의 "LLM 행동 편향 경고"에 두 항목 추�
 - **본주제 고도 점검** — 다회 교환 중 주기적으로 "지금 파는 것이 사용자가 물은 본주제인가, 그 기반인가"를 점검한다. 기반이 깊어지면 본주제로 올라갈 시점을 사용자에게 제안한다.
 
 ## 적용 대상 파일
-- `.mpa-workspace/personas/discussion_partner.md` (LLM 행동 편향 경고 절)
+- `.mpa/runtime/personas/discussion_partner.md` (LLM 행동 편향 경고 절)

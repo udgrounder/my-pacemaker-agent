@@ -26,7 +26,7 @@ tool: OpenAgent (실험적·수동 설정 지원)
 확인된 결과를 바탕으로 수동으로:
 1. 진입점 파일에 Agents Workspace 섹션 추가
 2. 규칙 파일(`pacemaker.md`)을 해당 폴더에 생성
-3. hook을 지원하면 `.mpa-workspace/hooks/` 의 3개 스크립트
+3. hook을 지원하면 `.mpa/runtime/hooks/` 의 3개 스크립트
    (`session_start.py` / `code_gate.py` / `turn_end.py`)를 해당 이벤트에 등록한다.
    차단은 exit 2 + stderr 공통, 스크립트는 `--agent <agent>` 플래그를 받는다.
 4. 이 `spec.md`의 감지 조건·폴더 규칙·설치 처리·hook 항목을 업데이트하여 다음 설치에 재사용한다. 검증되지 않은 추정값은 기록하지 않는다.

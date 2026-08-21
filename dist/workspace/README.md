@@ -2,7 +2,7 @@
 
 이 폴더는 **my pacemaker agent**가 관리하는 이 프로젝트의 실제 작업 데이터다. agent에게 자연어로 작업을 요청하면 대부분 자동으로 채워지므로, 사람이 직접 편집할 일은 많지 않다. 아래는 "무엇이 어디에 있는지" 파악용 안내다.
 
-> 방법론(어떻게 일하는가)을 보려면 형제 폴더 `.mpa-workspace/`를 참고한다. 그쪽은 직접 수정하지 않는다 (아래 참조).
+> 방법론(어떻게 일하는가)을 보려면 형제 폴더 `.mpa/runtime/`를 참고한다. 그쪽은 직접 수정하지 않는다 (아래 참조).
 
 ---
 
@@ -32,13 +32,13 @@ workspace/
 
 ---
 
-## 형제 폴더 `.mpa-workspace/` 란?
+## 형제 폴더 `.mpa/runtime/` 란?
 
-`.mpa-workspace/`는 agent가 이 프로젝트에서 **어떻게 일하는지를 정의한 협업 방법론**이다 (페르소나·세션 절차·규칙·hook·템플릿).
+`.mpa/runtime/`는 agent가 이 프로젝트에서 **어떻게 일하는지를 정의한 협업 방법론**이다 (페르소나·세션 절차·규칙·hook·템플릿).
 
-> ⚠️ **`.mpa-workspace/`는 직접 수정하지 않는다.** 방법론 개선이 필요하면 `workspace/issues/`에 `methodology_improvement` issue를 기록하고, 사용자가 승인한 수집·검토·release 절차로 반영한다. 직접 수정하면 다음 Runtime 배포 때 덮어쓰여 사라진다.
+> ⚠️ **`.mpa/runtime/`는 직접 수정하지 않는다.** 방법론 개선이 필요하면 `workspace/issues/`에 `methodology_improvement` issue를 기록하고, 사용자가 승인한 수집·검토·release 절차로 반영한다. 직접 수정하면 다음 Runtime 배포 때 덮어쓰여 사라진다.
 
-| | `workspace/` | `.mpa-workspace/` |
+| | `workspace/` | `.mpa/runtime/` |
 |--|-------------|-------------------|
 | 역할 | 이 프로젝트의 데이터 (WHAT) | 일하는 방법 (HOW) |
 | 변경 | 작업할 때마다 agent가 갱신 | 승인된 Runtime release로 최신화 |

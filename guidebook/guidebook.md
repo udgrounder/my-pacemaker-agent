@@ -1,7 +1,7 @@
 # my pacemaker agent 가이드북
 
 > **이 문서의 성격:** AI agent와의 협업 구조에 관심이 있는 사용자가 "왜 이런 구조인가"부터 "어떻게 쓰는가"까지 이해할 수 있도록 작성된 실용 안내서.  
-> 이 문서 자체는 매 세션 자동 로드되지 않는다 — 실제 실행 규칙은 `.mpa-workspace/`가 담당하고, 이 문서는 그 구조를 이해하기 위한 설명서다.  
+> 이 문서 자체는 매 세션 자동 로드되지 않는다 — 실제 실행 규칙은 `.mpa/runtime/`가 담당하고, 이 문서는 그 구조를 이해하기 위한 설명서다.  
 > 설계 사고의 과정은 `workspace/exploration/discussion/` 참조.
 
 ---
@@ -446,13 +446,13 @@ AI를 잘 쓰는 사람과 못 쓰는 사람의 차이는 프롬프트 실력이
 
 | 디렉토리 | 한 줄 역할 | 읽는 주체 | 시점 |
 |---------|-----------|---------|-----|
-| `.mpa-workspace/` | 에이전트에게 어떻게 일하라고 알려주는 파일 | 에이전트 | 매 세션 |
+| `.mpa/runtime/` | 에이전트에게 어떻게 일하라고 알려주는 파일 | 에이전트 | 매 세션 |
 | `workspace/` | 이 프로젝트가 무엇인지 기억하는 파일 | 에이전트 | 필요 시 |
 | `agent-specs/` | CLI/IDE와 체계를 연결하는 파일 (agent별) | install.py | 설치 시 1회 |
 
 이 세 가지가 분리된 이유는 변경 주기가 다르기 때문이다.
 
-| | `.mpa-workspace/` | `workspace/` |
+| | `.mpa/runtime/` | `workspace/` |
 |--|-------------------|--------------|
 | 내용 | 어떻게 일할 것인가 (방법, 절차) | 이 프로젝트가 무엇인가 (데이터) |
 | 바뀌는 시점 | 체계를 개선할 때 | 프로젝트가 진행될 때 |
@@ -460,12 +460,12 @@ AI를 잘 쓰는 사람과 못 쓰는 사람의 차이는 프롬프트 실력이
 
 섞어두면 체계를 개선할 때 프로젝트 데이터가 영향을 받거나, 다음 프로젝트에 이번 프로젝트 데이터가 섞여 들어간다.
 
-#### 5.2 .mpa-workspace/ 안에 무엇이 있는가
+#### 5.2 .mpa/runtime/ 안에 무엇이 있는가
 
-`.mpa-workspace/`는 에이전트의 행동 규칙과 작업 도구가 들어있다. Layer 0/1/2 작업을 실행할 때 에이전트가 여기서 필요한 파일을 읽는다.
+`.mpa/runtime/`는 에이전트의 행동 규칙과 작업 도구가 들어있다. Layer 0/1/2 작업을 실행할 때 에이전트가 여기서 필요한 파일을 읽는다.
 
 ```
-.mpa-workspace/
+.mpa/runtime/
 ├── core/
 │   ├── principles.md         ← 10개 관점의 실전 요약
 │   ├── agent_rules.md        ← 에이전트 행동 규칙 (항상 로딩)
@@ -554,7 +554,7 @@ agent-specs/
     각 디렉토리: inject/ (진입점 파일), files/ (프로젝트에 복사할 파일), spec.md
 ```
 
-`install.py`는 선택된 agent의 `agent-specs/{agent}/inject/` 진입점 내용을 프로젝트 루트의 해당 설정 파일(`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`)에 덧붙인다. 이 진입점이 `@.mpa-workspace/core/agent_rules.md`를 참조하므로 에이전트 규칙이 매 세션 자동 로딩된다. (저장소 루트의 `agent-configs/`는 구버전 호환용 fallback이며, 신규 설치에서는 `agent-specs/`가 우선한다.)
+`install.py`는 선택된 agent의 `agent-specs/{agent}/inject/` 진입점 내용을 프로젝트 루트의 해당 설정 파일(`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`)에 덧붙인다. 이 진입점이 `@.mpa/runtime/core/agent_rules.md`를 참조하므로 에이전트 규칙이 매 세션 자동 로딩된다. (저장소 루트의 `agent-configs/`는 구버전 호환용 fallback이며, 신규 설치에서는 `agent-specs/`가 우선한다.)
 
 `session_protocol.md`는 체계를 처음 접하는 사람이 "지금 어떤 inject 파일을 써야 하는가"를 빠르게 파악할 수 있는 진입점 가이드다. 에이전트가 아닌 사용자가 읽는 파일이다.
 
@@ -963,7 +963,7 @@ inject 파일의 구성:
 
 에이전트가 잘못 라우팅했거나 특정 inject 파일로 세션을 강제로 시작하고 싶을 때는 직접 지정할 수 있다:
 ```
-@.mpa-workspace/inject/layer1_design.md
+@.mpa/runtime/inject/layer1_design.md
 [작업 요구사항 설명]
 ```
 
@@ -1040,7 +1040,7 @@ C. 부정 컨텍스트 — "건드리지 말아야 할 것" 명시
 
 #### 8.2 페르소나별 사용 시점
 
-페르소나 파일은 `.mpa-workspace/personas/`에 있고, 프로젝트별 누적 학습은 `workspace/memory/roles/`에 별도 저장된다. 이 분리가 중요하다: 페르소나 정의는 체계 파일(모든 프로젝트 공통)이고, 학습 기록은 프로젝트 데이터다.
+페르소나 파일은 `.mpa/runtime/personas/`에 있고, 프로젝트별 누적 학습은 `workspace/memory/roles/`에 별도 저장된다. 이 분리가 중요하다: 페르소나 정의는 체계 파일(모든 프로젝트 공통)이고, 학습 기록은 프로젝트 데이터다.
 
 | 페르소나 | 사용 시점 | 스레드 | 핵심 태도 |
 |----------|-----------|--------|-----------|
@@ -1051,7 +1051,7 @@ C. 부정 컨텍스트 — "건드리지 말아야 할 것" 명시
 | `code_reviewer` | Layer 1 작업 결과 검토 | 새 스레드 | 결과물 전반 검토, 논리 검증, 조용한 결정 탐지, UI/UX 동작 확인 |
 | `integration_auditor` | Layer 2 통합 감사 | 새 스레드 | 규칙 준수 여부만 판단 |
 | `memory_curator` | Layer 2 이후 또는 스프린트 종료 시 | 새 스레드 | memory 무결성 전담, 개발 작업 없음 |
-| `mpa_system_designer` | 체계(.mpa-workspace) 자체 수정 시 | 새 스레드 | 방법론 파일 수정 전담, 변경이 모든 프로젝트에 파급됨을 인지 |
+| `mpa_system_designer` | 체계(.mpa/runtime) 자체 수정 시 | 새 스레드 | 방법론 파일 수정 전담, 변경이 모든 프로젝트에 파급됨을 인지 |
 
 **`task_designer`와 `plan_critic`을 왜 분리하는가**
 
@@ -1132,7 +1132,7 @@ C. 부정 컨텍스트 — "건드리지 말아야 할 것" 명시
    Q1. 프로젝트 경로 확인
    Q2. 사용할 agent 결정 (프로젝트 폴더를 보고 자동 감지 → 사용자 확인)
    Q3. agent-specs/{agent}/spec.md를 읽어 설치 내용 파악·안내
-   Q4. .mpa-workspace/ 존재 여부로 신규 설치 또는 Runtime 배포 절차를 판단
+   Q4. .mpa/runtime/ 존재 여부로 신규 설치 또는 Runtime 배포 절차를 판단
    Q5. 신규 설치일 때만 수집한 정보를 요약해 install.py 실행
 ```
 
@@ -1146,15 +1146,15 @@ python3 release_manager.py deployment-dry-run --manifest workspace/releases/<rel
 python3 release_manager.py deploy --manifest workspace/releases/<release-id>/manifest_<release-id>.json --target <경로> --target-ref <대상-식별자> --verified-by <검증자> --dry-run <dry-run-receipt> --approved-by <승인자> --approval-ref <승인기록> --rollback-owner <책임자>
 ```
 
-`--project`와 `--agents`는 신규 설치에만 **둘 다 필수**다. `install.py --dry-run`으로 template·agent spec·변경 범위를 먼저 확인할 수 있다. 기존 `.mpa-workspace/`가 있으면 `install.py`는 중단하며, Runtime update는 validation을 통과한 immutable release manifest와 recorded dry-run, 승인, rollback 책임자로만 수행한다.
+`--project`와 `--agents`는 신규 설치에만 **둘 다 필수**다. `install.py --dry-run`으로 template·agent spec·변경 범위를 먼저 확인할 수 있다. 기존 `.mpa/runtime/`가 있으면 `install.py`는 중단하며, Runtime update는 validation을 통과한 immutable release manifest와 recorded dry-run, 승인, rollback 책임자로만 수행한다.
 
-기존 설치의 agent wiring·agent spec·고유 설정은 Runtime 프로젝트가 자체 관리한다. `install.py`는 기존 `.mpa-workspace/`가 있는 대상을 변경하지 않으며, Runtime update도 사용자 설정·workspace·docs·일반 소스를 보존한다. 단, release manifest가 명시한 `runtime.*` additive migration은 `${project.name}`·`${project.root_path}` 등의 참조를 대상 config 값으로 해석해 deploy transaction 안에서 누락값만 추가한다. 이 경우 배포 전 `.mpa-workspace`와 config snapshot을 함께 백업하고 rollback 때 함께 복원한다.
+기존 설치의 agent wiring·agent spec·고유 설정은 Runtime 프로젝트가 자체 관리한다. `install.py`는 기존 `.mpa/runtime/`가 있는 대상을 변경하지 않으며, Runtime update도 사용자 설정·workspace·docs·일반 소스를 보존한다. 단, release manifest가 명시한 `runtime.*` additive migration은 `${project.name}`·`${project.root_path}` 등의 참조를 대상 config 값으로 해석해 deploy transaction 안에서 누락값만 추가한다. 이 경우 배포 전 `.mpa/runtime`와 config snapshot을 함께 백업하고 rollback 때 함께 복원한다.
 
 **설치 후 프로젝트 구조:**
 ```
 my-project/
-├── .mpa-workspace/              ← 체계 파일 (에이전트 행동 규칙)
-├── .mpa-project/config.yaml     ← 설치 고유 설정 (프로젝트명·초기화 시각·로컬 root path)
+├── .mpa/runtime/              ← 체계 파일 (에이전트 행동 규칙)
+├── .mpa/config/config.yaml     ← 설치 고유 설정 (프로젝트명·초기화 시각·로컬 root path)
 ├── workspace/                   ← 프로젝트 데이터 (템플릿 골격만 있는 상태)
 │   ├── memory/ tasks/
 ├── CLAUDE.md / AGENTS.md / GEMINI.md  ← 선택한 agent의 진입점 (기존 파일이면 섹션 추가)
@@ -1162,7 +1162,7 @@ my-project/
 └── .agents/rules/mpa_pacemaker.md     ← codex/antigravity 포함 시
 ```
 
-진입점 파일(`CLAUDE.md` 등)에는 Agents Workspace 섹션이 추가되고, agent별 전용 파일(`mpa_pacemaker.md`)은 해당 agent의 native 폴더에 복사된다(없는 경우만). `.mpa-project/config.yaml`은 파일이 없을 때 기본값으로 생성하며, 기존 파일에는 누락 필드만 추가한다. Runtime이 프로젝트명·root path 같은 값을 필요로 하면 신규 설치의 `--runtime-config-json` 또는 release의 `--runtime-config-json`에 `runtime.*` 기본값을 선언할 수 있다. 기존 값은 보존되고 `${project.*}` 참조는 대상 local 값으로 해석된다. `workspace/`는 어떤 agent를 쓰든 동일하므로 프로젝트 루트에 한 번만 설치된다.
+진입점 파일(`CLAUDE.md` 등)에는 Agents Workspace 섹션이 추가되고, agent별 전용 파일(`mpa_pacemaker.md`)은 해당 agent의 native 폴더에 복사된다(없는 경우만). `.mpa/config/config.yaml`은 파일이 없을 때 기본값으로 생성하며, 기존 파일에는 누락 필드만 추가한다. Runtime이 프로젝트명·root path 같은 값을 필요로 하면 신규 설치의 `--runtime-config-json` 또는 release의 `--runtime-config-json`에 `runtime.*` 기본값을 선언할 수 있다. 기존 값은 보존되고 `${project.*}` 참조는 대상 local 값으로 해석된다. `workspace/`는 어떤 agent를 쓰든 동일하므로 프로젝트 루트에 한 번만 설치된다.
 
 지원 agent와 감지 조건:
 
@@ -1175,7 +1175,7 @@ my-project/
 
 **Runtime 업데이트:**
 
-release preparation에서 `dist/.mpa-workspace/` 해시와 불변 package를 고정한다. 필요한 릴리즈는 `--runtime-config-json`으로 Runtime 기본값 migration을 함께 고정할 수 있다. deployment는 그 package로 프로젝트의 `.mpa-workspace/`를 backup·교체·검증하고, 명시된 `runtime.*` 누락값만 config에 추가한다. `.mpa-project/config.yaml`의 기존 값, `workspace/`, 루트 `docs/`, agent 설정과 일반 소스는 건드리지 않는다. config audit은 `python3 project_config.py audit --project <경로>`로 실행하며 결과는 경고 수준으로 안내한다.
+release preparation에서 `dist/.mpa/runtime/` 해시와 불변 package를 고정한다. 필요한 릴리즈는 `--runtime-config-json`으로 Runtime 기본값 migration을 함께 고정할 수 있다. deployment는 그 package로 프로젝트의 `.mpa/runtime/`를 backup·교체·검증하고, 명시된 `runtime.*` 누락값만 config에 추가한다. `.mpa/config/config.yaml`의 기존 값, `workspace/`, 루트 `docs/`, agent 설정과 일반 소스는 건드리지 않는다. config audit은 `python3 project_config.py audit --project <경로>`로 실행하며 결과는 경고 수준으로 안내한다.
 
 복사되는 것과 복사 안 되는 것:
 - **복사됨**: 에이전트 행동 규칙, inject 파일, 페르소나, 스킬 등 체계 운영 파일
@@ -1227,7 +1227,7 @@ plan.md 열기 → "구현 단계" 체크리스트 확인
 
 #### 10.2 역할 메모리 업데이트
 
-역할별 누적 학습은 `workspace/memory/roles/[페르소나명].md`에 저장된다. `.mpa-workspace/personas/`의 파일은 역할 정의(체계 공통)이고, `workspace/memory/roles/`는 이 프로젝트에서 해당 역할이 배운 것(프로젝트 데이터)이다. 이 두 가지를 섞지 않는다.
+역할별 누적 학습은 `workspace/memory/roles/[페르소나명].md`에 저장된다. `.mpa/runtime/personas/`의 파일은 역할 정의(체계 공통)이고, `workspace/memory/roles/`는 이 프로젝트에서 해당 역할이 배운 것(프로젝트 데이터)이다. 이 두 가지를 섞지 않는다.
 
 처음부터 완성된 체계를 만들려 하지 않는다. 체계는 학습 시스템이다.
 
@@ -1587,7 +1587,7 @@ git clone https://github.com/udgrounder/my-pacemaker-agent.git
 ```
 
 에이전트가 install.md의 질의응답 절차로 경로와 agent를 확정하고(폴더를 보고 자동 감지 → 확인), 신규 설치일 때만 `install.py`를 실행한다. 기존 설치본 Runtime은 release manifest를 명시적으로 배포한다.
-설치 후 프로젝트에 `.mpa-workspace/`, `workspace/`(템플릿 골격)가 생기고, 선택한 agent의 진입점이 루트 설정 파일(`CLAUDE.md` 등)에 추가된다.
+설치 후 프로젝트에 `.mpa/runtime/`, `workspace/`(템플릿 골격)가 생기고, 선택한 agent의 진입점이 루트 설정 파일(`CLAUDE.md` 등)에 추가된다.
 
 ---
 
@@ -1595,7 +1595,7 @@ git clone https://github.com/udgrounder/my-pacemaker-agent.git
 
 새 채팅 스레드에서 아래와 같이 실행한다:
 ```
-@.mpa-workspace/inject/layer0_init.md
+@.mpa/runtime/inject/layer0_init.md
 [새 프로젝트 / 기존 프로젝트 여부와 간략한 배경 설명]
 ```
 
@@ -1613,7 +1613,7 @@ Layer 0가 완료되면 "이 컨텍스트 없이 시작하면 어떤 잘못된 �
 
 작업 요청을 하면 에이전트가 유형을 판단해 자동으로 설계 세션을 시작한다. 직접 지정하고 싶다면:
 ```
-@.mpa-workspace/inject/layer1_design.md
+@.mpa/runtime/inject/layer1_design.md
 [작업 요구사항]
 ```
 
@@ -1630,7 +1630,7 @@ Layer 0가 완료되면 "이 컨텍스트 없이 시작하면 어떤 잘못된 �
 
 새 스레드에서 아래를 실행한다:
 ```
-@.mpa-workspace/inject/layer1_critique.md
+@.mpa/runtime/inject/layer1_critique.md
 ```
 plan_critic이 설계 과정 없이 plan.md만 보고 독립 비평을 수행한다.
 
@@ -1751,7 +1751,7 @@ plan_critic이 설계 과정 없이 plan.md만 보고 독립 비평을 수행한
 
 **스킬(Skill)**: 규칙 기반 *how-to*(기법·절차) — "어떻게 하는가"(인간 "인터뷰 스킬" + Claude Code의 로드 가능한 skill의 핵심). "무엇인가"에 답하는 **지식(reference 사실)** 과 성격이 다르다(`skills/analysis`=기법, `skills/programming`=도메인 지식). **단 기능상 분리 불가** — 기법은 지식이 채워져야 작동, 지식은 기법이 있어야 활용된다(저장은 분리, 기능은 합성). 그래서 별도 저장소로 쪼개지 않고 `skills/`(도메인 자원) 우산으로 둔다. 진짜 "역량" = 역할 ⊗ 기법 ⊗ 지식의 합성 결과.
 
-**도메인(Domain)**: 역할 무관 지식·방법. 두 종류 — **방법 도메인**(analysis: 어떻게 따지나) / **주제 도메인**(programming·finance: 무엇에 관한 지식인가). 세 저장소로 갈린다: `.mpa-workspace/skills/`(방법·패턴) / `.mpa-workspace/knowledge/`(승격된 검증 사실) / `workspace/memory/domains/`(이 프로젝트의 규칙·기억). 평가 역할은 방법 도메인을 *구성적으로 요구*한다.
+**도메인(Domain)**: 역할 무관 지식·방법. 두 종류 — **방법 도메인**(analysis: 어떻게 따지나) / **주제 도메인**(programming·finance: 무엇에 관한 지식인가). 세 저장소로 갈린다: `.mpa/runtime/skills/`(방법·패턴) / `.mpa/runtime/knowledge/`(승격된 검증 사실) / `workspace/memory/domains/`(이 프로젝트의 규칙·기억). 평가 역할은 방법 도메인을 *구성적으로 요구*한다.
 
 **주입(Injection) — 메커니즘**: 구성 층위(워크플로우·역할·스킬)는 *내용*이고, 주입은 그 내용을 워크플로우 단계에 따라 (새) 쓰레드에 *싣는 행위*다. `inject/` 폴더는 "주입 레이어"가 아니라 단계 워크플로우(내용)이며, '주입'은 그 내용에 가하는 동작 이름일 뿐이다.
 

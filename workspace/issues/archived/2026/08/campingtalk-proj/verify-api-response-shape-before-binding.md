@@ -39,7 +39,7 @@
 
 ## 적용 대상 파일
 
-- `.mpa-workspace/core/agent_rules.md`
+- `.mpa/runtime/core/agent_rules.md`
 
 ## 처리 결과
 

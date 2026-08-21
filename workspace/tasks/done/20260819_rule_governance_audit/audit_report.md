@@ -93,7 +93,7 @@
 |---|---|---|
 | 신규 설치 | `dist/.mpa-workspace/`, `dist/workspace/`, 선택 agent spec, 신규 config·docs 초기화 | Runtime·workspace·agent spec 존재. OpenAgent만 위의 미완결 통합 위험이 있다. |
 | Runtime update | immutable package·manifest, dry-run, 승인·rollback 책임자, additive-only config | profile·command contract·코드가 같은 흐름을 설명한다. 현재 bundle도 release audit 통과. |
-| rollback | 대상 `.mpa-backups/`의 Runtime·config snapshot, receipt/history 검증 | profile·architecture·코드가 동일한 복구 경계를 사용한다. 현재 release의 validation 기록에 deploy/rollback 시나리오가 포함된다. |
+| rollback | 대상 `.mpa/backups/`의 Runtime·config snapshot, receipt/history 검증 | profile·architecture·코드가 동일한 복구 경계를 사용한다. 현재 release의 validation 기록에 deploy/rollback 시나리오가 포함된다. |
 
 ## 대표 요청 계약 검증 (정적)
 

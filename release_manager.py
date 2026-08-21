@@ -24,8 +24,14 @@ import project_config
 
 
 ROOT = Path(__file__).resolve().parent
-RUNTIME_SOURCE = ROOT / ".mpa-workspace"
-RUNTIME_DIST = ROOT / "dist" / ".mpa-workspace"
+RUNTIME_SOURCE = ROOT / ".mpa/runtime"
+RUNTIME_DIST = ROOT / "dist" / ".mpa/runtime"
+RUNTIME_DIR = ".mpa/runtime"
+LEGACY_RUNTIME_DIR = ".mpa-workspace"
+INTERMEDIATE_RUNTIME_DIR = ".mpa-runtime"
+LEGACY_CONFIG_RELATIVE = ".mpa-project/config.yaml"
+INTERMEDIATE_CONFIG_RELATIVE = ".mpa-config/config.yaml"
+LEGACY_RUNTIME_CONFIG = ".mpa-workspace/config.toml"
 WORKSPACE = ROOT / "workspace"
 RELEASES = WORKSPACE / "releases"
 LEGACY_RELEASES = RELEASES / "legacy"
@@ -53,6 +59,75 @@ BACKUP_MARKER = "backup-metadata.json"
 LOCK_FILE = ".mpa-deploy.lock"
 RUNTIME_BACKUP_ROOT = "runtime"
 RUNTIME_CONFIG_BACKUP_ROOT = "runtime-config"
+
+
+def resolve_runtime(root: Path) -> tuple[Path, bool]:
+    """Return the installed Runtime and whether it still uses the legacy path."""
+    runtime = root / RUNTIME_DIR
+    if runtime.is_dir():
+        return runtime, False
+    legacy = root / LEGACY_RUNTIME_DIR
+    if legacy.is_dir():
+        return legacy, True
+    intermediate = root / INTERMEDIATE_RUNTIME_DIR
+    if intermediate.is_dir():
+        return intermediate, True
+    raise ValueError("target .mpa/runtime is missing; use install.py for first installation")
+
+
+def migrate_legacy_project_config(root: Path) -> bool:
+    """Seed the new config location without replacing an existing config."""
+    destination = project_config.config_path(root)
+    source = root / INTERMEDIATE_CONFIG_RELATIVE
+    if not source.is_file():
+        source = root / LEGACY_CONFIG_RELATIVE
+    if destination.exists() or not source.is_file():
+        return False
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    content = source.read_text(encoding="utf-8").replace(LEGACY_RUNTIME_DIR, RUNTIME_DIR)
+    temporary = destination.with_name(f".{destination.name}.migrate-{uuid.uuid4().hex[:8]}")
+    try:
+        temporary.write_text(content, encoding="utf-8")
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return True
+
+
+def migrate_legacy_runtime_config(root: Path, legacy_runtime: Path) -> bool:
+    """Preserve the legacy per-project TOML beside the new project config."""
+    source = root / ".mpa-config/config.toml"
+    if not source.is_file():
+        source = legacy_runtime / "config.toml"
+    destination = root / ".mpa/config" / "config.toml"
+    if destination.exists() or not source.is_file():
+        return False
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return True
+
+
+def migrate_agent_runtime_references(root: Path) -> list[str]:
+    """Update only managed agent files that explicitly reference the legacy Runtime."""
+    candidates = ("AGENTS.md", "CLAUDE.md", "GEMINI.md", ".claude/settings.json",
+                  ".codex/hooks.json", ".agents/rules/mpa_pacemaker.md",
+                  ".codex/agents/mpa_pacemaker.toml")
+    updated = []
+    for relative in candidates:
+        path = root / relative
+        if not path.is_file():
+            continue
+        content = path.read_text(encoding="utf-8")
+        if LEGACY_RUNTIME_DIR not in content and INTERMEDIATE_RUNTIME_DIR not in content:
+            continue
+        temporary = path.with_name(f".{path.name}.mpa-path-{uuid.uuid4().hex[:8]}")
+        try:
+            temporary.write_text(content.replace(LEGACY_RUNTIME_DIR, RUNTIME_DIR).replace(INTERMEDIATE_RUNTIME_DIR, RUNTIME_DIR), encoding="utf-8")
+            temporary.replace(path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        updated.append(relative)
+    return updated
 
 
 def now() -> str:
@@ -299,7 +374,7 @@ def replace_tree(source: Path, destination: Path) -> None:
 
 
 def scoped_git() -> dict:
-    paths = [".mpa-workspace", "dist/.mpa-workspace", "release_manager.py", "install.py"]
+    paths = [".mpa/runtime", "dist/.mpa/runtime", "release_manager.py", "install.py"]
     try:
         head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True,
                               capture_output=True, check=True).stdout.strip()
@@ -527,7 +602,7 @@ def prepare_release(args: argparse.Namespace) -> None:
             "bundle_schema_version": RELEASE_BUNDLE_SCHEMA_VERSION,
             "release_id": ident,
             "created_at": now(),
-            "asset_root": "dist/.mpa-workspace",
+            "asset_root": "dist/.mpa/runtime",
             "package": relative_to_root(final_package),
             "note": relative_to_root(final_note),
             "assets": assets,
@@ -679,7 +754,7 @@ def ensure_required_project_directories(root: Path) -> list[str]:
 
 def prune_runtime_backups(root: Path, keep: int = RUNTIME_BACKUP_RETENTION) -> list[str]:
     """Retain only marked successful Runtime backups; leave unknown dirs untouched."""
-    backups = root / ".mpa-backups"
+    backups = root / ".mpa/backups"
     if not backups.is_dir():
         return []
     candidates = []
@@ -706,7 +781,7 @@ def prune_runtime_backups(root: Path, keep: int = RUNTIME_BACKUP_RETENTION) -> l
 
 def _backup_runtime_path(path: Path) -> Path:
     """Resolve the Runtime tree in a current or legacy backup."""
-    nested = path / RUNTIME_BACKUP_ROOT / ".mpa-workspace"
+    nested = path / RUNTIME_BACKUP_ROOT / ".mpa/runtime"
     return nested if nested.is_dir() else path
 
 
@@ -735,7 +810,7 @@ def _restore_config_state(root: Path, state: tuple[bool, bytes | None]) -> None:
 
 
 def _backup_runtime(root: Path, target: Path, backup: Path, include_config: bool) -> dict[str, object]:
-    runtime_destination = backup / RUNTIME_BACKUP_ROOT / ".mpa-workspace"
+    runtime_destination = backup / RUNTIME_BACKUP_ROOT / ".mpa/runtime"
     runtime_destination.parent.mkdir(parents=True, exist_ok=False)
     shutil.copytree(target, runtime_destination)
     config_path = project_config.config_path(root)
@@ -778,7 +853,7 @@ def _write_backup_marker(path: Path, release_id: str, assets: dict[str, str], co
         "release_id": release_id,
         "asset_checksum": hashlib.sha256(json.dumps(backup_assets, sort_keys=True).encode()).hexdigest(),
         "release_asset_checksum": hashlib.sha256(json.dumps(assets, sort_keys=True).encode()).hexdigest(),
-        "runtime_backup": "runtime/.mpa-workspace",
+        "runtime_backup": "runtime/.mpa/runtime",
         "config_snapshot": config_snapshot or {"included": False, "existed": False, "checksum": None},
         "created_at": now(),
     })
@@ -802,7 +877,7 @@ def _validate_backup(path: Path, release_id: str) -> dict:
     runtime_path = _backup_runtime_path(path)
     if not runtime_path.is_dir():
         raise ValueError("backup Runtime tree is missing")
-    if metadata.get("schema_version", 1) >= 2 and metadata.get("runtime_backup") != "runtime/.mpa-workspace":
+    if metadata.get("schema_version", 1) >= 2 and metadata.get("runtime_backup") != "runtime/.mpa/runtime":
         raise ValueError("backup Runtime path metadata is invalid")
     return metadata
 
@@ -932,9 +1007,7 @@ def deployment_dry_run(args: argparse.Namespace) -> None:
     manifest_path, manifest = load_manifest(args.manifest)
     release_package(manifest)
     root = Path(args.target).resolve()
-    target = root / ".mpa-workspace"
-    if not target.is_dir():
-        raise ValueError("target .mpa-workspace is missing; use install.py for first installation")
+    target, legacy_runtime = resolve_runtime(root)
     created_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
     result = {"release_id": manifest["release_id"],
               "from_release": current_release(target), "to_release": manifest["release_id"], "manifest": relative_to_root(manifest_path),
@@ -942,6 +1015,8 @@ def deployment_dry_run(args: argparse.Namespace) -> None:
               "target": str(root), "target_ref": target_ref, "current_assets": asset_map(target),
               "release_assets": manifest["assets"], "history": target_history(target), "issue_inventory": update_issue_inventory(root),
               "runtime_config": _runtime_config_summary(root, manifest.get("runtime_config")),
+              "path_migration": {"from": LEGACY_RUNTIME_DIR if legacy_runtime else RUNTIME_DIR,
+                                 "to": RUNTIME_DIR, "required": legacy_runtime},
               "created_at": created_at.isoformat(),
               "expires_at": (created_at + dt.timedelta(minutes=30)).isoformat()}
     path = DEPLOYMENT_RECEIPTS / target_ref / f"dry-run-{manifest['release_id']}-{receipt_suffix()}.json"
@@ -954,9 +1029,9 @@ def deploy(args: argparse.Namespace) -> None:
     manifest_path, manifest = load_manifest(args.manifest)
     package = release_package(manifest)
     root = Path(args.target).resolve()
-    target = root / ".mpa-workspace"
-    if not target.is_dir():
-        raise ValueError("target .mpa-workspace is missing; use install.py for first installation")
+    target, legacy_runtime = resolve_runtime(root)
+    original_target = target
+    destination = root / RUNTIME_DIR
     dry_run = (ROOT / args.dry_run).resolve()
     if DEPLOYMENT_RECEIPTS.resolve() not in dry_run.parents or not dry_run.is_file():
         raise ValueError("deploy requires a recorded deployment dry-run")
@@ -989,7 +1064,7 @@ def deploy(args: argparse.Namespace) -> None:
         if target_history(target).get(manifest["release_id"], {}).get("status") == "applied":
             raise ValueError("target history already contains this release ID")
         from_release = current_release(target)
-        backup = root / ".mpa-backups" / f"{manifest['release_id']}-{receipt_suffix()}"
+        backup = root / ".mpa/backups" / f"{manifest['release_id']}-{receipt_suffix()}"
         replacement = None
         previous = None
         created_paths: list[str] = []
@@ -997,14 +1072,18 @@ def deploy(args: argparse.Namespace) -> None:
         deployment_receipt: Path | None = None
         history_path: Path | None = None
         config_snapshot: dict[str, object] = {"included": False, "existed": False, "checksum": None}
+        migrated_legacy_toml = False
+        migrated_legacy_config = False
+        migrated_agent_files: list[str] = []
         with tempfile.TemporaryDirectory(prefix=f"deploy-{manifest['release_id']}-") as directory:
             extracted = Path(directory) / "runtime"
             try:
                 created_paths = ensure_required_project_directories(root)
                 backup.parent.mkdir(parents=True, exist_ok=True)
                 config_snapshot = _backup_runtime(root, target, backup, runtime_config is not None)
-                replacement = target.with_name(f".mpa-workspace.new-{uuid.uuid4().hex[:8]}")
-                previous = target.with_name(f".mpa-workspace.previous-{uuid.uuid4().hex[:8]}")
+                migrated_legacy_toml = legacy_runtime and migrate_legacy_runtime_config(root, target)
+                replacement = destination.parent / f".runtime.new-{uuid.uuid4().hex[:8]}"
+                previous = target.with_name(f"{target.name}.previous-{uuid.uuid4().hex[:8]}")
                 _extract_runtime(package, extracted)
                 shutil.copytree(extracted, replacement)
                 history = target / "history"
@@ -1013,14 +1092,17 @@ def deploy(args: argparse.Namespace) -> None:
                 verify_target(replacement, manifest["assets"])
                 target.replace(previous)
                 try:
-                    replacement.replace(target)
+                    replacement.replace(destination)
+                    target = destination
                     verify_target(target, manifest["assets"])
                 except Exception:
                     if target.exists():
                         shutil.rmtree(target)
                     if previous.exists():
-                        previous.replace(target)
+                        previous.replace(root / (LEGACY_RUNTIME_DIR if legacy_runtime else RUNTIME_DIR))
                     raise
+                migrated_legacy_config = migrate_legacy_project_config(root)
+                migrated_agent_files = migrate_agent_runtime_references(root) if legacy_runtime else []
                 config_migration = {"status": "none", "add": [], "skipped": []}
                 if runtime_config is not None:
                     config_migration = project_config.apply_runtime_config_migration(root, runtime_config)
@@ -1036,6 +1118,10 @@ def deploy(args: argparse.Namespace) -> None:
                     "rollback_owner": args.rollback_owner, "dry_run": relative_to_root(dry_run),
                     "assets": manifest["assets"], "verification": {"asset_map": "matched", "verified_at": now()},
                     "runtime_config": {"migration": config_migration, "config_backup": config_snapshot},
+                    "path_migration": {"from": LEGACY_RUNTIME_DIR if legacy_runtime else RUNTIME_DIR,
+                                       "to": RUNTIME_DIR, "legacy_config_migrated": migrated_legacy_config,
+                                       "legacy_toml_migrated": migrated_legacy_toml,
+                                       "agent_files_migrated": migrated_agent_files},
                     "collected_issues": collected,
                     "issue_collection": {"status": "collected" if collected else "no-op", "count": len(collected)},
                 }
@@ -1057,7 +1143,7 @@ def deploy(args: argparse.Namespace) -> None:
                 if previous and previous.exists():
                     if target.exists():
                         shutil.rmtree(target)
-                    previous.replace(target)
+                    previous.replace(original_target)
                 try:
                     _restore_config_from_backup(root, backup, {"config_snapshot": config_snapshot})
                 except Exception:
@@ -1111,7 +1197,7 @@ def rollback(args: argparse.Namespace) -> None:
     root = Path(args.target).resolve()
     with target_lock(root):
         previous = None
-        target = root / ".mpa-workspace"
+        target = root / ".mpa/runtime"
         from_release = None
         created_paths: list[str] = []
         receipt_path: Path | None = None
@@ -1119,12 +1205,12 @@ def rollback(args: argparse.Namespace) -> None:
         release_id = None
         config_before: tuple[bool, bytes | None] = (False, None)
         try:
-            backups_root = (root / ".mpa-backups").resolve()
+            backups_root = (root / ".mpa/backups").resolve()
             backup = (root / args.backup).resolve()
             if backups_root not in backup.parents or not backup.is_dir():
-                raise ValueError("backup must be inside target .mpa-backups")
+                raise ValueError("backup must be inside target .mpa/backups")
             if not target.is_dir():
-                raise ValueError("target .mpa-workspace is missing")
+                raise ValueError("target .mpa/runtime is missing")
             release_id = require_safe_ref(args.release_id, "release-id")
             if release_id not in target_history(target):
                 raise ValueError("target history does not contain the release to roll back")
@@ -1132,8 +1218,8 @@ def rollback(args: argparse.Namespace) -> None:
             from_release = current_release(target)
             created_paths = ensure_required_project_directories(root)
             config_before = _capture_config(root)
-            replacement = target.with_name(f".mpa-workspace.rollback-{uuid.uuid4().hex[:8]}")
-            previous = target.with_name(f".mpa-workspace.rollback-previous-{uuid.uuid4().hex[:8]}")
+            replacement = target.parent / f".runtime.rollback-{uuid.uuid4().hex[:8]}"
+            previous = target.parent / f".runtime.rollback-previous-{uuid.uuid4().hex[:8]}"
             try:
                 shutil.copytree(_backup_runtime_path(backup), replacement)
                 target.replace(previous)
@@ -1150,14 +1236,14 @@ def rollback(args: argparse.Namespace) -> None:
                 if replacement.exists():
                     shutil.rmtree(replacement)
             receipt = {"status": "rolled_back", "release_id": release_id,
-                       "from_release": from_release, "to_release": current_release(root / ".mpa-workspace"),
+                       "from_release": from_release, "to_release": current_release(root / ".mpa/runtime"),
                        "target_ref": target_ref, "target_fingerprint": project_fingerprint(root),
                        "backup": str(backup.relative_to(root)), "rolled_back_at": now(),
                        "approved_by": args.approved_by, "approval_ref": args.approval_ref,
                        "rollback_owner": args.rollback_owner, "verified_by": args.verified_by,
-                       "verification": {"asset_map": asset_map(root / ".mpa-workspace"), "verified_at": now()}}
+                       "verification": {"asset_map": asset_map(root / ".mpa/runtime"), "verified_at": now()}}
             receipt_path = DEPLOYMENT_RECEIPTS / target_ref / f"rollback-{receipt_suffix()}.json"
-            history_path = root / ".mpa-workspace" / "history" / "releases" / f"{release_id}.json"
+            history_path = root / ".mpa/runtime" / "history" / "releases" / f"{release_id}.json"
             write_json(receipt_path, receipt)
             write_json(history_path, receipt)
         except Exception as error:

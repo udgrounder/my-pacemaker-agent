@@ -10,5 +10,5 @@
 `agent_rules_detail.md`의 "minor 경량 처리 절차" 1~3단계(계획 제시 → plan.md 작성 → approve 실행) 사이 또는 직후에 "INDEX.md에 상태(구현 중)로 즉시 등록" 단계를 명시적으로 추가한다. 이상적으로는 `plan_hash.py approve` 실행 시 INDEX.md 등록 여부를 함께 안내하거나(예: approve 성공 메시지에 "INDEX.md 등록 확인" 리마인더 추가) 기계적으로 강제하는 방법도 고려할 수 있다(단, 이건 스크립트 수정이 필요해 별도 설계 필요).
 
 ## 적용 대상 파일
-- `.mpa-workspace/core/agent_rules_detail.md` ("minor 경량 처리 절차" 섹션)
-- (선택) `.mpa-workspace/hooks/plan_hash.py` (approve 성공 메시지에 리마인더 추가)
+- `.mpa/runtime/core/agent_rules_detail.md` ("minor 경량 처리 절차" 섹션)
+- (선택) `.mpa/runtime/hooks/plan_hash.py` (approve 성공 메시지에 리마인더 추가)

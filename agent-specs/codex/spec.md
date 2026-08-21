@@ -30,7 +30,7 @@ tool: OpenAI Codex
 ## Hooks
 
 Codex는 `.codex/hooks.json` 에서 hook을 지원한다.
-install.py는 `.codex/hooks.json` 에 Codex 편집 도구명을 포함한 matcher로 등록한다. 스크립트는 `.mpa-workspace/hooks/` 에 있다.
+install.py는 `.codex/hooks.json` 에 Codex 편집 도구명을 포함한 matcher로 등록한다. 스크립트는 `.mpa/runtime/hooks/` 에 있다.
 
 | 이벤트 | matcher | 스크립트 |
 |--------|---------|---------|

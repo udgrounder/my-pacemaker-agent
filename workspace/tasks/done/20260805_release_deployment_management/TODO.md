@@ -74,7 +74,7 @@
   - 구현: `deploy()`의 `applied`/`failed` receipt/history, `rollback()`의 `rolled_back` receipt/history 및 원자 교체 복구.
   - 검증: `test_deploy_and_rollback_preserve_user_owned_paths`, `test_failed_deploy_restores_runtime_and_records_failed_state` 통과.
 - [x] Runtime backup 보존 개수를 최신 3개로 제한한다.
-  - 완료: 성공 deploy의 receipt/history 기록 뒤에만 `.mpa-backups/`의 Runtime backup 디렉터리를 수정 시각 순으로 정리하며, 실패 deploy와 일반 파일은 보존한다.
+  - 완료: 성공 deploy의 receipt/history 기록 뒤에만 `.mpa/backups/`의 Runtime backup 디렉터리를 수정 시각 순으로 정리하며, 실패 deploy와 일반 파일은 보존한다.
   - 구현/검증: `prune_runtime_backups()`; `test_runtime_backup_retention_keeps_the_newest_three_directories_only` 통과.
 
 - [x] Runtime backup marker와 동시 실행 보호를 추가한다.
@@ -106,7 +106,7 @@
 
 - [x] Runtime version config migration의 백업·복구 경계를 구현한다.
   - 요구: migration이 있는 deploy는 `.mpa-workspace`와 `.mpa-project/config.yaml`을 함께 backup하고 rollback/실패 시 함께 복원한다. 사용자 소유 config 값·agent 설정·workspace·docs·일반 소스는 변경하지 않는다.
-  - 구현: `project_config.py` additive scalar merge/참조 해석, `release_manager.py` manifest `runtime_config`, dry-run checksum 재검증, `.mpa-backups/<id>/runtime/` 및 `runtime-config/`, marker schema 2.
+  - 구현: `project_config.py` additive scalar merge/참조 해석, `release_manager.py` manifest `runtime_config`, dry-run checksum 재검증, `.mpa/backups/<id>/runtime/` 및 `runtime-config/`, marker schema 2.
   - 검증: 전체 50개 테스트 통과, migration manifest/receipt 정합성 및 legacy backup 호환 경로 확인.
 
 - [x] issue identity·민감정보·receipt 경계를 보강한다.
@@ -191,7 +191,7 @@
 - [x] `/Users/kjkim/Temp/mpa-test2`에 승인된 Runtime release 업그레이드 테스트를 수행한다.
   - dry-run: `workspace/receipts/deployments/mpa-test2/dry-run-20260818093645-79cd0298-20260818T095101Z-8774cc00.json`에서 legacy `2026-08-12 12:06:00` → `20260818093645-79cd0298` 전환 계획과 59개 자산을 확인했다.
   - deploy: `workspace/receipts/deployments/mpa-test2/deploy-20260818093645-79cd0298-20260818T095127Z-b260787e.json`이 `status: applied`를 기록했고 issue 수집은 `no-op`(0건)이다.
-  - 검증: 대상 자산 59개가 manifest와 일치하고, `.mpa-backups/20260818093645-79cd0298-20260818T095127Z-b2df337b/`의 `runtime/.mpa-workspace` 59개 및 backup marker checksum을 확인했다. 기존 `workspace/`, `docs/`, `.agents/`, `.codex`는 보존됐다.
+  - 검증: 대상 자산 59개가 manifest와 일치하고, `.mpa/backups/20260818093645-79cd0298-20260818T095127Z-b2df337b/`의 `runtime/.mpa-workspace` 59개 및 backup marker checksum을 확인했다. 기존 `workspace/`, `docs/`, `.agents/`, `.codex`는 보존됐다.
   - 설정: 이번 release에는 `runtime_config` migration이 없어 `.mpa-project/config.yaml`은 생성하지 않고 기존 부재 상태를 유지했다.
 - [ ] 설치된 운영 프로젝트의 고유 설정 동작을 사용자 환경에서 확인한다.
   - 확인: config가 없을 때 프로젝트명·초기화 시각·절대 경로가 생성되는지, 기존 config가 있을 때 기존 내용은 유지되고 누락 필드만 추가되는지 확인한다.

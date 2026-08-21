@@ -166,7 +166,7 @@ Git 의존성 없이도 이슈 생성·수집부터 분류, 재현 가능한 릴
 - installation path privacy: `project.root_path`는 로컬 운영 편의 정보로만 사용한다. release/package/manifest checksum/issue/중앙 receipt에는 config의 절대 경로를 복사하지 않으며, 프로젝트 이동 시 기존 canonical path를 덮어쓰지 않는다. 배포 dry-run의 `target` 절대 경로는 apply 대상 일치 확인을 위한 기존 운영 필드이며 config 값을 복사하는 동작과 구분한다.
 - config audit: `config-audit`는 schema·필수 필드·경로 안전성·민감정보 패턴·semantic checksum을 검사하고 결과를 경고/receipt로 남긴다. 기본 audit은 사용자의 작업을 차단하지 않는다.
 - 대상 history: source release manifest를 복사하지 않고, `from_release`·`to_release`·manifest/receipt 경로·asset checksum/map·backup·applied/rolled_back 상태와 검증 결과를 `.mpa-workspace/history/releases/`에 기록한다. 이 history는 Runtime update 관리 파일로 배포 자산에는 포함하지 않는다.
-- backup 보존: 성공 receipt/history 기록 뒤에만 대상 `.mpa-backups/`의 Runtime backup 디렉터리를 수정 시각 기준 최신 3개로 정리한다. 실패한 deploy에서는 기존 backup을 정리하지 않으며, 관리자가 둔 일반 파일은 건드리지 않는다.
+- backup 보존: 성공 receipt/history 기록 뒤에만 대상 `.mpa/backups/`의 Runtime backup 디렉터리를 수정 시각 기준 최신 3개로 정리한다. 실패한 deploy에서는 기존 backup을 정리하지 않으며, 관리자가 둔 일반 파일은 건드리지 않는다.
 - backup 범위: 대상 `.mpa-workspace/`를 `runtime/.mpa-workspace/`에 보관하고, 해당 deploy가 config migration을 포함하면 `.mpa-project/config.yaml` 원문을 `runtime-config/config.yaml`에 함께 보관한다. 이 config snapshot은 rollback 원문 복원용 local copy이며 MPA가 사용자 값을 해석·수정하는 권한을 부여하지 않는다. `workspace/`, agent 설정, 일반 소스 파일은 backup·읽기·덮어쓰기 대상에서 제외하고, rollback은 Runtime과 config snapshot을 함께 복원한다.
 - issue 수집: copy 후 delete가 아닌 동일 파일시스템에서는 rename, 다른 파일시스템에서는 임시 목적지+원본 보존 확인을 사용하는 원자적 이동으로 구현한다.
 - 민감정보 검사: credential 형태와 절대 경로를 휴리스틱으로 거부하며, 애매한 경우 자동 마스킹하지 않고 사용자에게 수정 요청한다.

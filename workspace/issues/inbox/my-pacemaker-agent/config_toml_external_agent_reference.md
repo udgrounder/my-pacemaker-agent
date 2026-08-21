@@ -12,8 +12,8 @@
 
 MPA 규칙이 다음과 같이 분산되어 있다:
 
-- `.mpa-workspace/core/agent_rules.md` — 핵심 규칙 (Markdown)
-- `.mpa-workspace/core/agent_rules_detail.md` — 상세 가이드 (Markdown)
+- `.mpa/runtime/core/agent_rules.md` — 핵심 규칙 (Markdown)
+- `.mpa/runtime/core/agent_rules_detail.md` — 상세 가이드 (Markdown)
 - `CLAUDE.md` — 프로젝트 지시사항 (Markdown)
 - `.claude/CLAUDE.md` — 사용자 정의사항 (Markdown)
 
@@ -30,7 +30,7 @@ MPA 규칙이 다음과 같이 분산되어 있다:
 TOML 기반 단일 소스 설정 파일 도입:
 
 ```
-.mpa-workspace/config.toml
+.mpa/runtime/config.toml
 ├─ [mpa]                          # 메타데이터
 ├─ [workflow.major]               # 7단계 워크플로우
 ├─ [workflow.minor]               # 3단계 워크플로우
@@ -63,7 +63,7 @@ TOML 기반 단일 소스 설정 파일 도입:
 
 ### 1. config.toml 파일 생성
 
-위치: `.mpa-workspace/config.toml`
+위치: `.mpa/runtime/config.toml`
 
 주요 섹션:
 - **[mpa]** — 이름, 버전, 설명
@@ -103,7 +103,7 @@ task_resumption = "agent_rules_detail.md: 태스크 재개"
 ```python
 import toml
 
-config = toml.load('.mpa-workspace/config.toml')
+config = toml.load('.mpa/runtime/config.toml')
 
 # 라우팅 판단
 if user_input in config['routing']['explicit_keywords']['bug']:
@@ -124,26 +124,26 @@ else:
 ```bash
 # Python로 TOML → YAML 변환 가능
 pip install toml pyyaml
-python -c "import toml, yaml; print(yaml.dump(toml.load('.mpa-workspace/config.toml')))"
+python -c "import toml, yaml; print(yaml.dump(toml.load('.mpa/runtime/config.toml')))"
 ```
 
 ### 4. CI/CD 자동화 예시
 
 ```bash
 # 규칙 검증
-./scripts/validate_mpa_config.sh .mpa-workspace/config.toml
+./scripts/validate_mpa_config.sh .mpa/runtime/config.toml
 
 # 에이전트 규칙 변경 감지
-git diff .mpa-workspace/config.toml | grep -E "^\+" | ./scripts/notify_agent_updates.sh
+git diff .mpa/runtime/config.toml | grep -E "^\+" | ./scripts/notify_agent_updates.sh
 ```
 
 ---
 
 ## 적용 대상 파일
 
-- `.mpa-workspace/config.toml` (신규 파일)
-- `.mpa-workspace/core/agent_rules.md` (참조 추가: "config.toml로도 구조화된 참조 가능")
-- `.mpa-workspace/core/agent_rules_detail.md` (트리거 섹션 상단에 config.toml 경로 링크)
+- `.mpa/runtime/config.toml` (신규 파일)
+- `.mpa/runtime/core/agent_rules.md` (참조 추가: "config.toml로도 구조화된 참조 가능")
+- `.mpa/runtime/core/agent_rules_detail.md` (트리거 섹션 상단에 config.toml 경로 링크)
 - `CLAUDE.md` (graphify 다음으로 "config.toml 참조" 안내)
 
 ---

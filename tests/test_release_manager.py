@@ -23,8 +23,8 @@ class ReleaseManagerTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         release_manager.ROOT = self.root
-        release_manager.RUNTIME_SOURCE = self.root / ".mpa-workspace"
-        release_manager.RUNTIME_DIST = self.root / "dist" / ".mpa-workspace"
+        release_manager.RUNTIME_SOURCE = self.root / ".mpa/runtime"
+        release_manager.RUNTIME_DIST = self.root / "dist" / ".mpa/runtime"
         release_manager.WORKSPACE = self.root / "workspace"
         release_manager.RELEASES = release_manager.WORKSPACE / "releases"
         release_manager.MANIFESTS = release_manager.RELEASES
@@ -67,7 +67,7 @@ class ReleaseManagerTest(unittest.TestCase):
         manifest = self.prepare()
         self.write_runtime(release_manager.RUNTIME_DIST, "v2")
         target_root = self.root / "target"
-        self.write_runtime(target_root / ".mpa-workspace", "old")
+        self.write_runtime(target_root / ".mpa/runtime", "old")
         release_manager.deployment_dry_run(argparse.Namespace(
             manifest=str(manifest), target=str(target_root), target_ref="test-target",
         ))
@@ -78,15 +78,15 @@ class ReleaseManagerTest(unittest.TestCase):
             dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test",
         ))
 
-        self.assertEqual((target_root / ".mpa-workspace" / "rule.md").read_text(encoding="utf-8"), "v1")
-        self.assertTrue(any((target_root / ".mpa-backups").iterdir()))
-        self.assertTrue((target_root / ".mpa-workspace" / "history" / "releases" / json.loads(manifest.read_text())["release_id"]).with_suffix(".json").is_file())
+        self.assertEqual((target_root / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "v1")
+        self.assertTrue(any((target_root / ".mpa/backups").iterdir()))
+        self.assertTrue((target_root / ".mpa/runtime" / "history" / "releases" / json.loads(manifest.read_text())["release_id"]).with_suffix(".json").is_file())
 
     def test_deploy_and_rollback_preserve_user_owned_paths(self):
         manifest = self.prepare()
         release_id = json.loads(manifest.read_text(encoding="utf-8"))["release_id"]
         target_root = self.root / "target"
-        self.write_runtime(target_root / ".mpa-workspace", "old")
+        self.write_runtime(target_root / ".mpa/runtime", "old")
         (target_root / "workspace").mkdir()
         (target_root / "docs").mkdir()
         (target_root / "AGENTS.md").write_text("user config", encoding="utf-8")
@@ -95,8 +95,8 @@ class ReleaseManagerTest(unittest.TestCase):
         (target_root / "docs" / "user.md").write_text("docs", encoding="utf-8")
         docs_index = target_root / "docs" / "INDEX.md"
         docs_index.write_text("# operator index\n", encoding="utf-8")
-        config = target_root / ".mpa-project" / "config.yaml"
-        config.parent.mkdir()
+        config = target_root / ".mpa/config" / "config.yaml"
+        config.parent.mkdir(parents=True)
         config.write_text(
             "schema_version: 1\nproject:\n"
             "  name: \"operator-owned\"\n"
@@ -110,14 +110,14 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.deploy(argparse.Namespace(
             manifest=str(manifest), target=str(target_root), target_ref="test-target", verified_by="test",
             dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
-        backup = next((target_root / ".mpa-backups").iterdir())
-        self.assertTrue((backup / "runtime" / ".mpa-workspace" / ".mpa-version").is_file())
+        backup = next((target_root / ".mpa/backups").iterdir())
+        self.assertTrue((backup / "runtime" / ".mpa/runtime" / ".mpa-version").is_file())
         self.assertFalse((backup / "AGENTS.md").exists())
         self.assertFalse((backup / "runtime-config" / "config.yaml").exists())
         release_manager.rollback(argparse.Namespace(
             target=str(target_root), target_ref="test-target", backup=str(backup.relative_to(target_root)),
             release_id=release_id, verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
-        self.assertEqual((target_root / ".mpa-workspace" / "rule.md").read_text(encoding="utf-8"), "old")
+        self.assertEqual((target_root / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "old")
         self.assertEqual((target_root / "workspace" / "user.txt").read_text(encoding="utf-8"), "workspace")
         self.assertEqual((target_root / "docs" / "user.md").read_text(encoding="utf-8"), "docs")
         self.assertEqual(docs_index.read_text(encoding="utf-8"), "# operator index\n")
@@ -134,8 +134,8 @@ class ReleaseManagerTest(unittest.TestCase):
         manifest = self.prepare(migration)
         release_id = json.loads(manifest.read_text(encoding="utf-8"))["release_id"]
         target = self.root / "target"
-        self.write_runtime(target / ".mpa-workspace", "old")
-        config = target / ".mpa-project" / "config.yaml"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        config = target / ".mpa/config" / "config.yaml"
         config.parent.mkdir(parents=True)
         config.write_text(
             "schema_version: 1\nproject:\n  name: \"operator\"\n"
@@ -155,12 +155,12 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertIn('new_flag: true', updated)
         manifest_data = json.loads(manifest.read_text(encoding="utf-8"))
         self.assertNotIn(str(target), json.dumps(manifest_data))
-        backup = next((target / ".mpa-backups").iterdir())
+        backup = next((target / ".mpa/backups").iterdir())
         self.assertEqual((backup / "runtime-config" / "config.yaml").read_text(encoding="utf-8"), original)
         release_manager.rollback(argparse.Namespace(target=str(target), target_ref="target", backup=str(backup.relative_to(target)),
                                                     release_id=release_id, verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
         self.assertEqual(config.read_text(encoding="utf-8"), original)
-        self.assertEqual((target / ".mpa-workspace" / "rule.md").read_text(encoding="utf-8"), "old")
+        self.assertEqual((target / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "old")
 
     def test_runtime_config_migration_bootstraps_missing_config_and_rollback_removes_it(self):
         migration = {"schema_version": 2, "additive_defaults": {
@@ -170,8 +170,8 @@ class ReleaseManagerTest(unittest.TestCase):
         manifest = self.prepare(migration)
         release_id = json.loads(manifest.read_text(encoding="utf-8"))["release_id"]
         target = self.root / "legacy-target"
-        self.write_runtime(target / ".mpa-workspace", "legacy")
-        config = target / ".mpa-project" / "config.yaml"
+        self.write_runtime(target / ".mpa/runtime", "legacy")
+        config = target / ".mpa/config" / "config.yaml"
         self.assertFalse(config.exists())
 
         release_manager.deployment_dry_run(argparse.Namespace(
@@ -183,7 +183,7 @@ class ReleaseManagerTest(unittest.TestCase):
 
         self.assertTrue(config.is_file())
         self.assertIn('project_name: "legacy-target"', config.read_text(encoding="utf-8"))
-        backup = next((target / ".mpa-backups").iterdir())
+        backup = next((target / ".mpa/backups").iterdir())
         metadata = json.loads((backup / "backup-metadata.json").read_text(encoding="utf-8"))
         self.assertTrue(metadata["config_snapshot"]["included"])
         self.assertFalse(metadata["config_snapshot"]["existed"])
@@ -194,12 +194,12 @@ class ReleaseManagerTest(unittest.TestCase):
             release_id=release_id, verified_by="test", approved_by="test", approval_ref="unit",
             rollback_owner="test"))
         self.assertFalse(config.exists())
-        self.assertEqual((target / ".mpa-workspace" / "rule.md").read_text(encoding="utf-8"), "legacy")
+        self.assertEqual((target / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "legacy")
 
     def test_deploy_creates_only_missing_workspace_and_docs_roots(self):
         manifest = self.prepare()
         target = self.root / "target"
-        self.write_runtime(target / ".mpa-workspace", "old")
+        self.write_runtime(target / ".mpa/runtime", "old")
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         release_manager.deploy(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
@@ -220,7 +220,7 @@ class ReleaseManagerTest(unittest.TestCase):
 
     def test_runtime_backup_retention_keeps_the_newest_three_directories_only(self):
         target = self.root / "target"
-        backups = target / ".mpa-backups"
+        backups = target / ".mpa/backups"
         for index in range(4):
             backup = backups / f"backup-{index}"
             backup.mkdir(parents=True)
@@ -243,8 +243,8 @@ class ReleaseManagerTest(unittest.TestCase):
 
     def test_manual_backup_directory_is_not_pruned_or_accepted_for_rollback(self):
         target = self.root / "target"
-        self.write_runtime(target / ".mpa-workspace", "old")
-        manual = target / ".mpa-backups" / "operator-snapshot"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        manual = target / ".mpa/backups" / "operator-snapshot"
         manual.mkdir(parents=True)
         (manual / "rule.md").write_text("operator copy", encoding="utf-8")
         self.assertEqual(release_manager.prune_runtime_backups(target), [])
@@ -254,13 +254,13 @@ class ReleaseManagerTest(unittest.TestCase):
         manifest = self.prepare()
         release_id = json.loads(manifest.read_text(encoding="utf-8"))["release_id"]
         target = self.root / "target"
-        self.write_runtime(target / ".mpa-workspace", "old")
+        self.write_runtime(target / ".mpa/runtime", "old")
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         release_manager.deploy(argparse.Namespace(
             manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
             dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
-        backup = next(path for path in (target / ".mpa-backups").iterdir() if path.is_dir())
+        backup = next(path for path in (target / ".mpa/backups").iterdir() if path.is_dir())
         marker = backup / release_manager.BACKUP_MARKER
         data = json.loads(marker.read_text(encoding="utf-8"))
         data["asset_checksum"] = "0" * 64
@@ -274,12 +274,12 @@ class ReleaseManagerTest(unittest.TestCase):
         manifest = self.prepare()
         release_id = json.loads(manifest.read_text(encoding="utf-8"))["release_id"]
         target = self.root / "target"
-        self.write_runtime(target / ".mpa-workspace", "old")
+        self.write_runtime(target / ".mpa/runtime", "old")
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         release_manager.deploy(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
                                                   dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
-        backup = next((target / ".mpa-backups").iterdir())
+        backup = next((target / ".mpa/backups").iterdir())
         original_write = release_manager.write_json
         def fail_rollback_receipt(path, value):
             if path.parent == release_manager.DEPLOYMENT_RECEIPTS / "target" and value.get("status") == "rolled_back":
@@ -289,12 +289,12 @@ class ReleaseManagerTest(unittest.TestCase):
             with self.assertRaisesRegex(OSError, "receipt failed"):
                 release_manager.rollback(argparse.Namespace(target=str(target), target_ref="target", backup=str(backup.relative_to(target)),
                                                           release_id=release_id, verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
-        self.assertEqual((target / ".mpa-workspace" / "rule.md").read_text(encoding="utf-8"), "v1")
+        self.assertEqual((target / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "v1")
 
     def test_deploy_rejects_repeated_release_history(self):
         manifest = self.prepare()
         target_root = self.root / "target"
-        self.write_runtime(target_root / ".mpa-workspace", "old")
+        self.write_runtime(target_root / ".mpa/runtime", "old")
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target_root), target_ref="test-target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "test-target").glob("dry-run-*.json"))
         args = argparse.Namespace(manifest=str(manifest), target=str(target_root), target_ref="test-target", verified_by="test",
@@ -308,7 +308,7 @@ class ReleaseManagerTest(unittest.TestCase):
     def test_failed_release_history_allows_a_new_dry_run_retry(self):
         manifest = self.prepare()
         target = self.root / "target"
-        self.write_runtime(target / ".mpa-workspace", "old")
+        self.write_runtime(target / ".mpa/runtime", "old")
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target"))
         first = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         args = argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
@@ -328,7 +328,7 @@ class ReleaseManagerTest(unittest.TestCase):
         manifest = self.prepare()
         release_id = json.loads(manifest.read_text(encoding="utf-8"))["release_id"]
         target_root = self.root / "target"
-        self.write_runtime(target_root / ".mpa-workspace", "old")
+        self.write_runtime(target_root / ".mpa/runtime", "old")
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target_root), target_ref="test-target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "test-target").glob("dry-run-*.json"))
         args = argparse.Namespace(manifest=str(manifest), target=str(target_root), target_ref="test-target", verified_by="test",
@@ -336,15 +336,15 @@ class ReleaseManagerTest(unittest.TestCase):
         with mock.patch.object(release_manager, "verify_target", side_effect=[None, ValueError("verification failed")]):
             with self.assertRaisesRegex(ValueError, "verification failed"):
                 release_manager.deploy(args)
-        self.assertEqual((target_root / ".mpa-workspace" / "rule.md").read_text(encoding="utf-8"), "old")
-        history = json.loads((target_root / ".mpa-workspace" / "history" / "releases" / f"{release_id}.json").read_text(encoding="utf-8"))
+        self.assertEqual((target_root / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "old")
+        history = json.loads((target_root / ".mpa/runtime" / "history" / "releases" / f"{release_id}.json").read_text(encoding="utf-8"))
         self.assertEqual(history["status"], "failed")
         self.assertTrue(list((release_manager.DEPLOYMENT_RECEIPTS / "test-target").glob("deploy-failed-*.json")))
 
     def test_deploy_revalidates_target_receipt_and_approval(self):
         manifest = self.prepare()
         target = self.root / "target"
-        self.write_runtime(target / ".mpa-workspace", "old")
+        self.write_runtime(target / ".mpa/runtime", "old")
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         args = argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
@@ -359,7 +359,7 @@ class ReleaseManagerTest(unittest.TestCase):
             release_manager.deploy(args)
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target"))
         args.dry_run = str(max((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"), key=lambda path: path.stat().st_mtime_ns))
-        (target / ".mpa-workspace" / "unexpected.md").write_text("changed", encoding="utf-8")
+        (target / ".mpa/runtime" / "unexpected.md").write_text("changed", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "target changed"):
             release_manager.deploy(args)
 
@@ -381,7 +381,7 @@ class ReleaseManagerTest(unittest.TestCase):
     def test_target_ref_and_rollback_backup_scope_are_restricted(self):
         manifest = self.prepare()
         target_root = self.root / "target"
-        self.write_runtime(target_root / ".mpa-workspace", "old")
+        self.write_runtime(target_root / ".mpa/runtime", "old")
         with self.assertRaisesRegex(ValueError, "target-ref"):
             release_manager.deploy(argparse.Namespace(
                 manifest=str(manifest), target=str(target_root), target_ref="../escape", verified_by="test",
@@ -389,7 +389,7 @@ class ReleaseManagerTest(unittest.TestCase):
             ))
         with self.assertRaisesRegex(ValueError, "backup must be inside"):
             release_manager.rollback(argparse.Namespace(
-                target=str(target_root), target_ref="test-target", backup=".mpa-workspace",
+                target=str(target_root), target_ref="test-target", backup=".mpa/runtime",
             ))
 
     def test_repeated_preparation_creates_distinct_immutable_release_ids(self):
@@ -436,7 +436,7 @@ class ReleaseManagerTest(unittest.TestCase):
     def test_update_collects_issues_only_after_runtime_verification(self):
         manifest = self.prepare()
         target = self.root / "target"
-        self.write_runtime(target / ".mpa-workspace", "old")
+        self.write_runtime(target / ".mpa/runtime", "old")
         issue = target / "workspace" / "issues" / "issue.md"
         issue.parent.mkdir(parents=True)
         issue.write_text(release_manager.issue_text("test", "summary", "methodology_improvement"), encoding="utf-8")
@@ -451,7 +451,7 @@ class ReleaseManagerTest(unittest.TestCase):
     def test_update_issue_change_after_dry_run_preserves_source(self):
         manifest = self.prepare()
         target = self.root / "target"
-        self.write_runtime(target / ".mpa-workspace", "old")
+        self.write_runtime(target / ".mpa/runtime", "old")
         issue = target / "workspace" / "issues" / "issue.md"
         issue.parent.mkdir(parents=True)
         issue.write_text(release_manager.issue_text("test", "summary", "methodology_improvement"), encoding="utf-8")
@@ -513,7 +513,7 @@ class ReleaseManagerTest(unittest.TestCase):
     def test_deploy_legacy_current_version_records_a_single_legacy_origin(self):
         manifest = self.prepare()
         target = self.root / "legacy-target"
-        target_runtime = target / ".mpa-workspace"
+        target_runtime = target / ".mpa/runtime"
         target_runtime.mkdir(parents=True)
         (target_runtime / ".mpa-version").write_text("current_version: 2026-08-12 12:06:00\n", encoding="utf-8")
         (target_runtime / "rule.md").write_text("legacy", encoding="utf-8")
@@ -724,7 +724,7 @@ class ReleaseManagerTest(unittest.TestCase):
     def test_deploy_collection_failure_restores_runtime_and_issue(self):
         manifest = self.prepare()
         target = self.root / "target"
-        self.write_runtime(target / ".mpa-workspace", "old")
+        self.write_runtime(target / ".mpa/runtime", "old")
         issue = target / "workspace" / "issues" / "issue.md"
         issue.parent.mkdir(parents=True)
         issue.write_text(release_manager.issue_text("test", "summary", "methodology_improvement"), encoding="utf-8")
@@ -740,7 +740,7 @@ class ReleaseManagerTest(unittest.TestCase):
                 release_manager.deploy(argparse.Namespace(
                     manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
                     dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
-        self.assertEqual((target / ".mpa-workspace" / "rule.md").read_text(encoding="utf-8"), "old")
+        self.assertEqual((target / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "old")
         self.assertTrue(issue.exists())
         self.assertFalse((release_manager.ISSUES / "inbox" / "target" / issue.name).exists())
 

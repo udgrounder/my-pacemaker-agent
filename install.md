@@ -117,8 +117,8 @@ workspace는 어떤 agent를 사용하든 동일하므로 프로젝트 루트에
 
 | 조건 | 모드 |
 |------|------|
-| `.mpa-workspace/` 폴더 없음 | 신규 설치 — `install.py` 실행 |
-| `.mpa-workspace/` 폴더 있음 | 설치 중단 — 승인된 release manifest로 Runtime만 배포 |
+| `.mpa/runtime/` 폴더 없음 | 신규 설치 — `install.py` 실행 |
+| `.mpa/runtime/` 폴더 있음 | 설치 중단 — 승인된 release manifest로 Runtime만 배포 |
 
 ---
 
@@ -151,9 +151,9 @@ python3 release_manager.py deploy \
 
 ### Runtime release 준비·배포·롤백
 
-다음 명령은 **my-pacemaker-agent source 저장소에서만** 실행한다. Runtime release에는 `dist/.mpa-workspace/`만 포함된다. update 시 대상의 `workspace/` 또는 루트 `docs/`가 없으면 빈 폴더만 생성하며, 이미 존재하는 폴더·agent 설정·일반 소스는 변경하지 않는다.
+다음 명령은 **my-pacemaker-agent source 저장소에서만** 실행한다. Runtime release에는 `dist/.mpa/runtime/`만 포함된다. update 시 대상의 `workspace/` 또는 루트 `docs/`가 없으면 빈 폴더만 생성하며, 이미 존재하는 폴더·agent 설정·일반 소스는 변경하지 않는다.
 
-보관 자산은 용도별로 분리한다. `workspace/releases/<release-id>/package_<release-id>.zip`은 배포 기준과 릴리즈 이력을 보존하는 불변 release archive이고, deploy가 대상에 만드는 `.mpa-backups/` 디렉터리는 `runtime/.mpa-workspace/`와 migration 대상인 경우 `runtime-config/config.yaml`을 보존하는 운영 snapshot이다. 기존 사용자 설정은 Runtime 프로젝트 자체의 버전 관리·백업으로 관리하며 MPA deploy가 덮어쓰지 않는다.
+보관 자산은 용도별로 분리한다. `workspace/releases/<release-id>/package_<release-id>.zip`은 배포 기준과 릴리즈 이력을 보존하는 불변 release archive이고, deploy가 대상에 만드는 `.mpa/backups/` 디렉터리는 `runtime/.mpa/runtime/`와 migration 대상인 경우 `runtime-config/config.yaml`을 보존하는 운영 snapshot이다. 기존 사용자 설정은 Runtime 프로젝트 자체의 버전 관리·백업으로 관리하며 MPA deploy가 덮어쓰지 않는다.
 
 ```bash
 # 1. source 동기화·검증 후 불변 package와 manifest 생성 (출력된 단일 release ID를 기록)
@@ -185,10 +185,10 @@ python3 release_manager.py deploy \
   --dry-run workspace/receipts/deployments/<대상>/dry-run-<release-id>-<id>.json \
   --approved-by <승인자> --approval-ref <승인-기록> --rollback-owner <책임자>
 
-# 5. 문제가 있을 때, deploy 출력의 .mpa-backups/... 값을 그대로 사용해 rollback
+# 5. 문제가 있을 때, deploy 출력의 .mpa/backups/... 값을 그대로 사용해 rollback
 python3 release_manager.py rollback \
   --target <프로젝트-경로> --target-ref <소문자-식별자> \
-  --backup .mpa-backups/<release-id>-<timestamp>-<id> --release-id <release-id> \
+  --backup .mpa/backups/<release-id>-<timestamp>-<id> --release-id <release-id> \
   --verified-by <검증자> --approved-by <승인자> --approval-ref <승인-기록> \
   --rollback-owner <책임자>
 ```
@@ -201,7 +201,7 @@ python3 release_manager.py rollback \
 
 ```
 [project]/
-├── .mpa-workspace/          ← 방법론 스냅샷 (harness에서 복사)
+├── .mpa/runtime/          ← 방법론 스냅샷 (harness에서 복사)
 ├── CLAUDE.md                   ← claude 포함 시 (Agents Workspace 섹션)
 ├── AGENTS.md                   ← codex 포함 시 (Agents Workspace 섹션)
 ├── GEMINI.md                   ← antigravity 포함 시 (Agents Workspace 섹션)
@@ -219,10 +219,10 @@ python3 release_manager.py rollback \
     └── rules/mpa_pacemaker.md  ← native 폴더에 직접 배치
 ```
 
-> **hook 동작:** `.mpa-workspace/hooks/` 의 스크립트가 세션 시작 시 진행 태스크·라우팅 규칙을 주입하고,
+> **hook 동작:** `.mpa/runtime/hooks/` 의 스크립트가 세션 시작 시 진행 태스크·라우팅 규칙을 주입하고,
 > `plan.md` 상태가 `구현 중`인 active 태스크 없이 소스코드를 수정하면 차단한다.
 > 구현 승인 후에는 `plan_hash.py approve`로 `승인해시`를 갱신하며, 이후 plan.md 본문이 바뀌면 재승인이 필요하다.
 > Codex는 `.codex/hooks.json`의 `PreToolUse` matcher에 `apply_patch|write_file|replace|edit` 등을 포함해 게이트 실효성을 확보한다.
 > 게이트 강도는 환경변수 `MPA_GATE`(block/warn/off)로 조절한다.
 
-기존 설치본의 Runtime 업데이트는 배포 전 `.mpa-workspace/`와 예정된 `runtime.*` 설정을 `.mpa-backups/`에 보관한 뒤 교체·추가한다. 성공한 deploy 뒤 대상 `.mpa-backups/`의 성공 Runtime backup은 최신 3개만 남기며, 실패 backup은 정리하지 않는다. 배포·rollback은 `.mpa-project/config.yaml`의 기존 project/user 값, agent 설정, `workspace/`, 루트 `docs/`, 일반 소스를 변경하지 않는다. migration으로 추가된 MPA 설정은 rollback 때 함께 복원하며, 그 밖의 설정 변경과 전체 프로젝트 백업은 Runtime 프로젝트 자체의 절차로 처리한다.
+기존 설치본의 Runtime 업데이트는 배포 전 `.mpa/runtime/`와 예정된 `runtime.*` 설정을 `.mpa/backups/`에 보관한 뒤 교체·추가한다. 성공한 deploy 뒤 대상 `.mpa/backups/`의 성공 Runtime backup은 최신 3개만 남기며, 실패 backup은 정리하지 않는다. 배포·rollback은 `.mpa/config/config.yaml`의 기존 project/user 값, agent 설정, `workspace/`, 루트 `docs/`, 일반 소스를 변경하지 않는다. migration으로 추가된 MPA 설정은 rollback 때 함께 복원하며, 그 밖의 설정 변경과 전체 프로젝트 백업은 Runtime 프로젝트 자체의 절차로 처리한다.

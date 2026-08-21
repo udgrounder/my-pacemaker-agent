@@ -139,7 +139,7 @@
 - 진짜 결정 변수: **이 MPA repo를 "중앙 지식 허브"로 쓸 것인가?**
   - 후보 A: `guidebook/tools/` 또는 repo 최상위 `tools/` — 이 repo를 허브로. (단 guidebook *안*보다 별도 폴더가 성격상 나음)
   - 후보 B: 개인 전역(`~/.claude/` 등) — "로컬 전반" 범위에 정합, 모든 프로젝트 일관 참조.
-  - 후보 C: MPA 배포 자산(`.mpa-workspace/`) — MPA 사용자에 배포. 단 외부도구라 방법론 자산으로 보긴 약함.
+  - 후보 C: MPA 배포 자산(`.mpa/runtime/`) — MPA 사용자에 배포. 단 외부도구라 방법론 자산으로 보긴 약함.
 
 - **결정(Round 11): 후보 A.** repo 최상위 `tools/`(guidebook과 형제, guidebook 안 아님). 이 MPA repo를 **중앙 지식 허브**로 삼는다 → "로컬 환경 전반" 참조 지점 = 이 repo. 범위 미스매치 해소됨.
 

@@ -19,7 +19,7 @@ from project_config import (CONFIG_RELATIVE, apply_runtime_config_migration,
 
 HARNESS_ROOT = Path(__file__).parent
 DIST_ROOT = HARNESS_ROOT / "dist"
-AGENTS_WORKSPACE_SRC = DIST_ROOT / ".mpa-workspace"
+AGENTS_WORKSPACE_SRC = DIST_ROOT / ".mpa/runtime"
 WORKSPACE_TEMPLATE_SRC = DIST_ROOT / "workspace"
 AGENT_SPECS_SRC = HARNESS_ROOT / "agent-specs"
 AGENT_CONFIGS_SRC = HARNESS_ROOT / "agent-configs"  # 레거시 fallback
@@ -39,14 +39,14 @@ HOOK_SETTINGS_PATH = {
     "codex":  (".codex", "hooks.json"),
 }
 
-HOOK_DIR_REL = ".mpa-workspace/hooks"
+HOOK_DIR_REL = ".mpa/runtime/hooks"
 HOOK_MARKER = "mpa-workspace/hooks"  # 멱등성 판별용 (이미 등록됐는지)
 
 
 def _hook_cmd(script: str, agent: str) -> str:
     """훅 커맨드 문자열을 만든다.
 
-    상대경로(`.mpa-workspace/hooks/...`)만 쓰면 에이전트가 Bash에서 cd한 뒤
+    상대경로(`.mpa/runtime/hooks/...`)만 쓰면 에이전트가 Bash에서 cd한 뒤
     cwd가 바뀐 상태로 훅이 실행될 때 파일을 못 찾아 크래시한다
     (`workspace/issues/`로 이관된 hook path robustness issue 참조).
     agent별로 cwd에 의존하지 않는 방식을 쓴다 — 둘 다 절대경로를 파일에
@@ -137,8 +137,8 @@ _IGNORE = shutil.ignore_patterns(".DS_Store", ".gitkeep")
 
 
 def read_legacy_installed(agents_workspace_dst: Path) -> str:
-    """업그레이드 시 .mpa-workspace 교체 전에 호출한다.
-    구버전 .mpa-workspace/.mpa-version에서 설치일(installed_at 또는 레거시
+    """업그레이드 시 .mpa/runtime 교체 전에 호출한다.
+    구버전 .mpa/runtime/.mpa-version에서 설치일(installed_at 또는 레거시
     harness_date)을 읽어 마이그레이션용으로 반환한다. 없으면 빈 문자열.
     (방법론 release ID는 `current_release`로 분리되며 install.py가 다루지 않는다.)
     """
@@ -157,7 +157,7 @@ def read_legacy_installed(agents_workspace_dst: Path) -> str:
 def write_version(workspace_dst: Path, mode: str, legacy_installed: str = ""):
     """프로젝트 설치 이력을 workspace/.mpa-version-info에 기록한다.
 
-    방법론 release ID(current_release)는 .mpa-workspace/.mpa-version에 있고 통째 교체로
+    방법론 release ID(current_release)는 .mpa/runtime/.mpa-version에 있고 통째 교체로
     갱신되므로 여기서 다루지 않는다. 이력은 workspace에 있어 업그레이드 시 보존된다.
 
     - installed_at: 기존 history 값 보존 > 레거시 승계(마이그레이션) > 설치 당일
@@ -192,7 +192,7 @@ def write_version(workspace_dst: Path, mode: str, legacy_installed: str = ""):
 
 def copy_agents_workspace(dst: Path):
     shutil.copytree(AGENTS_WORKSPACE_SRC, dst, ignore=_IGNORE)
-    print(f"  [복사] .mpa-workspace/ → {dst}")
+    print(f"  [복사] .mpa/runtime/ → {dst}")
 
 
 
@@ -339,7 +339,7 @@ def copy_workspace_template(dst: Path, upgrade: bool = False):
 
 def make_hooks_executable(project_path: Path):
     """설치된 hook 스크립트에 실행 권한을 부여한다."""
-    hooks_dir = project_path / ".mpa-workspace" / "hooks"
+    hooks_dir = project_path / ".mpa/runtime" / "hooks"
     if not hooks_dir.exists():
         return
     for f in hooks_dir.glob("*.py"):
@@ -404,7 +404,7 @@ def wire_hooks(agent: str, project_path: Path):
 
 
 def run_install(project_path: Path, agents: list, upgrade: bool, runtime_config=None):
-    agents_workspace_dst = project_path / ".mpa-workspace"
+    agents_workspace_dst = project_path / ".mpa/runtime"
     workspace_dst = project_path / "workspace"
 
     if upgrade:
@@ -419,7 +419,7 @@ def run_install(project_path: Path, agents: list, upgrade: bool, runtime_config=
         migration_result = apply_runtime_config_migration(project_path, runtime_config)
         print(f"  [Runtime config] {migration_result['status']} — 추가: {', '.join(migration_result.get('add', [])) or '없음'}")
 
-    print("\n[1단계] .mpa-workspace 설치")
+    print("\n[1단계] .mpa/runtime 설치")
     copy_agents_workspace(agents_workspace_dst)
     print("\n[2단계] workspace 초기화")
     copy_workspace_template(workspace_dst)
@@ -551,13 +551,13 @@ def main():
         project_path = prompt_project_path()
 
     # 2. 최초 설치만 담당한다. Runtime 업데이트는 release_manager.py deploy로
-    # .mpa-workspace만 교체해야 하므로 여기서 workspace/설정을 다시 건드리지 않는다.
-    agents_workspace_dst = project_path / ".mpa-workspace"
+    # .mpa/runtime만 교체해야 하므로 여기서 workspace/설정을 다시 건드리지 않는다.
+    agents_workspace_dst = project_path / ".mpa/runtime"
     if cli.upgrade or agents_workspace_dst.exists():
         print("오류: 기존 설치본 업데이트는 release_manager.py deploy를 사용하세요.")
         return 1
     upgrade = False
-    print(f"\n.mpa-workspace/ 없음 → 신규 설치 모드")
+    print(f"\n.mpa/runtime/ 없음 → 신규 설치 모드")
 
     # 3. agent 선택
     if cli.agents:
@@ -578,7 +578,7 @@ def main():
         return 1
 
     # 신규 설치 전에 source·Python·agent spec의 최소 실행 조건과 변경 범위를 확인한다.
-    missing = [str(path) for path in (DIST_ROOT / ".mpa-workspace", DIST_ROOT / "workspace") if not path.is_dir()]
+    missing = [str(path) for path in (DIST_ROOT / ".mpa/runtime", DIST_ROOT / "workspace") if not path.is_dir()]
     missing.extend(str(AGENT_SPECS_SRC / agent / "spec.md") for agent in agents
                    if not (AGENT_SPECS_SRC / agent / "spec.md").is_file())
     for agent in agents:
@@ -608,7 +608,7 @@ def main():
         "mode": "install",
         "target": str(project_path),
         "agents": agents,
-        "create": (["project root/"] if not project_path.exists() else []) + [".mpa-workspace/", "workspace/ initial skeleton", "docs/ empty user document root", "selected agent entry settings"] + ([CONFIG_RELATIVE] if config_plan["status"] == "create" else []),
+        "create": (["project root/"] if not project_path.exists() else []) + [".mpa/runtime/", "workspace/ initial skeleton", "docs/ empty user document root", "selected agent entry settings"] + ([CONFIG_RELATIVE] if config_plan["status"] == "create" else []),
         "add": {CONFIG_RELATIVE: config_plan.get("add", [])},
         "preserve": ["workspace/ existing data", "docs/", CONFIG_RELATIVE, "existing agent settings", "general source files"],
         "project_config": config_plan,
@@ -631,7 +631,7 @@ def main():
     print(f"  모드    : {mode}")
     print(f"  경로    : {project_path}")
     print(f"  agents  : {', '.join(agents)}")
-    print(f"  변경    : .mpa-workspace/, workspace/ 초기 골격, 빈 docs/, {CONFIG_RELATIVE} 보강, 선택 agent 진입 설정")
+    print(f"  변경    : .mpa/runtime/, workspace/ 초기 골격, 빈 docs/, {CONFIG_RELATIVE} 보강, 선택 agent 진입 설정")
     print(f"─────────────────────────────")
 
     if cli.dry_run:

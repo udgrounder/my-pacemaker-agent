@@ -22,6 +22,6 @@
 - 기록 위치: `think-more/discussion/` (자유 서술). code_gate가 토론 기록 경로를 막지 않도록 처리 방안 검토 — 옵션: (a) `think-more/`를 ALLOW_PREFIXES에 추가, (b) 토론 모드 전용 경량 상태.
 
 ## 적용 대상 파일
-- `.mpa-workspace/core/agent_rules.md` (라우팅 표 + 토론 모드 섹션)
-- `.mpa-workspace/hooks/code_gate.py` (think-more/ 게이트 마찰 해소 검토)
-- 동기화: `dist/.mpa-workspace/`
+- `.mpa/runtime/core/agent_rules.md` (라우팅 표 + 토론 모드 섹션)
+- `.mpa/runtime/hooks/code_gate.py` (think-more/ 게이트 마찰 해소 검토)
+- 동기화: `dist/.mpa/runtime/`

@@ -7,30 +7,30 @@
 | Plane | 소유·진입점 | 복사/배포 규칙 |
 |---|---|---|
 | map-product | `MAP_PRODUCT_RULES.md`, `map-product-rules/`, `release_manager.py`, `install.py`, source `workspace/` | source 전용이며 배포하지 않음 |
-| Runtime | `.mpa-workspace/` | `sync-runtime`으로만 `dist/.mpa-workspace/`에 동기화하고 release asset으로 포함 |
+| Runtime | `.mpa/runtime/` | `sync-runtime`으로만 `dist/.mpa/runtime/`에 동기화하고 release asset으로 포함 |
 | 신규 설치 골격 | `dist/workspace/` | 최초 설치에만 복사, Runtime release에는 제외 |
-| 설치 고유 설정 | 대상 `.mpa-project/config.yaml` | 최초 install에서 없을 때 생성, 기존 파일은 누락 필드만 additive 보강. release의 `runtime.*` migration만 deploy transaction에서 추가하며 release ZIP에는 포함하지 않음 |
+| 설치 고유 설정 | 대상 `.mpa/config/config.yaml` | 최초 install에서 없을 때 생성, 기존 파일은 누락 필드만 additive 보강. release의 `runtime.*` migration만 deploy transaction에서 추가하며 release ZIP에는 포함하지 않음 |
 | 대상 사용자 데이터 | 대상 `workspace/`, 루트 `docs/`, agent 설정, 일반 소스 | install/deploy/rollback이 보존하며 release에 포함하지 않음 |
 
-release는 `workspace/releases/<release-id>/`의 `package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json` 단일 immutable bundle로 고정한다. deployment는 ZIP을 안전하게 해제한 뒤 dry-run·승인·rollback 책임자 검증을 거쳐 대상 `.mpa-workspace`를 교체하고, manifest에 있는 `runtime.*` migration만 config에 additive 적용하며 대상 history와 receipt를 남긴다. Git은 scoped source 식별 보조 정보일 뿐 dirty worktree 차단 Gate가 아니다.
+release는 `workspace/releases/<release-id>/`의 `package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json` 단일 immutable bundle로 고정한다. deployment는 ZIP을 안전하게 해제한 뒤 dry-run·승인·rollback 책임자 검증을 거쳐 대상 `.mpa/runtime`를 교체하고, manifest에 있는 `runtime.*` migration만 config에 additive 적용하며 대상 history와 receipt를 남긴다. Git은 scoped source 식별 보조 정보일 뿐 dirty worktree 차단 Gate가 아니다.
 
 ### 보관·복구 자산의 용도 구분
 
 | 자산 | 생성 위치·주체 | 보관하는 것 | 사용하는 시점 | 보존 정책 |
 |---|---|---|---|---|
-| Runtime release | source `workspace/releases/<release-id>/` · `prepare-release` | 배포할 `.mpa-workspace`의 불변 ZIP과 manifest/note/receipt | `release-audit`, deployment dry-run/deploy의 기준본, 릴리즈 이력·감사 | release ID별 immutable archive. 자동 삭제하지 않으며 별도 archive 정책으로 관리 |
-| Runtime deploy backup | 대상 `.mpa-backups/<release-id>-<timestamp>-<attempt-id>/` · `deploy` | `runtime/.mpa-workspace/` 및 migration 대상 `runtime-config/config.yaml` | 같은 Runtime 프로젝트에서 직전 MPA Runtime과 MPA 관리 설정을 함께 rollback | 성공 marker가 있는 백업 최신 3개. 실패 백업·marker 없는 사용자 snapshot은 보존·미사용 |
+| Runtime release | source `workspace/releases/<release-id>/` · `prepare-release` | 배포할 `.mpa/runtime`의 불변 ZIP과 manifest/note/receipt | `release-audit`, deployment dry-run/deploy의 기준본, 릴리즈 이력·감사 | release ID별 immutable archive. 자동 삭제하지 않으며 별도 archive 정책으로 관리 |
+| Runtime deploy backup | 대상 `.mpa/backups/<release-id>-<timestamp>-<attempt-id>/` · `deploy` | `runtime/.mpa/runtime/` 및 migration 대상 `runtime-config/config.yaml` | 같은 Runtime 프로젝트에서 직전 MPA Runtime과 MPA 관리 설정을 함께 rollback | 성공 marker가 있는 백업 최신 3개. 실패 백업·marker 없는 사용자 snapshot은 보존·미사용 |
 
 두 자산은 서로 대체하지 않는다. release ZIP은 “무엇을 배포했는가”를 보존하고, Runtime backup은 “대상에 배포하기 직전의 MPA Runtime과 MPA 관리 설정이 무엇이었는가”를 보존한다. Runtime 프로젝트의 사용자 설정 변경과 전체 프로젝트 백업은 Runtime 프로젝트 자체의 버전 관리·백업 절차로 처리한다.
 
 ### 설치 고유 설정의 additive-only 관리
 
-설치본의 프로젝트명·초기화 시각·canonical 절대 경로는 `.mpa-project/config.yaml`에 둔다. 파일이 없으면 schema 1 기본값으로 생성하고, 파일이 있으면 지원되는 현재 schema에서 누락 필드만 원자적으로 추가한다. 기존 값·주석·순서·사용자 지정 빈 값은 자동 수정하지 않는다. 잘못된 값이나 미래 schema는 경고·audit 대상으로 보존한다.
+설치본의 프로젝트명·초기화 시각·canonical 절대 경로는 `.mpa/config/config.yaml`에 둔다. 파일이 없으면 schema 1 기본값으로 생성하고, 파일이 있으면 지원되는 현재 schema에서 누락 필드만 원자적으로 추가한다. 기존 값·주석·순서·사용자 지정 빈 값은 자동 수정하지 않는다. 잘못된 값이나 미래 schema는 경고·audit 대상으로 보존한다.
 
 `project.root_path`는 설치 로컬 메타데이터다. Runtime package, manifest asset checksum, issue, 중앙 receipt에 절대 경로를 복사하지 않으며 프로젝트 이동 시 기존 canonical path를 덮어쓰지 않는다. release의 `${project.*}` 참조는 deploy 대상의 현재 local config 값으로만 해석한다. Runtime deploy/rollback은 기존 project/user 값과 agent 설정을 변경하지 않고, 배포 전 MPA 관리 설정을 Runtime backup에 함께 보존한다.
 
 ### dist/ 가 단일 배포 소스
-`install.py`가 `dist/.mpa-workspace/`를 대상 프로젝트로 복사한다.  
+`install.py`가 `dist/.mpa/runtime/`를 대상 프로젝트로 복사한다.  
 `agent-configs/`는 구버전 호환 fallback이며 신규 개발 대상이 아니다.  
 > 이 프로젝트에서의 개발 워크플로우(수정 순서·동기화 방법)는 `workspace/project_rules.md` 참조.
 
@@ -40,8 +40,8 @@ release는 `workspace/releases/<release-id>/`의 `package_<release-id>.zip`, `ma
 `agent-specs/{agent}/files/` — 대상 프로젝트에 복사할 파일  
 `agent-specs/{agent}/spec.md` — 설치 내용 설명
 
-### workspace/ vs .mpa-workspace/ 분리
-`.mpa-workspace/` — 에이전트 행동 규칙 (모든 프로젝트 공통, 체계 버전과 함께 변경)  
+### workspace/ vs .mpa/runtime/ 분리
+`.mpa/runtime/` — 에이전트 행동 규칙 (모든 프로젝트 공통, 체계 버전과 함께 변경)  
 `workspace/` — 이 프로젝트 고유 데이터 (업그레이드 시 보존)
 
 ### tools/ — 외부 도구 운영 가이드
@@ -83,7 +83,7 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 마커가 없으면 done 전체를 기준으로 한다. 타입 컬럼 없는 기존 태스크는 `minor`로 간주한다.
 
 ### 프로젝트 확장 영역
-`.mpa-workspace/`는 MPA 시스템 소유 — 업그레이드 시 덮어씌워진다. 원칙적으로 issue의 검토 내용을 사용자에게 제시한다. 사용자가 채택하면 새 작업 항목 plan을 만든 뒤 이슈에 연결하고 archive하며, 기각하면 판단 근거를 이슈에 기록하고 archive한다. 사용자가 승인한 MPA 수정 작업 항목에서만 직접 수정한다.
+`.mpa/runtime/`는 MPA 시스템 소유 — 업그레이드 시 덮어씌워진다. 원칙적으로 issue의 검토 내용을 사용자에게 제시한다. 사용자가 채택하면 새 작업 항목 plan을 만든 뒤 이슈에 연결하고 archive하며, 기각하면 판단 근거를 이슈에 기록하고 archive한다. 사용자가 승인한 MPA 수정 작업 항목에서만 직접 수정한다.
 `workspace/`는 프로젝트 소유 — 업그레이드해도 보존됨. 여기서 자유롭게 확장.
 
 프로젝트 고유 확장 지점:
@@ -92,7 +92,7 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 - `workspace/memory/shared/architecture.md` — 아키텍처 결정
 
 ### MPA 시스템 파일 수정 거버넌스
-`.mpa-workspace/` 하위 파일 수정은 일반 소스 코드 수정과 다른 규칙을 따른다.
+`.mpa/runtime/` 하위 파일 수정은 일반 소스 코드 수정과 다른 규칙을 따른다.
 - 페르소나: `personas/mpa_system_designer.md`
 - 코드 게이트 미적용 (YAML 프론트매터 상태 기반 게이트와 별개)
 - 비평: 새 스레드 원칙 / 환경 미지원 시 같은 스레드 허용
@@ -147,13 +147,13 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 
 | 저장소 | 내용 | 성격 |
 |--|--|--|
-| `.mpa-workspace/skills/<도메인>/` | 도메인 **방법·패턴**(어떻게 쓰나) | MPA 배포, 재사용 |
-| `.mpa-workspace/knowledge/[도메인].md` | 승격된 **검증 사실**(크로스 프로젝트) | upgrade-candidates 승인 후 승격 |
+| `.mpa/runtime/skills/<도메인>/` | 도메인 **방법·패턴**(어떻게 쓰나) | MPA 배포, 재사용 |
+| `.mpa/runtime/knowledge/[도메인].md` | 승격된 **검증 사실**(크로스 프로젝트) | upgrade-candidates 승인 후 승격 |
 | `workspace/memory/domains/<도메인>/` | 이 프로젝트의 **규칙·레지스트리**(=기억) | 프로젝트 데이터, 보존 |
 
 - skills=방법 / knowledge=검증 사실 / memory/domains=프로젝트 기억. 역할이 다르다.
 - **개념적 소유**(역할 종속성 — *언제 활성화*)와 **물리적 저장**(응집·DRY·이식성)은 별개다. 섞지 않는다.
-- 프로젝트 고유 주제 도메인이 생기면 `.mpa-workspace/skills/`(재사용)와 분리해 둔다.
+- 프로젝트 고유 주제 도메인이 생기면 `.mpa/runtime/skills/`(재사용)와 분리해 둔다.
 - **가용 도메인 집합 선언:** 이 프로젝트가 쓰는 주제 도메인 목록은 `workspace/memory/shared/project_identity.md`에 선언한다(사실이므로 코드 작업 시 로드됨). inject는 이 목록을 보고 활성 부분집합을 당긴다. 이 프로젝트(방법론)는 주제 도메인이 사실상 없어 **비워둔다** — 다른 프로젝트 도입 시 채운다.
 
 ### "스킬" 정의 — how-to ≠ what-is (성격 명시)
@@ -188,7 +188,7 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 
 ---
 
-## 파일별 역할 (dist/.mpa-workspace/) — 구성 층위 기준
+## 파일별 역할 (dist/.mpa/runtime/) — 구성 층위 기준
 
 | 파일/폴더 | 구성 층위 | 역할 |
 |------|------|------|
@@ -213,6 +213,6 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 
 ## 안티패턴
 
-- 시스템 파일 수정은 설치본 `.mpa-workspace/`에서 하고 `dist/`에 동기화한다 (project_rules.md). `dist/`·`agent-configs/`(동기화·생성 대상)를 직접 손대지 않는다 — 직접 편집하면 미러·재생성 시 어긋나거나 덮인다
+- 시스템 파일 수정은 설치본 `.mpa/runtime/`에서 하고 `dist/`에 동기화한다 (project_rules.md). `dist/`·`agent-configs/`(동기화·생성 대상)를 직접 손대지 않는다 — 직접 편집하면 미러·재생성 시 어긋나거나 덮인다
 - shared/ 파일에 결정 로그를 누적하지 않는다. 현재 상태만 유지한다
 - 에이전트가 사용자 확인 없이 태스크 상태를 완료로 전환하지 않는다

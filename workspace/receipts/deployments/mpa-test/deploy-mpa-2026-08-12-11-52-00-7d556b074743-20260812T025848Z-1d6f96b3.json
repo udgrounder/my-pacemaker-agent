@@ -5,7 +5,7 @@
   "to_version": "2026-08-12 11:52:00",
   "manifest": "workspace/releases/manifests/mpa-2026-08-12-11-52-00-7d556b074743.json",
   "target": "/Users/kjkim/Temp/mpa-test",
-  "backup": ".mpa-backups/mpa-2026-08-12-11-52-00-7d556b074743-20260812T025848Z-e9ac015a",
+  "backup": ".mpa/backups/mpa-2026-08-12-11-52-00-7d556b074743-20260812T025848Z-e9ac015a",
   "applied_at": "2026-08-12T02:58:48+00:00",
   "verified_by": "kjkim",
   "approved_by": "kjkim",

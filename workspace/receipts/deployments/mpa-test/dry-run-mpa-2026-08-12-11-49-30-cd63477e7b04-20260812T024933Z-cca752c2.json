@@ -136,7 +136,7 @@
       "release_id": "mpa-9326fb5686135269",
       "manifest": "workspace/releases/manifests/mpa-9326fb5686135269.json",
       "target": "/Users/kjkim/Temp/mpa-test",
-      "backup": ".mpa-backups/mpa-9326fb5686135269-20260812T021312Z-48c0526a",
+      "backup": ".mpa/backups/mpa-9326fb5686135269-20260812T021312Z-48c0526a",
       "applied_at": "2026-08-12T02:13:12+00:00",
       "verified_by": "codex",
       "approved_by": "kjkim",

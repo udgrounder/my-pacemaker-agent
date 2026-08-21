@@ -137,7 +137,7 @@
       "manifest": "workspace/releases/20260820050245-d601a2bb/manifest_20260820050245-d601a2bb.json",
       "target_ref": "mpa-test3",
       "target_fingerprint": "7a2be79d5e8f63fe",
-      "backup": ".mpa-backups/20260820050245-d601a2bb-20260820T093617Z-c7d36e21",
+      "backup": ".mpa/backups/20260820050245-d601a2bb-20260820T093617Z-c7d36e21",
       "applied_at": "2026-08-20T09:36:17+00:00",
       "verified_by": "deployment-dry-run + release-audit",
       "approved_by": "kjkim",

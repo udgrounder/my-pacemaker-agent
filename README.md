@@ -67,16 +67,16 @@ agent가 진행하는 절차:
 
 1. 프로젝트 경로 확인
 2. 사용할 agent 결정 — 프로젝트 폴더를 보고 자동 감지한 뒤 사용자 확인
-3. `.mpa-workspace/` 존재 여부로 신규 설치 또는 Runtime 배포 절차 판단
+3. `.mpa/runtime/` 존재 여부로 신규 설치 또는 Runtime 배포 절차 판단
 4. 신규 설치일 때만 수집한 정보를 요약해 설치 실행
 
 **지원 agent:** `claude`(CLAUDE.md) · `codex`(AGENTS.md) · `antigravity`(GEMINI.md) · `openagent`(실험적·수동 설정 — 자동 진입점·hook 연결 없음)
 
-설치되면 프로젝트에 `.mpa-workspace/`(방법론 파일), `workspace/`(프로젝트 데이터 골격), 빈 루트 `docs/`, 설치 고유 설정 `.mpa-project/config.yaml`이 준비되고, 자동 연결이 확인된 선택 agent의 진입점이 루트 설정 파일에 추가된다. `openagent`는 예외로 Runtime만 설치하며, 연결은 [OpenAgent spec](agent-specs/openagent/spec.md)의 확인 절차 뒤 수동으로 설정한다. config가 없으면 기본 프로젝트명·초기화 시각·절대 root path를 기록하며, 기존 config가 있으면 누락 필드만 보강한다. Runtime이 사용할 초기 `runtime.*` 값이 필요하면 신규 설치에서 `--runtime-config-json`으로 additive defaults를 제공할 수 있다. 기존 값과 사용자 파일은 변경하지 않는다. 자세한 절차와 옵션은 [`install.md`](install.md), 운영 맥락은 가이드북 9장을 참조한다.
+설치되면 프로젝트에 `.mpa/runtime/`(방법론 파일), `workspace/`(프로젝트 데이터 골격), 빈 루트 `docs/`, 설치 고유 설정 `.mpa/config/config.yaml`이 준비되고, 자동 연결이 확인된 선택 agent의 진입점이 루트 설정 파일에 추가된다. `openagent`는 예외로 Runtime만 설치하며, 연결은 [OpenAgent spec](agent-specs/openagent/spec.md)의 확인 절차 뒤 수동으로 설정한다. config가 없으면 기본 프로젝트명·초기화 시각·절대 root path를 기록하며, 기존 config가 있으면 누락 필드만 보강한다. Runtime이 사용할 초기 `runtime.*` 값이 필요하면 신규 설치에서 `--runtime-config-json`으로 additive defaults를 제공할 수 있다. 기존 값과 사용자 파일은 변경하지 않는다. 자세한 절차와 옵션은 [`install.md`](install.md), 운영 맥락은 가이드북 9장을 참조한다.
 
-기존 설치본의 Runtime update는 `install.py`가 아니라 source 저장소의 `release_manager.py`를 사용한다. `prepare-release → release-audit → deployment-dry-run → deploy` 순서이며, `prepare-release`가 UTC `YYYYMMDDHHMMSS-uuid8` 단일 release ID를 생성하고 source/dist에 기록한다. 필요한 경우 `--runtime-config-json`으로 `runtime.*` additive 기본값을 release manifest에 포함할 수 있다. deploy는 `${project.name}`, `${project.root_path}`, `${project.initialized_at}`를 대상 `.mpa-project/config.yaml`의 현재 값으로 해석하고 누락값만 추가한다. 산출물은 `workspace/releases/<release-id>/` 아래 `package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json` 한 묶음으로 보관한다. deploy에는 명시 승인과 rollback 책임자가 필요하고, update 중 발견된 issue 후보는 dry-run에서 고지한 뒤 검증 성공 시 원자 수집하며 실패하면 원본을 보존한다. 대상의 `workspace/`·루트 `docs/`가 없으면 빈 폴더만 생성하고, 이미 존재하는 폴더·agent 설정은 변경하지 않는다.
+기존 설치본의 Runtime update는 `install.py`가 아니라 source 저장소의 `release_manager.py`를 사용한다. `prepare-release → release-audit → deployment-dry-run → deploy` 순서이며, `prepare-release`가 UTC `YYYYMMDDHHMMSS-uuid8` 단일 release ID를 생성하고 source/dist에 기록한다. 필요한 경우 `--runtime-config-json`으로 `runtime.*` additive 기본값을 release manifest에 포함할 수 있다. deploy는 `${project.name}`, `${project.root_path}`, `${project.initialized_at}`를 대상 `.mpa/config/config.yaml`의 현재 값으로 해석하고 누락값만 추가한다. 산출물은 `workspace/releases/<release-id>/` 아래 `package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json` 한 묶음으로 보관한다. deploy에는 명시 승인과 rollback 책임자가 필요하고, update 중 발견된 issue 후보는 dry-run에서 고지한 뒤 검증 성공 시 원자 수집하며 실패하면 원본을 보존한다. 대상의 `workspace/`·루트 `docs/`가 없으면 빈 폴더만 생성하고, 이미 존재하는 폴더·agent 설정은 변경하지 않는다.
 
-release ZIP은 릴리즈 상태를 장기 보존하는 기준본이며, deploy의 `.mpa-backups/`는 대상별 즉시 rollback snapshot이다. 둘은 같은 파일을 보관하더라도 용도가 다르므로 release ZIP을 대상 backup 대신 사용하지 않는다. deploy backup에는 `runtime/.mpa-workspace/`와 migration이 있는 경우 `runtime-config/config.yaml`을 함께 보존하고, 성공 백업 최신 3개를 유지한다. rollback은 두 snapshot을 함께 복원하며, 기존 사용자 설정 값은 migration에서도 덮어쓰지 않는다.
+release ZIP은 릴리즈 상태를 장기 보존하는 기준본이며, deploy의 `.mpa/backups/`는 대상별 즉시 rollback snapshot이다. 둘은 같은 파일을 보관하더라도 용도가 다르므로 release ZIP을 대상 backup 대신 사용하지 않는다. deploy backup에는 `runtime/.mpa/runtime/`와 migration이 있는 경우 `runtime-config/config.yaml`을 함께 보존하고, 성공 백업 최신 3개를 유지한다. rollback은 두 snapshot을 함께 복원하며, 기존 사용자 설정 값은 migration에서도 덮어쓰지 않는다.
 
 ---
 
@@ -137,11 +137,11 @@ Agent가 `workspace/tasks/active/`에서 해당 작업 항목의 `plan.md`와 `c
 ```
 레벨 0: 왜 (Why)        ← AI 협업의 기본 원칙
   원칙                     출처(설계 사고): workspace/exploration/ (이 레포의 탐구 공간)
-  ↓ 근거 제공              요약(운용): .mpa-workspace/core/principles.md
+  ↓ 근거 제공              요약(운용): .mpa/runtime/core/principles.md
                            변경: 협업 방식의 근본이 바뀔 때
 
 레벨 1: 어떻게 (How)    ← 페이스메이커를 움직이는 방법론 (이 도구의 본체)
-  .mpa-workspace/          페르소나·스킬·inject·워크플로우
+  .mpa/runtime/          페르소나·스킬·inject·워크플로우
   ↓ 템플릿 제공            변경: 방법론이 개선될 때 (모든 프로젝트에 영향)
 
 레벨 2: 무엇을 (What)   ← 이 프로젝트의 실제 데이터
@@ -151,7 +151,7 @@ Agent가 `workspace/tasks/active/`에서 해당 작업 항목의 `plan.md`와 `c
 
 **레벨 구분의 의미:**  
 이 도구는 "프로젝트마다 쓸 작업 방식을 만들어 주는 도구"다.  
-레벨 1(`.mpa-workspace/`)을 수정하면 모든 프로젝트에 영향을 준다.  
+레벨 1(`.mpa/runtime/`)을 수정하면 모든 프로젝트에 영향을 준다.  
 레벨 2(`workspace/`)를 수정하면 해당 프로젝트에만 영향을 준다.  
 이 분리 덕분에 도구·방법론이 업그레이드되어도 프로젝트 데이터가 흔들리지 않는다.
 
@@ -159,11 +159,11 @@ Agent가 `workspace/tasks/active/`에서 해당 작업 항목의 `plan.md`와 `c
 
 ## 구조 원칙
 
-| | 레벨 0 (원칙) | 레벨 1 (`.mpa-workspace/`) | 레벨 2 (`workspace/`) |
+| | 레벨 0 (원칙) | 레벨 1 (`.mpa/runtime/`) | 레벨 2 (`workspace/`) |
 |--|---------------------|------------------|---------------------|
 | 질문 | 왜 이렇게 일하는가 | 어떻게 일하는가 | 이 프로젝트는 무엇인가 |
 | 내용 | 기본 원칙, 판단 기준 | 방법, 절차, 템플릿 | 프로젝트 데이터 |
-| 위치 | `workspace/exploration/` · `core/principles.md` | `.mpa-workspace/` | `workspace/` |
+| 위치 | `workspace/exploration/` · `core/principles.md` | `.mpa/runtime/` | `workspace/` |
 | 변경 주체 | 팀 논의 | 방법론 설계자 | 프로젝트 팀(agent) |
 | 재사용 | 모든 방법론의 근거 | 모든 프로젝트 공통 | 프로젝트마다 별도 |
 
@@ -176,7 +176,7 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 │
 ├── dist/                             ← 설치 소스 (프로젝트에 복사되는 파일들)
 │   │
-│   ├── .mpa-workspace/               ← 방법론 스냅샷 (복사 소스)
+│   ├── .mpa/runtime/               ← 방법론 스냅샷 (복사 소스)
 │   │   ├── core/                         ← 원칙과 프로토콜 (principles / agent_rules / session_protocol)
 │   │   ├── personas/                     ← agent 역할 정의 (WHO)
 │   │   ├── skills/                       ← agent 능력 정의 (WHAT IT KNOWS)
@@ -187,7 +187,7 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 │   │   ├── templates/                    ← 파일 생성용 템플릿 (plan/changelog/shared 등)
 │   │
 │   └── workspace/                    ← workspace/ 초기화 템플릿 (복사 소스, 골격만)
-│       ├── README.md  (workspace·.mpa-workspace 사용 안내 — 설치본 사용자용)
+│       ├── README.md  (workspace·.mpa/runtime 사용 안내 — 설치본 사용자용)
 │       ├── memory/   (shared/ domains/ roles/ 빈 골격)
 │       ├── tasks/    (INDEX.md, active/ done/)
 │
@@ -205,26 +205,26 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 
 ```
 [project]/
-├── .mpa-workspace/    ← 방법론 (승인된 Runtime release로 최신화; 원칙적 issue→review, 승인된 MPA 작업 항목에서만 직접 수정)
+├── .mpa/runtime/    ← 방법론 (승인된 Runtime release로 최신화; 원칙적 issue→review, 승인된 MPA 작업 항목에서만 직접 수정)
 │   ├── core/, personas/, skills/, workflows/, inject/
 │   ├── hooks/, templates/, knowledge/
 │
 └── workspace/            ← 프로젝트 데이터 (agent가 직접 관리)
-    ├── README.md         ← 설치본 사용자용 안내 (workspace·.mpa-workspace 소개)
+    ├── README.md         ← 설치본 사용자용 안내 (workspace·.mpa/runtime 소개)
     ├── memory/
     ├── tasks/
 ```
 
 | 폴더 | 역할 | 업데이트 방식 |
 |------|------|--------------|
-| `.mpa-workspace/` | 방법론 (HOW) | 승인된 Runtime release로만 최신화 / `mpa_system_designer` 프로세스로 직접 수정 가능 |
+| `.mpa/runtime/` | 방법론 (HOW) | 승인된 Runtime release로만 최신화 / `mpa_system_designer` 프로세스로 직접 수정 가능 |
 | `workspace/` | 프로젝트 데이터 (WHAT) — agent가 관리 | 작업할 때마다 자동 업데이트 |
 
 ---
 
 ## Hook (가드레일)
 
-`.mpa-workspace/hooks/`의 python 스크립트가 세션 시작 시 컨텍스트를 주입하고, 소스 수정 시 게이트로 작동한다. 외부 의존성(jq 등) 없이 `python3`로만 동작하며 실행 디렉터리는 프로젝트 루트를 가정한다.
+`.mpa/runtime/hooks/`의 python 스크립트가 세션 시작 시 컨텍스트를 주입하고, 소스 수정 시 게이트로 작동한다. 외부 의존성(jq 등) 없이 `python3`로만 동작하며 실행 디렉터리는 프로젝트 루트를 가정한다.
 
 | 스크립트 | 이벤트 | 차단 | 하는 일 |
 |---------|--------|------|--------|
@@ -263,7 +263,7 @@ MPA_GATE=off claude     # 또는 codex / gemini — 잠시 끄기
 - **작업 항목 범위 판정 한계:** `구현 중` 작업 항목이 있으면 수정 대상 파일이 그 작업 항목 범위 안인지까지 완전히 증명하지는 못한다. 에어타이트 봉쇄가 아니라 가드레일이다.
 - **승인해시 갱신은 agent가 한다:** 완전한 강제는 아니다. 다만 승인해시가 비어 있으면 자동 복구하지 않고 차단하므로, 사용자 승인 없이 사후 승인하는 우회를 줄인다.
 
-> 게이트 조건(계획 승인·완료 승인 확인)·승인해시 복구 절차의 상세는 `.mpa-workspace/core/agent_rules.md`·`agent_rules_detail.md`를 따른다.
+> 게이트 조건(계획 승인·완료 승인 확인)·승인해시 복구 절차의 상세는 `.mpa/runtime/core/agent_rules.md`·`agent_rules_detail.md`를 따른다.
 
 ---
 
@@ -276,7 +276,7 @@ MPA_GATE=off claude     # 또는 codex / gemini — 잠시 끄기
       ↓
 사용자 명시 요청으로 my-pacemaker-agent/workspace/issues/inbox/ 에 수집
       ↓
-검토 및 정제 → my-pacemaker-agent/.mpa-workspace/ 해당 파일에 반영
+검토 및 정제 → my-pacemaker-agent/.mpa/runtime/ 해당 파일에 반영
       ↓
 sync-runtime → 불변 release package 준비 → 대상 Runtime에 명시 배포
 ```
@@ -294,7 +294,7 @@ sync-runtime → 불변 release package 준비 → 대상 Runtime에 명시 배�
 
 ```
 [breaking]     layer1_design: [요청 문서] 섹션 추가
-               → 기존 프로젝트: .mpa-workspace/ 재복사 필요
+               → 기존 프로젝트: .mpa/runtime/ 재복사 필요
 
 [non-breaking] principles: T9 설명 보완
                → 기존 프로젝트 영향 없음
@@ -306,11 +306,11 @@ sync-runtime → 불변 release package 준비 → 대상 Runtime에 명시 배�
 
 | 상황 | inject 파일 | 비고 |
 |------|------------|------|
-| 새 프로젝트 초기화 | `.mpa-workspace/inject/layer0_init.md` | |
-| 방법론 업데이트 / 재설치 | `.mpa-workspace/inject/layer0_update.md` | |
-| 기능 설계 / 계획 작성 | `.mpa-workspace/inject/layer1_design.md` | |
-| 계획 독립 비평 | `.mpa-workspace/inject/layer1_critique.md` | 서브에이전트로 실행 (컨텍스트 격리) |
-| 구현 | `.mpa-workspace/inject/layer1_implement.md` | |
-| 코드 검토 / 에이전트 검증 | `.mpa-workspace/inject/layer1_review.md` | 서브에이전트로 실행 권장 |
-| 구현 후 발견 정리 | `.mpa-workspace/inject/layer1_discovery.md` | |
-| 정합성 점검 | `.mpa-workspace/inject/layer2_checkpoint.md` | |
+| 새 프로젝트 초기화 | `.mpa/runtime/inject/layer0_init.md` | |
+| 방법론 업데이트 / 재설치 | `.mpa/runtime/inject/layer0_update.md` | |
+| 기능 설계 / 계획 작성 | `.mpa/runtime/inject/layer1_design.md` | |
+| 계획 독립 비평 | `.mpa/runtime/inject/layer1_critique.md` | 서브에이전트로 실행 (컨텍스트 격리) |
+| 구현 | `.mpa/runtime/inject/layer1_implement.md` | |
+| 코드 검토 / 에이전트 검증 | `.mpa/runtime/inject/layer1_review.md` | 서브에이전트로 실행 권장 |
+| 구현 후 발견 정리 | `.mpa/runtime/inject/layer1_discovery.md` | |
+| 정합성 점검 | `.mpa/runtime/inject/layer2_checkpoint.md` | |

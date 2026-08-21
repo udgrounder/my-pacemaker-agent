@@ -24,7 +24,7 @@ class InstallDryRunTest(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("설치 dry-run 통과", result.stdout)
-            self.assertFalse((target / ".mpa-workspace").exists())
+            self.assertFalse((target / ".mpa/runtime").exists())
 
     def test_new_install_creates_root_docs_but_not_workspace_docs(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -37,7 +37,7 @@ class InstallDryRunTest(unittest.TestCase):
             self.assertFalse((target / "workspace" / "docs").exists())
             self.assertTrue((target / "docs").is_dir())
             self.assertTrue((target / "docs" / "INDEX.md").is_file())
-            config = (target / ".mpa-project" / "config.yaml").read_text(encoding="utf-8")
+            config = (target / ".mpa/config" / "config.yaml").read_text(encoding="utf-8")
             self.assertIn("schema_version: 1", config)
             self.assertIn('name: "' + target.name + '"', config)
             self.assertIn('root_path: "' + str(target.resolve()) + '"', config)
@@ -57,7 +57,7 @@ class InstallDryRunTest(unittest.TestCase):
                 cwd=ROOT, text=True, capture_output=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            config = (target / ".mpa-project" / "config.yaml").read_text(encoding="utf-8")
+            config = (target / ".mpa/config" / "config.yaml").read_text(encoding="utf-8")
             self.assertIn(f'project_name: "{target.name}"', config)
             self.assertIn(f'root_path: "{target.resolve()}"', config)
             self.assertIn("enabled: true", config)
@@ -105,8 +105,8 @@ class InstallDryRunTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "configured-project"
             target.mkdir()
-            config = target / ".mpa-project" / "config.yaml"
-            config.parent.mkdir()
+            config = target / ".mpa/config" / "config.yaml"
+            config.parent.mkdir(parents=True)
             original = (
                 "# operator-owned\n"
                 "schema_version: 1\n"
@@ -130,8 +130,8 @@ class InstallDryRunTest(unittest.TestCase):
     def test_missing_schema_is_added_but_future_schema_is_preserved(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory)
-            config = target / ".mpa-project" / "config.yaml"
-            config.parent.mkdir()
+            config = target / ".mpa/config" / "config.yaml"
+            config.parent.mkdir(parents=True)
             config.write_text("project:\n  name: \"legacy\"\n", encoding="utf-8")
             result = project_config.ensure_project_config(target)
             self.assertEqual(result["status"], "updated")
@@ -146,8 +146,8 @@ class InstallDryRunTest(unittest.TestCase):
     def test_invalid_schema_is_preserved_without_duplicate_schema_key(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory)
-            config = target / ".mpa-project" / "config.yaml"
-            config.parent.mkdir()
+            config = target / ".mpa/config" / "config.yaml"
+            config.parent.mkdir(parents=True)
             invalid = "schema_version: latest\nproject:\n  name: \"owned\"\n"
             config.write_text(invalid, encoding="utf-8")
 
@@ -160,8 +160,8 @@ class InstallDryRunTest(unittest.TestCase):
     def test_config_audit_warns_on_moved_root_without_exposing_absolute_path(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory)
-            config = target / ".mpa-project" / "config.yaml"
-            config.parent.mkdir()
+            config = target / ".mpa/config" / "config.yaml"
+            config.parent.mkdir(parents=True)
             config.write_text(
                 "schema_version: 1\nproject:\n"
                 "  name: \"project\"\n"
@@ -177,7 +177,7 @@ class InstallDryRunTest(unittest.TestCase):
     def test_existing_install_rejection_preserves_workspace_docs_and_agent_settings(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory)
-            (target / ".mpa-workspace").mkdir()
+            (target / ".mpa/runtime").mkdir(parents=True)
             (target / "workspace").mkdir()
             (target / "docs").mkdir()
             (target / "AGENTS.md").write_text("agent config", encoding="utf-8")
@@ -209,8 +209,8 @@ class InstallDryRunTest(unittest.TestCase):
         block = install.build_hook_block("codex")
         commands = [entries[0]["hooks"][0]["command"] for entries in block.values()]
         for script, command in zip(("session_start.py", "code_gate.py", "turn_end.py"), commands):
-            self.assertIn(f".mpa-workspace/hooks/{script}", command)
-            result = subprocess.run(["python3", ".mpa-workspace/hooks/" + script, "--help"],
+            self.assertIn(f".mpa/runtime/hooks/{script}", command)
+            result = subprocess.run(["python3", ".mpa/runtime/hooks/" + script, "--help"],
                                     cwd=ROOT, text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
 

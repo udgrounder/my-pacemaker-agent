@@ -29,7 +29,7 @@ tool: Claude Code (Anthropic)
 
 ## Hooks
 
-`.claude/settings.json` 의 `hooks` 에 다음을 등록한다. 스크립트는 `.mpa-workspace/hooks/` 에 있다.
+`.claude/settings.json` 의 `hooks` 에 다음을 등록한다. 스크립트는 `.mpa/runtime/hooks/` 에 있다.
 
 | 이벤트 | matcher | 스크립트 | 역할 |
 |--------|---------|---------|------|

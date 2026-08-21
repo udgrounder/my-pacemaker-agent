@@ -32,8 +32,8 @@ class TaskIndexPolicyTest(unittest.TestCase):
         self.assertIn("[Layer 2 완료]", text)
 
     def test_source_runtime_and_current_index_use_active_hold_only(self):
-        self.assert_runtime_policy(ROOT / ".mpa-workspace")
-        self.assert_runtime_policy(ROOT / "dist/.mpa-workspace")
+        self.assert_runtime_policy(ROOT / ".mpa/runtime")
+        self.assert_runtime_policy(ROOT / "dist/.mpa/runtime")
         self.assert_index_policy(ROOT / "workspace/tasks/INDEX.md")
         self.assert_index_policy(ROOT / "dist/workspace/tasks/INDEX.md")
 

@@ -6,7 +6,7 @@
 
 ## 현재 방식
 
-`.mpa-workspace/templates/docs_template.md`, `core/agent_rules.md`, `inject/layer1_design.md`, `inject/layer1_implement.md`, `inject/layer2_checkpoint.md`가 모두 태스크 완료 문서의 저장 위치를 `workspace/docs/[경로]/[파일명].md` + `workspace/docs/INDEX.md` 등록으로 하드코딩하고 있음. 이번에 4개 운영매뉴얼 파일과 INDEX.md 내용을 `docs/운영매뉴얼/`, `docs/INDEX.md`로 수동 이전했지만, 방법론 파일 자체는 손대지 않아 다음 태스크 완료 시 다시 `workspace/docs/`에 새 문서를 생성하게 됨 — 분산이 재발할 것.
+`.mpa/runtime/templates/docs_template.md`, `core/agent_rules.md`, `inject/layer1_design.md`, `inject/layer1_implement.md`, `inject/layer2_checkpoint.md`가 모두 태스크 완료 문서의 저장 위치를 `workspace/docs/[경로]/[파일명].md` + `workspace/docs/INDEX.md` 등록으로 하드코딩하고 있음. 이번에 4개 운영매뉴얼 파일과 INDEX.md 내용을 `docs/운영매뉴얼/`, `docs/INDEX.md`로 수동 이전했지만, 방법론 파일 자체는 손대지 않아 다음 태스크 완료 시 다시 `workspace/docs/`에 새 문서를 생성하게 됨 — 분산이 재발할 것.
 
 ## 개선 방안
 
@@ -18,8 +18,8 @@
 
 ## 적용 대상 파일
 
-- `.mpa-workspace/templates/docs_template.md`
-- `.mpa-workspace/core/agent_rules.md`
-- `.mpa-workspace/inject/layer1_design.md`
-- `.mpa-workspace/inject/layer1_implement.md`
-- `.mpa-workspace/inject/layer2_checkpoint.md`
+- `.mpa/runtime/templates/docs_template.md`
+- `.mpa/runtime/core/agent_rules.md`
+- `.mpa/runtime/inject/layer1_design.md`
+- `.mpa/runtime/inject/layer1_implement.md`
+- `.mpa/runtime/inject/layer2_checkpoint.md`

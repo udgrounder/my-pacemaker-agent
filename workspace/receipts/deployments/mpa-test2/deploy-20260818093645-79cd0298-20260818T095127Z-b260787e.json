@@ -6,7 +6,7 @@
   "manifest": "workspace/releases/20260818093645-79cd0298/manifest_20260818093645-79cd0298.json",
   "target_ref": "mpa-test2",
   "target_fingerprint": "1e412e1463beb434",
-  "backup": ".mpa-backups/20260818093645-79cd0298-20260818T095127Z-b2df337b",
+  "backup": ".mpa/backups/20260818093645-79cd0298-20260818T095127Z-b2df337b",
   "applied_at": "2026-08-18T09:51:27+00:00",
   "verified_by": "kjkim",
   "approved_by": "kjkim",
