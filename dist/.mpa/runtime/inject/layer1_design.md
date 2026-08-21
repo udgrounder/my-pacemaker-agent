@@ -6,7 +6,7 @@
 
 ## 역할
 
-`.mpa-workspace/personas/task_designer.md` 를 읽고 그 역할로 작업한다.
+`.mpa/runtime/personas/task_designer.md` 를 읽고 그 역할로 작업한다.
 
 ---
 
@@ -22,7 +22,7 @@
 **Phase 2 선택 (설계 내용에 따라 필요 시):**
 4. `workspace/memory/shared/direction.md` (존재하는 경우) — 결과 경험을 통해 발견된 제품/UX 방향
 5. `workspace/memory/roles/architect.md` (존재하는 경우) — 이 프로젝트에서 architect 역할이 축적한 학습
-6. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
+6. `.mpa/runtime/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
 
 관련 기존 문서가 있으면 `docs/INDEX.md` 도 확인한다.
 
@@ -31,10 +31,10 @@
 ## 스킬 참조
 
 필요 시 다음을 읽는다:
-- `.mpa-workspace/skills/analysis/silent_decision_extraction.md` (분석 방법 도메인)
-- `.mpa-workspace/skills/analysis/counterexample_finding.md` (분석 방법 도메인)
-- 관련 기술(프로그래밍) 스킬이 있으면 `.mpa-workspace/skills/programming/` 에서 해당 파일을 읽는다 — 설계도 해당 스택의 제약을 알아야 한다(역할-면: 설계자 면).
-- `.mpa-workspace/inject/plan_interview.md` ← 사용자가 검토 도움을 요청할 때 (절차이므로 inject에 위치)
+- `.mpa/runtime/skills/analysis/silent_decision_extraction.md` (분석 방법 도메인)
+- `.mpa/runtime/skills/analysis/counterexample_finding.md` (분석 방법 도메인)
+- 관련 기술(프로그래밍) 스킬이 있으면 `.mpa/runtime/skills/programming/` 에서 해당 파일을 읽는다 — 설계도 해당 스택의 제약을 알아야 한다(역할-면: 설계자 면).
+- `.mpa/runtime/inject/plan_interview.md` ← 사용자가 검토 도움을 요청할 때 (절차이므로 inject에 위치)
 
 > 위 분석 스킬은 task_designer/architect가 **구성적으로 요구**하는 방법 도메인이다. 프로그래밍 스킬은 역할 무관 주제 도메인으로, 설계 단계도 합성한다(구현·검토와 동일).
 
@@ -100,7 +100,7 @@ INDEX.md에서 이 태스크의 **파생 출처**를 확인한다.
 
 > **plan.md 작성 전 반드시 템플릿을 Read한다:**
 > ```
-> Read .mpa-workspace/templates/plan_template.md
+> Read .mpa/runtime/templates/plan_template.md
 > ```
 > 템플릿을 기억에서 꺼내 쓰지 않는다 — 파일을 직접 읽어 최신 형식을 확인한 뒤 작성한다.
 
@@ -149,7 +149,7 @@ INDEX.md에서 이 태스크의 **파생 출처**를 확인한다.
    → 위 항목에 답해주시면 실행 계획을 이어서 작성하겠습니다.
      인터뷰 지원이 필요하면 "인터뷰 해줘"라고 말씀해주세요.
    ```
-   - **인터뷰 요청 시** → `.mpa-workspace/inject/plan_interview.md` 지시에 따라 진행
+   - **인터뷰 요청 시** → `.mpa/runtime/inject/plan_interview.md` 지시에 따라 진행
    - 결정 대기 항목이 애초에 `없음`이면 이 단계는 형식적 확인만 하고 바로 다음으로 진행한다.
 4. **2단계 — 답변을 반영해 실행 계획과 실행 TODO 작성.** 3번에서 받은 답을 `사용자 결정`에 반영하고, `## 실행 계획`(구현 단계·예상 조용한 결정·수정 대상 파일·참고 파일·반례)을 이어서 작성한다. 이어서 `## 실행 TODO`에는 이번 태스크 종료 전 증빙을 갖춰 완료 처리할 수 있는 구현·검증·문서화·즉시 확인 가능한 사용자 결정/승인만 체크리스트로 만든다. 운영 중에만 알 수 있는 사항·장래 관찰과 사용자·운영자의 후속 행동은 `운영 시 안내 사항`으로, 구현·설계·검증이 추가로 필요한 후속 작업은 새 태스크로 분리한다. major plan에서는 안내 사항을 `검증 결과` 뒤 별도 최상위 섹션에 체크박스 없이 기록하고 완료 조건에서 제외한다. minor plan에서는 마지막 체크리스트 아래에 둔다. 사용자 결정·승인 항목은 반드시 마지막 체크리스트 섹션으로 모은다. 큰 태스크는 `TODO.md`를 같은 폴더에 만들고 항목별 구현 위치·검증 명령·결과를 기록한다.
 5. tasks/INDEX.md 업데이트 → 새 태스크 항목을 `상태: active`로 추가한 뒤 `agent_rules.md`의 "INDEX.md 유지보수 원칙"을 수행한다.
@@ -192,7 +192,7 @@ INDEX.md에서 이 태스크의 **파생 출처**를 확인한다.
 
    **요구사항 명세 반영이 끝난 직후:**
    ```bash
-   python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/yyyymmdd_[태스크명]/plan.md
+   python3 .mpa/runtime/hooks/plan_hash.py approve workspace/tasks/active/yyyymmdd_[태스크명]/plan.md
    ```
    이 명령이 plan.md 상태를 `구현 중`으로 전환하고 승인해시를 기록한다 (원자적 처리).
    상태가 `설계 완료`가 아니면 approve가 거부된다. 이후에는 명세 변경만 code_gate.py가 감지하며, 실행 계획·변경 기록·검증 결과 보완은 즉시 기록하고 누적 보고한다.

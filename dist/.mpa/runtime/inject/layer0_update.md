@@ -6,7 +6,7 @@
 
 ## 역할
 
-`.mpa-workspace/personas/architect.md` 를 읽고 그 역할로 작업한다.
+`.mpa/runtime/personas/architect.md` 를 읽고 그 역할로 작업한다.
 
 ---
 

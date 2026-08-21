@@ -156,7 +156,7 @@ def build_message(cwd):
         )
 
     lines.append(
-        "요청을 받으면 .mpa-workspace/core/agent_rules.md 의 라우팅 표로 유형을 판단하고 "
+        "요청을 받으면 .mpa/runtime/core/agent_rules.md 의 라우팅 표로 유형을 판단하고 "
         "해당 inject 파일을 로드해 작업하세요."
     )
     lines.append(

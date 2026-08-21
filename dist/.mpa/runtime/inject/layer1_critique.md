@@ -147,7 +147,7 @@ Write 도구로 [태스크 폴더 경로]/critique.md에 직접 저장한다.
 
 ## 역할
 
-`.mpa-workspace/personas/plan_critic.md` 를 읽고 그 역할로 작업한다.
+`.mpa/runtime/personas/plan_critic.md` 를 읽고 그 역할로 작업한다.
 
 ---
 
@@ -167,8 +167,8 @@ Write 도구로 [태스크 폴더 경로]/critique.md에 직접 저장한다.
 ## 스킬 참조
 
 필요 시 다음을 읽는다:
-- `.mpa-workspace/skills/analysis/counterexample_finding.md`
-- `.mpa-workspace/skills/analysis/silent_decision_extraction.md`
+- `.mpa/runtime/skills/analysis/counterexample_finding.md`
+- `.mpa/runtime/skills/analysis/silent_decision_extraction.md`
 
 ---
 

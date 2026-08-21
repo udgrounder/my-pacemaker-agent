@@ -1,8 +1,8 @@
 # 프로젝트 규칙 (project_rules.md)
 
 > **이 파일의 목적:**  
-> `.mpa-workspace/`를 수정하지 않고 이 프로젝트에 맞게 MPA 동작을 확장·보완한다.  
-> 업그레이드 시 `.mpa-workspace/`는 덮어씌워지지만 이 파일은 보존된다.
+> `.mpa/runtime/`를 수정하지 않고 이 프로젝트에 맞게 MPA 동작을 확장·보완한다.  
+> 업그레이드 시 `.mpa/runtime/`는 덮어씌워지지만 이 파일은 보존된다.
 >
 > **위치:** `workspace/project_rules.md` (프로젝트 루트의 workspace/ 직하)  
 > **작성 원칙:** 간결하게 유지한다. 길어질수록 컨텍스트 낭비가 커진다.

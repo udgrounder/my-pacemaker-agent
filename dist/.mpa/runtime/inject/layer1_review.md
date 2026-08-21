@@ -121,7 +121,7 @@ review_summary.md 형식:
 
 ## 역할
 
-`.mpa-workspace/personas/code_reviewer.md` 를 읽고 그 역할로 작업한다.
+`.mpa/runtime/personas/code_reviewer.md` 를 읽고 그 역할로 작업한다.
 
 > 서브에이전트가 검증을 수행하는 경우, 위 페르소나도 서브에이전트가 읽는다. 메인 에이전트는 검증 실행을 오케스트레이션만 한다.
 
@@ -145,7 +145,7 @@ review_summary.md 형식:
 
 **Phase 2 선택 (검토 도메인에 따라 필요 시):**
 5. `workspace/memory/shared/project_identity.md` — 사용자 흐름·도메인 판단이 필요한 검토 시 읽는다
-6. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
+6. `.mpa/runtime/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
 7. `workspace/memory/roles/code_reviewer.md` (존재하는 경우)
 
 ---
@@ -153,10 +153,10 @@ review_summary.md 형식:
 ## 스킬 참조
 
 필요 시 다음을 읽는다:
-- `.mpa-workspace/skills/analysis/counterexample_finding.md`
-- `.mpa-workspace/skills/analysis/path_tracing.md`
+- `.mpa/runtime/skills/analysis/counterexample_finding.md`
+- `.mpa/runtime/skills/analysis/path_tracing.md`
 
-관련 기술(프로그래밍) 스킬이 있으면 `.mpa-workspace/skills/programming/` 에서 해당 파일을 읽는다.
+관련 기술(프로그래밍) 스킬이 있으면 `.mpa/runtime/skills/programming/` 에서 해당 파일을 읽는다.
 
 ---
 

@@ -6,7 +6,7 @@
 
 ## 역할
 
-`.mpa-workspace/personas/implementer.md` 를 읽고 그 역할로 작업한다.
+`.mpa/runtime/personas/implementer.md` 를 읽고 그 역할로 작업한다.
 
 ---
 
@@ -23,17 +23,17 @@
 4. `workspace/memory/shared/project_identity.md` — 도메인 판단이 필요한 구현 시 읽는다 (단순 리팩터링·기술적 변경은 생략 가능)
 5. `workspace/memory/domains/[작업 도메인]/rules.md`
 6. `workspace/memory/domains/[작업 도메인]/registry.md` (존재하는 경우)
-7. `.mpa-workspace/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
+7. `.mpa/runtime/knowledge/` — 관련 도메인 파일이 있으면 읽는다 (존재하는 경우)
 8. `workspace/memory/roles/implementer.md` (존재하는 경우) — 이 프로젝트에서 implementer 역할이 축적한 학습
 
-관련 기술(프로그래밍) 스킬이 있으면 `.mpa-workspace/skills/programming/` 에서 해당 파일을 읽는다.
+관련 기술(프로그래밍) 스킬이 있으면 `.mpa/runtime/skills/programming/` 에서 해당 파일을 읽는다.
 
 ---
 
 ## 스킬 참조
 
 필요 시 다음을 읽는다:
-- `.mpa-workspace/skills/analysis/silent_decision_extraction.md`
+- `.mpa/runtime/skills/analysis/silent_decision_extraction.md`
 
 ---
 
@@ -109,7 +109,7 @@
 
 > **changelog.md를 처음 작성할 때는 반드시 템플릿을 Read한 뒤 형식에 맞춰 작성한다:**
 > ```
-> Read .mpa-workspace/templates/changelog_template.md
+> Read .mpa/runtime/templates/changelog_template.md
 > ```
 > 템플릿을 기억에서 꺼내 쓰지 않는다 — 파일을 직접 읽어 최신 형식을 확인한 뒤 작성한다.
 

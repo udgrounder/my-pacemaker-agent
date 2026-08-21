@@ -6,15 +6,15 @@
 
 ## 역할
 
-`.mpa-workspace/personas/architect.md` 를 읽고 그 역할로 작업한다.
+`.mpa/runtime/personas/architect.md` 를 읽고 그 역할로 작업한다.
 
 ---
 
 ## 작업 시작 전 읽을 파일
 
-1. `.mpa-workspace/skills/analysis/dependency_mapping.md`
-2. `.mpa-workspace/skills/analysis/silent_decision_extraction.md`
-3. `.mpa-workspace/knowledge/` — 이 프로젝트와 관련된 도메인 파일이 있으면 읽는다 (존재하는 경우)
+1. `.mpa/runtime/skills/analysis/dependency_mapping.md`
+2. `.mpa/runtime/skills/analysis/silent_decision_extraction.md`
+3. `.mpa/runtime/knowledge/` — 이 프로젝트와 관련된 도메인 파일이 있으면 읽는다 (존재하는 경우)
 
 ---
 
@@ -156,7 +156,7 @@
 ```
 📌 파일 소유권 안내:
 
-· .mpa-workspace/  → MPA 시스템 소유
+· .mpa/runtime/  → MPA 시스템 소유
   업그레이드 시 덮어씌워집니다. 직접 수정하지 마세요.
 
 · workspace/       → 이 프로젝트 소유
@@ -168,7 +168,7 @@
 → workspace/memory/shared/architecture.md (아키텍처 결정)
 ```
 
-`workspace/project_rules.md`를 템플릿(`dist/.mpa-workspace/templates/project_rules_template.md`)에서 복사해 생성한다.
+`workspace/project_rules.md`를 템플릿(`dist/.mpa/runtime/templates/project_rules_template.md`)에서 복사해 생성한다.
 
 ---
 

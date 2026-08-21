@@ -7,7 +7,7 @@
 
 ## 역할
 
-`.mpa-workspace/personas/integration_auditor.md` 를 읽고 그 역할로 작업한다.
+`.mpa/runtime/personas/integration_auditor.md` 를 읽고 그 역할로 작업한다.
 
 ---
 
@@ -29,9 +29,9 @@
 ## 스킬 참조
 
 필요 시 다음을 읽는다:
-- `.mpa-workspace/skills/analysis/dependency_mapping.md`
-- `.mpa-workspace/skills/analysis/counterexample_finding.md`
-- `.mpa-workspace/skills/analysis/path_tracing.md`
+- `.mpa/runtime/skills/analysis/dependency_mapping.md`
+- `.mpa/runtime/skills/analysis/counterexample_finding.md`
+- `.mpa/runtime/skills/analysis/path_tracing.md`
 
 ---
 
@@ -129,7 +129,7 @@ methodology issue 누적: [N]개
 형식: `core/agent_rules_detail.md` "issue 기록" 섹션 참조.
 
 > 매 태스크마다 경계를 판단하지 않는다. Layer 2에서 한꺼번에 평가하는 것이 단방향 흐름 원칙이다.
-> map-product review가 승인하면 `.mpa-workspace/knowledge/[도메인].md`로 승격된다.
+> map-product review가 승인하면 `.mpa/runtime/knowledge/[도메인].md`로 승격된다.
 
 ---
 

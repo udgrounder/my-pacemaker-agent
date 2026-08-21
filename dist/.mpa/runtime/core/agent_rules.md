@@ -23,7 +23,7 @@
 | 새 작업 항목 생성 판단 직전 (실패비용 등급을 정해야 할 때) | "실패비용 추정 기준" |
 | 실패 비용 추정 결과 `minor`로 판단된 직후 | "minor 경량 처리 절차" |
 | 완료 처리 판단 직전 (사용자 발화가 완료로 인정되는지 판단해야 할 때) | "완료 인정 판별 기준" |
-| "규칙 바꿔줘"·"inject 수정"·".mpa-workspace 수정" 등 발화 시 | "MPA 파일 수정 세부" |
+| "규칙 바꿔줘"·"inject 수정"·".mpa/runtime 수정" 등 발화 시 | "MPA 파일 수정 세부" |
 | 용어(요청/작업 항목/실행 항목/계획서/GATE/Zone/Tier 또는 외부 표준 용어) 의미가 모호할 때 | `core/glossary.md` (disclosed reference — agent_rules_detail.md가 아니라 별도 파일) |
 
 > **"참조"라는 표시만 보고 건너뛰지 않는다.** 트리거 조건이 충족되면 detail 파일의 해당 섹션을 즉시 Read 도구로 읽는다.
@@ -148,7 +148,7 @@
 | "전체 확인", "정합성 점검", "전체 점검", "충돌 확인" | 전체 정합성 점검 | `layer2_checkpoint.md` + `personas/integration_auditor.md` |
 | "초기화", "프로젝트 설정", "Layer 0" | 프로젝트 초기화 | `layer0_init.md` + `personas/architect.md` |
 | "MPA 시스템 업데이트", "업그레이드" | MPA 버전 업데이트 | `layer0_update.md` + `personas/architect.md` |
-| "규칙 바꿔줘", "inject 수정", ".mpa-workspace 수정" | MPA 파일 수정 | → `agent_rules_detail.md` "MPA 파일 수정 세부" 섹션 |
+| "규칙 바꿔줘", "inject 수정", ".mpa/runtime 수정" | MPA 파일 수정 | → `agent_rules_detail.md` "MPA 파일 수정 세부" 섹션 |
 
 **판단 후 반드시 고지 — 라우팅 결과 + 정정 옵션:**
 
@@ -247,7 +247,7 @@
 **승인 시 처리:**
 1. **approve 명령 실행** — 상태 전환과 해시 기록을 원자적으로 처리:
    ```bash
-   python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/yyyymmdd_[태스크명]/plan.md
+   python3 .mpa/runtime/hooks/plan_hash.py approve workspace/tasks/active/yyyymmdd_[태스크명]/plan.md
    ```
    - plan.md 상태가 `설계 완료`(또는 minor의 `설계 중`)일 때만 실행된다.
    - 자동으로 상태를 `구현 중`으로 전환하고 승인해시를 기록한다.

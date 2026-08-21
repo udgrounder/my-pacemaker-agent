@@ -32,7 +32,7 @@ from plan_hash import compute_for_plan
 # 항상 허용하는 경로 접두사 (방법론·프로젝트 데이터·agent 설정)
 ALLOW_PREFIXES = (
     "workspace/",
-    ".mpa-workspace/",
+    ".mpa/runtime/",
     ".claude/",
     ".codex/",
     ".gemini/",
@@ -172,7 +172,7 @@ def check_hash_integrity(cwd, mode, agent):
                 "  2. 직전 사용자 승인 후 기록만 누락됨 → 누락 사실과 현재 변경 내용을 사용자에게 확인받은 뒤 approve 실행\n"
                 "  3. minor 자동 승인 태스크임 → 최소 plan.md가 사용자 요청과 일치하는지 확인한 뒤 approve 실행\n"
                 "승인해시 갱신 명령:\n"
-                f"  python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/{name}/plan.md"
+                f"  python3 .mpa/runtime/hooks/plan_hash.py approve workspace/tasks/active/{name}/plan.md"
             )
             if mode == "warn":
                 emit_warn(agent, msg)

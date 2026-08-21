@@ -14,7 +14,7 @@
 
 **1. audit 실행**
 ```bash
-python3 .mpa-workspace/hooks/plan_hash.py audit workspace/tasks/active/[태스크명]/plan.md
+python3 .mpa/runtime/hooks/plan_hash.py audit workspace/tasks/active/[태스크명]/plan.md
 ```
 
 **2. 누락 필드 추론**
@@ -30,7 +30,7 @@ python3 .mpa-workspace/hooks/plan_hash.py audit workspace/tasks/active/[태스�
 
 **3. 사용자 확인 후 주입 (Zone 2)**
 ```bash
-python3 .mpa-workspace/hooks/plan_hash.py init workspace/tasks/active/[태스크명]/plan.md \
+python3 .mpa/runtime/hooks/plan_hash.py init workspace/tasks/active/[태스크명]/plan.md \
   --field 태스크=<값> --field 생성일=<값> --field 상태=<값> \
   --field 타입=<값> --field 실패비용=<값>
 ```
@@ -54,7 +54,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 2. 명세 변경이면 변경분·발견 이유·영향·권장안을 사용자에게 제시한다.
 3. 사용자 승인 후에만 다음을 실행한다. 태스크 상태는 유지한다.
    ```bash
-   python3 .mpa-workspace/hooks/plan_hash.py renew-spec workspace/tasks/active/[태스크명]/plan.md --summary "[승인된 변경 요약]"
+   python3 .mpa/runtime/hooks/plan_hash.py renew-spec workspace/tasks/active/[태스크명]/plan.md --summary "[승인된 변경 요약]"
    ```
 4. 접두사 없는 구형 plan은 기존 절차대로 `설계 완료`로 되돌려 재승인한다. 자동 변환하지 않는다.
 
@@ -165,7 +165,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 
 ### 3단계 — issue 검토 후: knowledge/로 승격
 
-사용자가 수집·검토한 `knowledge_promotion` issue를 승인하면 `.mpa-workspace/knowledge/[도메인명].md`로 이동한다.
+사용자가 수집·검토한 `knowledge_promotion` issue를 승인하면 `.mpa/runtime/knowledge/[도메인명].md`로 이동한다.
 승격된 지식은 **실제로 다른 프로젝트에서 import해 사용 가능한 검증된 지식**이다.
 
 ### 위치 요약
@@ -174,7 +174,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 |------|------|--------|
 | `workspace/memory/domains/[도메인]/rules.md` | 발견 즉시 기록 | 이 프로젝트 한정 |
 | `workspace/issues/` | Layer 2 시 기록한 승격 issue | 평가 중 |
-| `.mpa-workspace/knowledge/[도메인].md` | 사용자 승인 후 승격 | 검증된 범용 지식 |
+| `.mpa/runtime/knowledge/[도메인].md` | 사용자 승인 후 승격 | 검증된 범용 지식 |
 
 > 기록 시점에 경계를 판단하지 않으므로 인지 부담이 분산된다.
 > knowledge/는 진짜 검증된 지식만 모이는 곳이 되어 신뢰도가 보장된다.
@@ -231,7 +231,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 [더 나은 방법]
 
 ## 적용 대상 파일
-- `.mpa-workspace/[파일명]`
+- `.mpa/runtime/[파일명]`
 ```
 
 **`knowledge_promotion` — 도메인 지식** (다른 프로젝트에도 유효한 도메인·업종 지식)
@@ -245,7 +245,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 [기록할 지식]
 
 ## 적용 대상 파일
-- `.mpa-workspace/knowledge/[도메인명].md`
+- `.mpa/runtime/knowledge/[도메인명].md`
 ```
 
 > local issue는 프로젝트 `workspace/issues/`에 기록한다. map-product source 저장소로의 수집·review·triage·archive는 사용자가 지정한 요청 또는 승인된 Runtime update의 dry-run에서 후보·원본 정리 계획을 고지한 경우에만 수행한다. 검증·receipt 기록이 실패하면 대상 원본을 보존한다.
@@ -254,11 +254,11 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 
 ## MPA 파일 수정 세부
 
-> **트리거:** "규칙 바꿔줘", "inject 수정", ".mpa-workspace 수정" 등 MPA 시스템 파일 수정 요청 시
+> **트리거:** "규칙 바꿔줘", "inject 수정", ".mpa/runtime 수정" 등 MPA 시스템 파일 수정 요청 시
 
-> **기본 원칙:** `.mpa-workspace/` 개선은 **원칙적으로 local issue → map-product review**로 다룬다. 다만 사용자가 범위와 목적을 승인한 MPA 수정 작업 항목에서는 아래 절차에 따라 직접 수정할 수 있다. 승인 없는 독단 수정은 하지 않는다.
+> **기본 원칙:** `.mpa/runtime/` 개선은 **원칙적으로 local issue → map-product review**로 다룬다. 다만 사용자가 범위와 목적을 승인한 MPA 수정 작업 항목에서는 아래 절차에 따라 직접 수정할 수 있다. 승인 없는 독단 수정은 하지 않는다.
 
-**적용 대상:** `.mpa-workspace/` 하위 파일 직접 수정. 버전 업그레이드는 `layer0_update.md` 참조.
+**적용 대상:** `.mpa/runtime/` 하위 파일 직접 수정. 버전 업그레이드는 `layer0_update.md` 참조.
 
 | 항목 | 소스 코드 수정 | MPA 시스템 파일 수정 |
 |------|------------|------------|
@@ -268,7 +268,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 
 **처리 흐름:** `mpa_system_designer.md` 읽기 → plan.md 작성 및 승인 → 수정 → 일관성 점검 → `prepare-release`로 Runtime 동기화·검증·단일 release ID 생성
 
-> **release ID 생성:** 방법론(`.mpa-workspace/`)을 의미 있게 수정한 태스크를 release할 때 `release_manager.py prepare-release`가 `.mpa-version`의 `current_release`를 UTC `YYYYMMDDHHMMSS-uuid8`으로 갱신하고 `dist/.mpa-workspace/`에 동기화한다. 이 값 하나가 package·manifest·receipt·대상 history·backup의 표시 ID다. checksum은 내부 무결성 증빙이며 **dist를 직접 편집하지 않는다**.
+> **release ID 생성:** 방법론(`.mpa/runtime/`)을 의미 있게 수정한 태스크를 release할 때 `release_manager.py prepare-release`가 `.mpa-version`의 `current_release`를 UTC `YYYYMMDDHHMMSS-uuid8`으로 갱신하고 `dist/.mpa/runtime/`에 동기화한다. 이 값 하나가 package·manifest·receipt·대상 history·backup의 표시 ID다. checksum은 내부 무결성 증빙이며 **dist를 직접 편집하지 않는다**.
 
 ---
 
@@ -295,7 +295,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 3. **INDEX 등록** — `workspace/tasks/INDEX.md`에 새 태스크 행을 `상태: active`로 추가한 뒤 `agent_rules.md`의 "INDEX.md 유지보수 원칙"을 수행한다.
 4. **`approve` 실행**:
    ```bash
-   python3 .mpa-workspace/hooks/plan_hash.py approve workspace/tasks/active/yyyymmdd_[태스크명]/plan.md
+   python3 .mpa/runtime/hooks/plan_hash.py approve workspace/tasks/active/yyyymmdd_[태스크명]/plan.md
    ```
 5. 구현 완료 후 **보고 + 사용자 확인 대기** → 확인 후 done 처리 (`agent_rules.md` "태스크 완료" 섹션 참조)
 6. minor에서는 changelog.md, review_phase*.md, 역할 메모리, docs 업데이트, Layer 2 현황 표시는 기본 생략한다. 외부 동작·아키텍처·계약이 바뀐 경우에만 해당 문서를 갱신하고, 그 순간 major 전환 여부를 재판단한다.

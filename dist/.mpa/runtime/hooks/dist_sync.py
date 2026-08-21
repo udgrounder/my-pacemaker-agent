@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-dist_sync.py — .mpa-workspace/ 수정 시 dist/ 자동 동기화 (PostToolUse)
+dist_sync.py — .mpa/runtime/ 수정 시 dist/ 자동 동기화 (PostToolUse)
 
-Edit/Write 도구로 .mpa-workspace/ 파일이 저장되면 즉시 dist/.mpa-workspace/ 에 복사한다.
+Edit/Write 도구로 .mpa/runtime/ 파일이 저장되면 즉시 dist/.mpa/runtime/ 에 복사한다.
 성공은 조용히 처리 (Zone 3). 실패 시에만 stderr 경고.
 """
 
@@ -34,7 +34,7 @@ def main():
         file_path = os.path.join(cwd, file_path)
     file_path = os.path.normpath(file_path)
 
-    mpa_src = os.path.normpath(os.path.join(cwd, ".mpa-workspace"))
+    mpa_src = os.path.normpath(os.path.join(cwd, ".mpa/runtime"))
     if not file_path.startswith(mpa_src + os.sep):
         sys.exit(0)
 

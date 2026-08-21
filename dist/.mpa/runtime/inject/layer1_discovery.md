@@ -14,7 +14,7 @@
 
 ## 역할
 
-`.mpa-workspace/personas/task_designer.md`를 읽고 그 역할로 작업한다.
+`.mpa/runtime/personas/task_designer.md`를 읽고 그 역할로 작업한다.
 
 ---
 
@@ -30,7 +30,7 @@
 
 ## 스킬 참조
 
-`.mpa-workspace/skills/analysis/discovery_classification.md`를 읽는다.
+`.mpa/runtime/skills/analysis/discovery_classification.md`를 읽는다.
 
 ---
 

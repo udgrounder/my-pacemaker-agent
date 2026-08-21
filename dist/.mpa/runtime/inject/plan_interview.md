@@ -27,7 +27,7 @@ plan.md의 `요구사항 명세 > 결정 대기 항목`을 하나씩 사용자�
 
 ### 2단계 — 숨은 결정 발굴
 
-`.mpa-workspace/skills/analysis/silent_decision_extraction.md`의 프롬프트 템플릿을 plan.md에 적용한다.
+`.mpa/runtime/skills/analysis/silent_decision_extraction.md`의 프롬프트 템플릿을 plan.md에 적용한다.
 
 → 추출된 숨은 결정 포인트를 사용자에게 하나씩 제시하고, 방향을 함께 결정한다.  
 → 결정된 내용은 plan.md의 `예상 조용한 결정` 섹션에 추가한다.
@@ -38,7 +38,7 @@ plan.md의 `요구사항 명세 > 결정 대기 항목`을 하나씩 사용자�
 
 ### 3단계 — 실패 시나리오 확인
 
-`.mpa-workspace/skills/analysis/counterexample_finding.md`의 계획서 반례 탐색 템플릿을 plan.md에 적용한다.
+`.mpa/runtime/skills/analysis/counterexample_finding.md`의 계획서 반례 탐색 템플릿을 plan.md에 적용한다.
 
 → 발견된 시나리오를 사용자에게 제시하고, 대응 방향을 결정한다.  
 → 결정 내용은 plan.md의 `반례` 섹션에 추가한다.
