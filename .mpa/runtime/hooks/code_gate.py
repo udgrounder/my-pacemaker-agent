@@ -27,7 +27,7 @@ import json
 import os
 import re
 import sys
-from plan_hash import compute_for_plan
+from plan_hash import HASH_REQUIRED_STATUSES, approval_hash_issue
 
 # 항상 허용하는 경로 접두사 (방법론·프로젝트 데이터·agent 설정)
 ALLOW_PREFIXES = (
@@ -146,7 +146,7 @@ def find_active_statuses(cwd):
 
 
 def check_hash_integrity(cwd, mode, agent):
-    """GATE 1 재진입 — '구현 중' 상태 태스크의 plan.md 해시가 승인해시와 일치하는지 확인."""
+    """GATE 1 재진입 — 승인 이후 상태 태스크의 승인해시를 검증한다."""
     base = os.path.join(cwd, "workspace", "tasks", "active")
     if not os.path.isdir(base):
         return
@@ -156,22 +156,20 @@ def check_hash_integrity(cwd, mode, agent):
         if not os.path.exists(plan_path):
             continue
         fields, body = parse_plan_fields(plan_path)
-        if fields.get("상태") != "구현 중":
+        status = fields.get("상태")
+        if status not in HASH_REQUIRED_STATUSES:
             continue
-        approved_hash = fields.get("승인해시")
-        if not approved_hash:
-            try:
-                current_hash = compute_for_plan("\n".join(f"{k}: {v}" for k, v in fields.items()), body)
-            except ValueError as error:
-                current_hash = f"오류: {error}"
+        front_matter = "\n".join(f"{k}: {v}" for k, v in fields.items())
+        issue = approval_hash_issue(front_matter, body)
+        if issue:
             msg = (
-                f"⛔ 계획 승인 기록 복구 필요: '{name}' plan.md 상태는 '구현 중'이지만 승인해시가 없습니다.\n"
-                f"  현재해시: {current_hash}\n"
-                "자동 승인해시 등록은 하지 않습니다. 아래 중 하나로 명시적으로 복구하세요:\n"
+                f"⛔ 계획 승인 기록 복구 필요: '{name}' plan.md 상태는 '{status}'이며 승인해시가 유효하지 않습니다.\n"
+                f"  사유: {issue}\n"
+                "승인해시를 직접 입력하거나 날짜·승인 문구로 바꾸지 마세요. 아래 중 하나로 명시적으로 복구하세요:\n"
                 "  1. 사용자 승인 이력이 불명확함 → 상태를 '설계 완료'로 되돌리고 plan.md 검토 후 재승인\n"
-                "  2. 직전 사용자 승인 후 기록만 누락됨 → 누락 사실과 현재 변경 내용을 사용자에게 확인받은 뒤 approve 실행\n"
-                "  3. minor 자동 승인 태스크임 → 최소 plan.md가 사용자 요청과 일치하는지 확인한 뒤 approve 실행\n"
-                "승인해시 갱신 명령:\n"
+                "  2. 사용자 승인 뒤 기록만 누락됨 → 현재 변경 내용을 사용자에게 확인받은 뒤 approve 실행\n"
+                "  3. 승인된 요구사항 명세 변경 → 사용자 승인 후 renew-spec 실행\n"
+                "최초 승인 명령:\n"
                 f"  python3 .mpa/runtime/hooks/plan_hash.py approve workspace/tasks/active/{name}/plan.md"
             )
             if mode == "warn":
@@ -179,30 +177,6 @@ def check_hash_integrity(cwd, mode, agent):
             else:
                 emit_block(msg)
             return
-        try:
-            current_hash = compute_for_plan("\n".join(f"{k}: {v}" for k, v in fields.items()), body)
-        except ValueError as error:
-            msg = f"⛔ 요구사항 명세 형식 오류: '{name}' plan.md — {error}"
-            if mode == "warn":
-                emit_warn(agent, msg)
-            else:
-                emit_block(msg)
-            return
-        if current_hash != approved_hash:
-            msg = (
-                f"⛔ 계획 재승인 필요: '{name}' plan.md가 승인 후 변경됐습니다.\n"
-                f"  승인해시: {approved_hash}\n"
-                f"  현재해시: {current_hash}\n"
-                "요구사항 명세가 변경됐는지 확인하고:\n"
-                "  - 새 형식의 명세 변경 → 사용자 승인 후 renew-spec으로 승인 기록 갱신\n"
-                "  - 명세 밖 실행 계획 변경 → 변경 기록에 남기고 계속 진행\n"
-                "  - 구형 plan의 요구사항 변경 → 상태를 '설계 완료'로 되돌리고 재승인"
-            )
-            if mode == "warn":
-                emit_warn(agent, msg)
-            else:
-                emit_block(msg)
-            return  # 차단은 즉시 — 이후 태스크 검사 불필요
 
 
 def check_done_write(rel, cwd, agent):

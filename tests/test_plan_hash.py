@@ -16,6 +16,9 @@ sys.path.insert(0, str(HOOK_DIR))
 GATE_SPEC = importlib.util.spec_from_file_location("code_gate", HOOK_DIR / "code_gate.py")
 code_gate = importlib.util.module_from_spec(GATE_SPEC)
 GATE_SPEC.loader.exec_module(code_gate)
+SESSION_SPEC = importlib.util.spec_from_file_location("session_start", HOOK_DIR / "session_start.py")
+session_start = importlib.util.module_from_spec(SESSION_SPEC)
+SESSION_SPEC.loader.exec_module(session_start)
 
 
 NEW_PLAN = """---
@@ -38,6 +41,43 @@ NEW_PLAN = """---
 
 """
 
+MINOR_PLAN = """---
+태스크: minor-example
+생성일: 2026-08-21
+타입: minor
+실패비용: minor
+상태: 작성 중
+승인해시: ""
+승인대상: 요구사항 명세
+---
+# 작업 계획서: minor example
+## 요구사항 명세
+### 요청 기준
+작은 요청을 처리한다.
+### 목적
+작은 결과를 만든다.
+### 범위·제외 범위
+- 범위: 단일 파일
+- 제외 범위: 구조 변경
+### 완료 기준
+- 결과가 확인된다.
+### 사용자 결정
+- 없음
+### 변경 불가 제약
+- 없음
+### 에이전트 가정
+- 없음
+### 결정 대기 항목 (Open Questions)
+- 없음
+### minor 판단 근거
+- 단일 관심사
+## 실행 계획
+### 구현 단계
+1. 파일을 수정한다.
+## 실행 TODO
+- [ ] 검증한다.
+"""
+
 
 class PlanHashTest(unittest.TestCase):
     def new_plan_hash(self, content=NEW_PLAN):
@@ -57,6 +97,20 @@ class PlanHashTest(unittest.TestCase):
         path = root / "workspace/tasks/active/example/plan.md"
         path.parent.mkdir(parents=True)
         path.write_text(content, encoding="utf-8")
+
+    def run_plan_hash_cli(self, *args):
+        old_argv = sys.argv
+        stdout, stderr = io.StringIO(), io.StringIO()
+        try:
+            sys.argv = ["plan_hash.py", *args]
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                try:
+                    plan_hash.main()
+                except SystemExit as error:
+                    return error.code, stdout.getvalue(), stderr.getvalue()
+        finally:
+            sys.argv = old_argv
+        return None, stdout.getvalue(), stderr.getvalue()
 
     def test_spec_hash_ignores_execution_and_verification_changes(self):
         baseline = plan_hash.compute(NEW_PLAN.split("---\n", 2)[2])
@@ -136,6 +190,93 @@ class PlanHashTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             plan_hash.compute_for_plan(front, body)
 
+    def test_audit_rejects_manual_approval_date_in_post_approval_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            invalid = NEW_PLAN.replace("상태: 구현 중", "상태: 검증 중").replace(
+                "승인해시: oldhash", "승인해시: user-approved-2026-08-21"
+            )
+            path.write_text(invalid, encoding="utf-8")
+            result = plan_hash.audit(str(path))
+            self.assertEqual(result["missing"], [])
+            self.assertEqual(result["invalid"][0]["field"], "승인해시")
+            self.assertIn("reqspec-v1:<16자리 소문자 16진수>", result["invalid"][0]["reason"])
+
+    def test_audit_allows_matching_legacy_hash_before_approval(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            body = "## 목적\n초기 목적\n## 구현 계획\n- [ ] 구현\n"
+            path.write_text(
+                "---\n상태: 설계 완료\n승인해시: " + plan_hash.compute(body) + "\n---\n" + body,
+                encoding="utf-8",
+            )
+            self.assertEqual(plan_hash.audit(str(path))["invalid"], [])
+
+    def test_audit_rejects_legacy_hash_in_post_approval_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            body = "## 목적\n초기 목적\n## 구현 계획\n- [ ] 구현\n"
+            path.write_text(
+                "---\n상태: 검증 중\n승인해시: " + plan_hash.compute(body) + "\n---\n" + body,
+                encoding="utf-8",
+            )
+            result = plan_hash.audit(str(path))
+            self.assertEqual(result["invalid"][0]["field"], "승인해시")
+            self.assertIn("reqspec-v1:<16자리 소문자 16진수>", result["invalid"][0]["reason"])
+
+    def test_single_plan_template_supports_minor_specification_hash_format(self):
+        template = (ROOT / ".mpa/runtime/templates/plan_template.md").read_text(encoding="utf-8")
+        self.assertFalse((ROOT / ".mpa/runtime/templates/minor_plan_template.md").exists())
+        self.assertIn("# 작업 계획서: [작업 항목명]", template)
+        self.assertIn("승인대상: 요구사항 명세", template)
+        self.assertIn("## 요구사항 명세", template)
+        for heading in (
+            "### 요청 기준", "### 목적", "### 범위·제외 범위", "### 완료 기준",
+            "### 사용자 결정", "### 변경 불가 제약", "### 에이전트 가정",
+            "### 결정 대기 항목 (Open Questions)", "### minor 판단 근거",
+        ):
+            self.assertIn(heading, template)
+
+    def test_minor_specification_hash_excludes_execution_plan(self):
+        _, front_matter, body = MINOR_PLAN.split("---\n", 2)
+        baseline = plan_hash.compute_for_plan(front_matter, body)
+        self.assertEqual(
+            baseline,
+            plan_hash.compute_for_plan(front_matter, body.replace("파일을 수정한다.", "다른 순서로 수정한다.")),
+        )
+        self.assertNotEqual(
+            baseline,
+            plan_hash.compute_for_plan(front_matter, body.replace("작은 결과를 만든다.", "다른 결과를 만든다.")),
+        )
+
+    def test_approve_rejects_legacy_plan_before_state_transition(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            path.write_text(
+                "---\n태스크: legacy\n타입: major\n상태: 설계 완료\n승인해시: \"\"\n---\n## 목적\n구형 계획\n",
+                encoding="utf-8",
+            )
+            code, output, error = self.run_plan_hash_cli("approve", str(path))
+            self.assertEqual(code, 2)
+            self.assertEqual(output, "")
+            self.assertIn("구형 plan은 자동 변환하지 않습니다", error)
+            self.assertIn("상태: 설계 완료", path.read_text(encoding="utf-8"))
+
+    def test_approve_transitions_current_plan_and_records_reqspec_hash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            current = NEW_PLAN.replace("상태: 구현 중", "상태: 설계 완료").replace(
+                "승인해시: oldhash", "승인해시: \"\""
+            )
+            path.write_text(current, encoding="utf-8")
+            code, output, error = self.run_plan_hash_cli("approve", str(path))
+            self.assertIsNone(code)
+            self.assertIn("상태 → 구현 중", output)
+            self.assertEqual(error, "")
+            result = plan_hash.audit(str(path))
+            self.assertEqual(result["missing"], [])
+            self.assertEqual(result["invalid"], [])
+
     def test_gate_allows_new_plan_execution_only_change(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -155,22 +296,51 @@ class PlanHashTest(unittest.TestCase):
             self.write_active_plan(root, changed)
             code, output, error = self.run_gate(root, "warn")
             self.assertEqual(code, 0)
-            self.assertIn("요구사항 명세가 변경됐는지 확인", output)
+            self.assertIn("승인해시가 현재 승인 대상과 일치하지 않습니다", output)
             self.assertEqual(error, "")
             code, output, error = self.run_gate(root, "block")
             self.assertEqual(code, 2)
             self.assertEqual(output, "")
-            self.assertIn("요구사항 명세가 변경됐는지 확인", error)
+            self.assertIn("승인해시가 현재 승인 대상과 일치하지 않습니다", error)
 
     def test_gate_rejects_new_format_without_specification_heading(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            invalid = NEW_PLAN.replace("## 요구사항 명세\n", "")
+            invalid = NEW_PLAN.replace("승인해시: oldhash", "승인해시: reqspec-v1:0123456789abcdef").replace(
+                "## 요구사항 명세\n", ""
+            )
             self.write_active_plan(root, invalid)
             code, output, error = self.run_gate(root, "warn")
             self.assertEqual(code, 0)
-            self.assertIn("요구사항 명세 형식 오류", output)
+            self.assertIn("`## 요구사항 명세` 섹션이 누락", output)
             self.assertEqual(error, "")
+
+    def test_gate_checks_manual_hash_in_verification_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            invalid = NEW_PLAN.replace("상태: 구현 중", "상태: 검증 중").replace(
+                "승인해시: oldhash", "승인해시: user-approved-2026-08-21"
+            )
+            self.write_active_plan(root, invalid)
+            code, output, error = self.run_gate(root, "warn")
+            self.assertEqual(code, 0)
+            self.assertIn("날짜·승인 문구", output)
+            self.assertEqual(error, "")
+            code, output, error = self.run_gate(root, "block")
+            self.assertEqual(code, 2)
+            self.assertEqual(output, "")
+            self.assertIn("날짜·승인 문구", error)
+
+    def test_session_start_marks_manual_hash_as_invalid(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            invalid = NEW_PLAN.replace("상태: 구현 중", "상태: 검증 중").replace(
+                "승인해시: oldhash", "승인해시: user-approved-2026-08-21"
+            )
+            self.write_active_plan(root, invalid)
+            message = session_start.build_message(str(root))
+            self.assertIn("유효하지 않은 필드: 승인해시", message)
+            self.assertIn("승인해시는 직접 입력하지 않고", message)
 
     def test_gate_blocks_legacy_plan_requirement_change(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -182,7 +352,7 @@ class PlanHashTest(unittest.TestCase):
             code, output, error = self.run_gate(root, "block")
             self.assertEqual(code, 2)
             self.assertEqual(output, "")
-            self.assertIn("구형 plan의 요구사항 변경", error)
+            self.assertIn("승인 이후 상태의 승인해시는", error)
 
 
 if __name__ == "__main__":

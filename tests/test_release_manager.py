@@ -46,6 +46,13 @@ class ReleaseManagerTest(unittest.TestCase):
         path.mkdir(parents=True, exist_ok=True)
         (path / ".mpa-version").write_text(f"current_release: {version}\n", encoding="utf-8")
         (path / "rule.md").write_text(version, encoding="utf-8")
+        hooks = path / "hooks"
+        hooks.mkdir(exist_ok=True)
+        for name in ("session_start.py", "code_gate.py"):
+            (hooks / name).write_text(
+                "import argparse\nparser = argparse.ArgumentParser()\nparser.parse_args()\n",
+                encoding="utf-8",
+            )
 
     def prepare(self, runtime_config=None):
         release_manager.sync_runtime(argparse.Namespace())
@@ -65,6 +72,7 @@ class ReleaseManagerTest(unittest.TestCase):
 
     def test_deploy_uses_immutable_package_not_current_dist(self):
         manifest = self.prepare()
+        self.assertEqual(json.loads(manifest.read_text(encoding="utf-8"))["asset_root"], ".mpa/runtime")
         self.write_runtime(release_manager.RUNTIME_DIST, "v2")
         target_root = self.root / "target"
         self.write_runtime(target_root / ".mpa/runtime", "old")
@@ -81,6 +89,22 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertEqual((target_root / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "v1")
         self.assertTrue(any((target_root / ".mpa/backups").iterdir()))
         self.assertTrue((target_root / ".mpa/runtime" / "history" / "releases" / json.loads(manifest.read_text())["release_id"]).with_suffix(".json").is_file())
+
+    def test_deployment_dry_run_requires_current_runtime_layout(self):
+        manifest = self.prepare()
+        target = self.root / "target"
+        (target / ".mpa/config").mkdir(parents=True)
+        with self.assertRaisesRegex(ValueError, "current MPA layout"):
+            release_manager.deployment_dry_run(argparse.Namespace(
+                manifest=str(manifest), target=str(target), target_ref="target"))
+        self.assertFalse((release_manager.DEPLOYMENT_RECEIPTS / "target").exists())
+
+    def test_prepare_release_rejects_invalid_packaged_hook(self):
+        hook = release_manager.RUNTIME_SOURCE / "hooks" / "session_start.py"
+        hook.write_text("def invalid(:\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "hook is not valid Python: hooks/session_start.py"):
+            self.prepare()
+        self.assertFalse(any(release_manager.RELEASES.glob("*/manifest_*.json")))
 
     def test_deploy_and_rollback_preserve_user_owned_paths(self):
         manifest = self.prepare()

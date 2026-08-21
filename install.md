@@ -120,6 +120,8 @@ workspace는 어떤 agent를 사용하든 동일하므로 프로젝트 루트에
 | `.mpa/runtime/` 폴더 없음 | 신규 설치 — `install.py` 실행 |
 | `.mpa/runtime/` 폴더 있음 | 설치 중단 — 승인된 release manifest로 Runtime만 배포 |
 
+설치와 업데이트는 `.mpa/runtime`, `.mpa/config`, `.mpa/backups` 구조만 지원한다. Runtime이 없는 기존 프로젝트를 업데이트 대상으로 자동 변환하지 않는다. 해당 경우에는 신규 설치 또는 별도 복구 절차를 먼저 완료한다.
+
 ---
 
 ### Q5. 설치 실행
@@ -151,7 +153,7 @@ python3 release_manager.py deploy \
 
 ### Runtime release 준비·배포·롤백
 
-다음 명령은 **my-pacemaker-agent source 저장소에서만** 실행한다. Runtime release에는 `dist/.mpa/runtime/`만 포함된다. update 시 대상의 `workspace/` 또는 루트 `docs/`가 없으면 빈 폴더만 생성하며, 이미 존재하는 폴더·agent 설정·일반 소스는 변경하지 않는다.
+다음 명령은 **my-pacemaker-agent source 저장소에서만** 실행한다. Runtime release에는 `dist/.mpa/runtime/`만 포함된다. **사용자가 릴리즈를 명시 요청했거나 배포 요청에 현재 source Runtime을 담은 최신 유효 release가 없을 때만** 1단계 `prepare-release`를 실행한다. Runtime 변경·검증만으로 release를 자동 생성하지 않는다. update는 대상 `.mpa/runtime/`이 있는 경우에만 수행하며, 대상의 `workspace/` 또는 루트 `docs/`가 없으면 빈 폴더만 생성한다. 이미 존재하는 폴더·agent 설정·일반 소스는 변경하지 않는다.
 
 보관 자산은 용도별로 분리한다. `workspace/releases/<release-id>/package_<release-id>.zip`은 배포 기준과 릴리즈 이력을 보존하는 불변 release archive이고, deploy가 대상에 만드는 `.mpa/backups/` 디렉터리는 `runtime/.mpa/runtime/`와 migration 대상인 경우 `runtime-config/config.yaml`을 보존하는 운영 snapshot이다. 기존 사용자 설정은 Runtime 프로젝트 자체의 버전 관리·백업으로 관리하며 MPA deploy가 덮어쓰지 않는다.
 
@@ -170,7 +172,7 @@ python3 release_manager.py prepare-release \
 # }}
 # prepare-release에 --runtime-config-json runtime-config.json 을 덧붙인다.
 
-# 2. 모든 활성 release bundle의 ZIP·manifest·note·receipt 정합성 확인
+# 2. 모든 활성 release bundle의 ZIP·manifest·note·receipt 정합성 및 패키지 훅 정적 문법 확인
 python3 release_manager.py release-audit
 
 # 3. 대상의 현재 release와 새 release를 기록한 dry-run 생성
@@ -201,7 +203,10 @@ python3 release_manager.py rollback \
 
 ```
 [project]/
-├── .mpa/runtime/          ← 방법론 스냅샷 (harness에서 복사)
+├── .mpa/
+│   ├── runtime/           ← 방법론 스냅샷 (harness에서 복사)
+│   ├── config/            ← 설치 고유 설정 (기존 값 보존)
+│   └── backups/           ← 배포 직전 Runtime·설정 snapshot
 ├── CLAUDE.md                   ← claude 포함 시 (Agents Workspace 섹션)
 ├── AGENTS.md                   ← codex 포함 시 (Agents Workspace 섹션)
 ├── GEMINI.md                   ← antigravity 포함 시 (Agents Workspace 섹션)

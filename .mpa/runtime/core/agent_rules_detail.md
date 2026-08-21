@@ -56,7 +56,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
    ```bash
    python3 .mpa/runtime/hooks/plan_hash.py renew-spec workspace/tasks/active/[태스크명]/plan.md --summary "[승인된 변경 요약]"
    ```
-4. 접두사 없는 구형 plan은 기존 절차대로 `설계 완료`로 되돌려 재승인한다. 자동 변환하지 않는다.
+4. 접두사 없는 구형 plan은 `설계 완료`로 되돌린 뒤 최신 템플릿 구조의 `승인대상: 요구사항 명세`와 `## 요구사항 명세`를 사용자와 정리하고 재승인한다. 자동 변환하지 않는다.
 
 ---
 
@@ -266,9 +266,11 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 | 페르소나 | task_designer | **`personas/mpa_system_designer.md`** |
 | 수정 후 동기화 | 불필요 | `dist/`와 설치본 양쪽 동기화 필수 |
 
-**처리 흐름:** `mpa_system_designer.md` 읽기 → plan.md 작성 및 승인 → 수정 → 일관성 점검 → `prepare-release`로 Runtime 동기화·검증·단일 release ID 생성
+**처리 흐름:** `mpa_system_designer.md` 읽기 → plan.md 작성 및 승인 → 수정 → 일관성 점검·source 테스트 → **사용자의 명시 릴리즈 요청 또는 배포 요청 시에만** 최신 release 필요 여부 판정 → 필요한 경우 `prepare-release`로 Runtime 동기화·검증·단일 release ID 생성
 
 > **release ID 생성:** 방법론(`.mpa/runtime/`)을 의미 있게 수정한 태스크를 release할 때 `release_manager.py prepare-release`가 `.mpa-version`의 `current_release`를 UTC `YYYYMMDDHHMMSS-uuid8`으로 갱신하고 `dist/.mpa/runtime/`에 동기화한다. 이 값 하나가 package·manifest·receipt·대상 history·backup의 표시 ID다. checksum은 내부 무결성 증빙이며 **dist를 직접 편집하지 않는다**.
+
+> **릴리즈 생성 시점:** Runtime 변경·테스트 통과만으로는 release를 만들지 않는다. 사용자가 “릴리즈 만들어줘”처럼 명시 요청했거나 “배포해줘” 요청에서 현재 source Runtime을 담은 최신 release가 없을 때만 생성한다. 이미 만든 immutable release는 삭제·재작성하지 않는다.
 
 ---
 
@@ -276,7 +278,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
 
 > **트리거:** 실패 비용 추정 결과 `minor`로 판단된 직후
 
-`실패비용: minor` 판단 시 전체 plan.md 형식 대신 아래 경량 흐름만 처리한다. 목적은 게이트 감사 기록을 남기되, 태스크 운영 비용을 최소화하는 것이다.
+`실패비용: minor` 판단 시에도 공통 plan.md 형식은 유지하고, 아래 경량 흐름으로 승인·실행·검증 절차만 축소한다. 목적은 게이트 감사 기록을 남기되, 태스크 운영 비용을 최소화하는 것이다.
 
 1. **계획 제시** — 반드시 아래 형식으로 출력한다. 생략 불가.
    - 필수 판단 질문(언어, 기능 범위 등)이 있으면 **2개 이내**로 먼저 확인한다.
@@ -290,7 +292,7 @@ code_gate.py가 "계획 승인 기록 복구 필요" 또는 "계획 재승인 �
    ```
    - "진행" / "그래" / "ok" 등 확인 응답 → 구현 시작
    - "major로 변경" → major 흐름으로 전환 (계획 승인 포함)
-2. **plan.md 작성** — 사용자 응답 반영 후 반드시 `templates/minor_plan_template.md`를 Read하여 작성한다. minor 태스크는 에이전트 보고(사용자 결정·암묵적 결정·에이전트 가정·minor 판단 근거)·핵심 기능·구현 항목·`### 실행 TODO` 체크리스트를 기록한다. 실행 TODO에는 이번 태스크 종료 전 증빙으로 완료 처리할 수 있는 항목만 두고, 운영 영향은 마지막 체크리스트 아래의 `운영 시 안내 사항`에 기록한다. 사용자·운영자가 수행할 후속 행동은 안내 사항에 둘 수 있지만, 구현·설계·검증이 추가로 필요한 후속 작업은 새 태스크로 분리한다. 반례·검증 체크리스트·문서 업데이트 대상·구현 후 발견은 생략한다.
+2. **plan.md 작성** — 사용자 응답 반영 후 반드시 공통 `templates/plan_template.md`를 Read하여 작성한다. minor도 major와 같은 `# 작업 계획서` 및 `## 요구사항 명세` 필드(요청 기준·목적·범위·제외 범위·완료 기준·사용자 결정·변경 불가 제약·가정·결정 대기)를 채워 승인해시 대상으로 삼는다. 경량화 대상은 실행·검증 절차다. minor에서는 공통 템플릿의 `### 사전 조사`, `### 예상 조용한 결정`, `### 수정 대상 파일`, `### 참고 파일`, `### 반례`, `## 검증 결과`, `## 실행 중 변경 기록`, `### 구현 후 발견`을 필요 없으면 섹션째 생략한다. 간결한 구현 단계와 `## 실행 TODO`, `## 운영 시 안내 사항`은 유지한다.
    - 작성 완료 후 파일 경로를 사용자에게 고지한다: `계획서: workspace/tasks/active/yyyymmdd_[태스크명]/plan.md`
 3. **INDEX 등록** — `workspace/tasks/INDEX.md`에 새 태스크 행을 `상태: active`로 추가한 뒤 `agent_rules.md`의 "INDEX.md 유지보수 원칙"을 수행한다.
 4. **`approve` 실행**:

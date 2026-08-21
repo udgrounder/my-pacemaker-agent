@@ -27,11 +27,6 @@ ROOT = Path(__file__).resolve().parent
 RUNTIME_SOURCE = ROOT / ".mpa/runtime"
 RUNTIME_DIST = ROOT / "dist" / ".mpa/runtime"
 RUNTIME_DIR = ".mpa/runtime"
-LEGACY_RUNTIME_DIR = ".mpa-workspace"
-INTERMEDIATE_RUNTIME_DIR = ".mpa-runtime"
-LEGACY_CONFIG_RELATIVE = ".mpa-project/config.yaml"
-INTERMEDIATE_CONFIG_RELATIVE = ".mpa-config/config.yaml"
-LEGACY_RUNTIME_CONFIG = ".mpa-workspace/config.toml"
 WORKSPACE = ROOT / "workspace"
 RELEASES = WORKSPACE / "releases"
 LEGACY_RELEASES = RELEASES / "legacy"
@@ -61,73 +56,12 @@ RUNTIME_BACKUP_ROOT = "runtime"
 RUNTIME_CONFIG_BACKUP_ROOT = "runtime-config"
 
 
-def resolve_runtime(root: Path) -> tuple[Path, bool]:
-    """Return the installed Runtime and whether it still uses the legacy path."""
+def resolve_runtime(root: Path) -> Path:
+    """Return the Runtime at the sole supported installed location."""
     runtime = root / RUNTIME_DIR
     if runtime.is_dir():
-        return runtime, False
-    legacy = root / LEGACY_RUNTIME_DIR
-    if legacy.is_dir():
-        return legacy, True
-    intermediate = root / INTERMEDIATE_RUNTIME_DIR
-    if intermediate.is_dir():
-        return intermediate, True
-    raise ValueError("target .mpa/runtime is missing; use install.py for first installation")
-
-
-def migrate_legacy_project_config(root: Path) -> bool:
-    """Seed the new config location without replacing an existing config."""
-    destination = project_config.config_path(root)
-    source = root / INTERMEDIATE_CONFIG_RELATIVE
-    if not source.is_file():
-        source = root / LEGACY_CONFIG_RELATIVE
-    if destination.exists() or not source.is_file():
-        return False
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    content = source.read_text(encoding="utf-8").replace(LEGACY_RUNTIME_DIR, RUNTIME_DIR)
-    temporary = destination.with_name(f".{destination.name}.migrate-{uuid.uuid4().hex[:8]}")
-    try:
-        temporary.write_text(content, encoding="utf-8")
-        temporary.replace(destination)
-    finally:
-        temporary.unlink(missing_ok=True)
-    return True
-
-
-def migrate_legacy_runtime_config(root: Path, legacy_runtime: Path) -> bool:
-    """Preserve the legacy per-project TOML beside the new project config."""
-    source = root / ".mpa-config/config.toml"
-    if not source.is_file():
-        source = legacy_runtime / "config.toml"
-    destination = root / ".mpa/config" / "config.toml"
-    if destination.exists() or not source.is_file():
-        return False
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
-    return True
-
-
-def migrate_agent_runtime_references(root: Path) -> list[str]:
-    """Update only managed agent files that explicitly reference the legacy Runtime."""
-    candidates = ("AGENTS.md", "CLAUDE.md", "GEMINI.md", ".claude/settings.json",
-                  ".codex/hooks.json", ".agents/rules/mpa_pacemaker.md",
-                  ".codex/agents/mpa_pacemaker.toml")
-    updated = []
-    for relative in candidates:
-        path = root / relative
-        if not path.is_file():
-            continue
-        content = path.read_text(encoding="utf-8")
-        if LEGACY_RUNTIME_DIR not in content and INTERMEDIATE_RUNTIME_DIR not in content:
-            continue
-        temporary = path.with_name(f".{path.name}.mpa-path-{uuid.uuid4().hex[:8]}")
-        try:
-            temporary.write_text(content.replace(LEGACY_RUNTIME_DIR, RUNTIME_DIR).replace(INTERMEDIATE_RUNTIME_DIR, RUNTIME_DIR), encoding="utf-8")
-            temporary.replace(path)
-        finally:
-            temporary.unlink(missing_ok=True)
-        updated.append(relative)
-    return updated
+        return runtime
+    raise ValueError("target .mpa/runtime is missing; initialize the current MPA layout before deployment")
 
 
 def now() -> str:
@@ -556,6 +490,7 @@ def prepare_release(args: argparse.Namespace) -> None:
         staging.mkdir(parents=True, exist_ok=False)
         _zip_runtime(RUNTIME_DIST, staged_paths["package"])
         package_checksum = sha(staged_paths["package"])
+        validate_packaged_runtime(staged_paths["package"], assets)
         note = (
             f"# Release {ident}\n\n"
             f"- release_id: `{ident}`\n"
@@ -602,7 +537,7 @@ def prepare_release(args: argparse.Namespace) -> None:
             "bundle_schema_version": RELEASE_BUNDLE_SCHEMA_VERSION,
             "release_id": ident,
             "created_at": now(),
-            "asset_root": "dist/.mpa/runtime",
+            "asset_root": RUNTIME_DIR,
             "package": relative_to_root(final_package),
             "note": relative_to_root(final_note),
             "assets": assets,
@@ -691,6 +626,22 @@ def release_package(manifest: dict) -> Path:
     return package
 
 
+def validate_packaged_runtime(package: Path, expected_assets: dict[str, str]) -> None:
+    """Verify a release archive without executing its hook code."""
+    with tempfile.TemporaryDirectory(prefix="package-verify-") as directory:
+        runtime = Path(directory) / "runtime"
+        _extract_runtime(package, runtime)
+        verify_target(runtime, expected_assets)
+        for relative in ("hooks/session_start.py", "hooks/code_gate.py"):
+            hook = runtime / relative
+            if not hook.is_file():
+                raise ValueError(f"packaged Runtime hook is missing: {relative}")
+            try:
+                compile(hook.read_text(encoding="utf-8"), str(hook), "exec")
+            except (OSError, UnicodeDecodeError, SyntaxError) as error:
+                raise ValueError(f"packaged Runtime hook is not valid Python: {relative}: {error}") from error
+
+
 def audit_releases(_: argparse.Namespace) -> None:
     invalid = []
     if LEGACY_ACTIVE_MANIFESTS.exists() and any(LEGACY_ACTIVE_MANIFESTS.glob("*.json")):
@@ -708,11 +659,7 @@ def audit_releases(_: argparse.Namespace) -> None:
         try:
             _, manifest = load_manifest(str(paths["manifest"]))
             package = release_package(manifest)
-            with tempfile.TemporaryDirectory(prefix=f"audit-{release_id}-") as directory:
-                extracted = Path(directory) / "runtime"
-                _extract_runtime(package, extracted)
-                if asset_map(extracted) != manifest["assets"]:
-                    raise ValueError("decompressed Runtime asset map does not match manifest")
+            validate_packaged_runtime(package, manifest["assets"])
         except (OSError, ValueError, json.JSONDecodeError) as error:
             invalid.append(f"{release_id}: {error}")
     if invalid:
@@ -780,9 +727,8 @@ def prune_runtime_backups(root: Path, keep: int = RUNTIME_BACKUP_RETENTION) -> l
 
 
 def _backup_runtime_path(path: Path) -> Path:
-    """Resolve the Runtime tree in a current or legacy backup."""
-    nested = path / RUNTIME_BACKUP_ROOT / ".mpa/runtime"
-    return nested if nested.is_dir() else path
+    """Resolve the Runtime tree in a current managed backup."""
+    return path / RUNTIME_BACKUP_ROOT / ".mpa/runtime"
 
 
 def _backup_config_path(path: Path) -> Path:
@@ -1007,7 +953,7 @@ def deployment_dry_run(args: argparse.Namespace) -> None:
     manifest_path, manifest = load_manifest(args.manifest)
     release_package(manifest)
     root = Path(args.target).resolve()
-    target, legacy_runtime = resolve_runtime(root)
+    target = resolve_runtime(root)
     created_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
     result = {"release_id": manifest["release_id"],
               "from_release": current_release(target), "to_release": manifest["release_id"], "manifest": relative_to_root(manifest_path),
@@ -1015,8 +961,6 @@ def deployment_dry_run(args: argparse.Namespace) -> None:
               "target": str(root), "target_ref": target_ref, "current_assets": asset_map(target),
               "release_assets": manifest["assets"], "history": target_history(target), "issue_inventory": update_issue_inventory(root),
               "runtime_config": _runtime_config_summary(root, manifest.get("runtime_config")),
-              "path_migration": {"from": LEGACY_RUNTIME_DIR if legacy_runtime else RUNTIME_DIR,
-                                 "to": RUNTIME_DIR, "required": legacy_runtime},
               "created_at": created_at.isoformat(),
               "expires_at": (created_at + dt.timedelta(minutes=30)).isoformat()}
     path = DEPLOYMENT_RECEIPTS / target_ref / f"dry-run-{manifest['release_id']}-{receipt_suffix()}.json"
@@ -1029,7 +973,7 @@ def deploy(args: argparse.Namespace) -> None:
     manifest_path, manifest = load_manifest(args.manifest)
     package = release_package(manifest)
     root = Path(args.target).resolve()
-    target, legacy_runtime = resolve_runtime(root)
+    target = resolve_runtime(root)
     original_target = target
     destination = root / RUNTIME_DIR
     dry_run = (ROOT / args.dry_run).resolve()
@@ -1072,16 +1016,12 @@ def deploy(args: argparse.Namespace) -> None:
         deployment_receipt: Path | None = None
         history_path: Path | None = None
         config_snapshot: dict[str, object] = {"included": False, "existed": False, "checksum": None}
-        migrated_legacy_toml = False
-        migrated_legacy_config = False
-        migrated_agent_files: list[str] = []
         with tempfile.TemporaryDirectory(prefix=f"deploy-{manifest['release_id']}-") as directory:
             extracted = Path(directory) / "runtime"
             try:
                 created_paths = ensure_required_project_directories(root)
                 backup.parent.mkdir(parents=True, exist_ok=True)
                 config_snapshot = _backup_runtime(root, target, backup, runtime_config is not None)
-                migrated_legacy_toml = legacy_runtime and migrate_legacy_runtime_config(root, target)
                 replacement = destination.parent / f".runtime.new-{uuid.uuid4().hex[:8]}"
                 previous = target.with_name(f"{target.name}.previous-{uuid.uuid4().hex[:8]}")
                 _extract_runtime(package, extracted)
@@ -1099,10 +1039,8 @@ def deploy(args: argparse.Namespace) -> None:
                     if target.exists():
                         shutil.rmtree(target)
                     if previous.exists():
-                        previous.replace(root / (LEGACY_RUNTIME_DIR if legacy_runtime else RUNTIME_DIR))
+                        previous.replace(destination)
                     raise
-                migrated_legacy_config = migrate_legacy_project_config(root)
-                migrated_agent_files = migrate_agent_runtime_references(root) if legacy_runtime else []
                 config_migration = {"status": "none", "add": [], "skipped": []}
                 if runtime_config is not None:
                     config_migration = project_config.apply_runtime_config_migration(root, runtime_config)
@@ -1118,10 +1056,6 @@ def deploy(args: argparse.Namespace) -> None:
                     "rollback_owner": args.rollback_owner, "dry_run": relative_to_root(dry_run),
                     "assets": manifest["assets"], "verification": {"asset_map": "matched", "verified_at": now()},
                     "runtime_config": {"migration": config_migration, "config_backup": config_snapshot},
-                    "path_migration": {"from": LEGACY_RUNTIME_DIR if legacy_runtime else RUNTIME_DIR,
-                                       "to": RUNTIME_DIR, "legacy_config_migrated": migrated_legacy_config,
-                                       "legacy_toml_migrated": migrated_legacy_toml,
-                                       "agent_files_migrated": migrated_agent_files},
                     "collected_issues": collected,
                     "issue_collection": {"status": "collected" if collected else "no-op", "count": len(collected)},
                 }

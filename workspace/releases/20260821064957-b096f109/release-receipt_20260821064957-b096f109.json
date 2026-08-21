@@ -1,0 +1,28 @@
+{
+  "schema_version": 4,
+  "bundle_schema_version": 1,
+  "release_id": "20260821064957-b096f109",
+  "manifest": "workspace/releases/20260821064957-b096f109/manifest_20260821064957-b096f109.json",
+  "package": "workspace/releases/20260821064957-b096f109/package_20260821064957-b096f109.zip",
+  "note": "workspace/releases/20260821064957-b096f109/note_20260821064957-b096f109.md",
+  "created_at": "2026-08-21T06:50:01+00:00",
+  "verified_by": "codex",
+  "package_checksum": "112ea5a6468a7814c9394e026db9cf243c05a7e2ab180190bf4cb27e34a5221e",
+  "asset_checksum": "b995f6c38831e70d058d48dc10d0570107b2d223af424b0cb473a057aea737c5",
+  "validation": {
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_*.py"
+    ],
+    "exit_code": 0,
+    "stdout": "n\": {\"status\": \"no-op\", \"count\": 0}}\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp41nehv_9/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp41nehv_9/dist/.mpa/runtime\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp41nehv_9/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp41nehv_9/dist/.mpa/runtime\n20260821065000-9cf86026\nworkspace/receipts/deployments/legacy-target/dry-run-20260821065000-9cf86026-20260821T065000Z-8e7293f9.json\n{\"backup\": \".mpa/backups/20260821065000-9cf86026-20260821T065000Z-366cd80d\", \"issue_collection\": {\"status\": \"no-op\", \"count\": 0}}\n{\"status\": \"rolled_back\", \"release_id\": \"20260821065000-9cf86026\", \"backup\": \".mpa/backups/20260821065000-9cf86026-20260821T065000Z-366cd80d\"}\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp_5vkm2r9/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp_5vkm2r9/dist/.mpa/runtime\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp_5vkm2r9/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp_5vkm2r9/dist/.mpa/runtime\n20260821065000-7274c268\nworkspace/receipts/deployments/target/dry-run-20260821065000-7274c268-20260821T065000Z-2b730c40.json\n{\"backup\": \".mpa/backups/20260821065000-7274c268-20260821T065000Z-b4fafc3e\", \"issue_collection\": {\"status\": \"no-op\", \"count\": 0}}\n{\"status\": \"rolled_back\", \"release_id\": \"20260821065000-7274c268\", \"backup\": \".mpa/backups/20260821065000-7274c268-20260821T065000Z-b4fafc3e\"}\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp6r_44t88/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp6r_44t88/dist/.mpa/runtime\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpwdvzmz5f/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpwdvzmz5f/dist/.mpa/runtime\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpwdvzmz5f/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpwdvzmz5f/dist/.mpa/runtime\n20260821065000-8d9cafc4\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpo4j9bnvj/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpo4j9bnvj/dist/.mpa/runtime\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpo4j9bnvj/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpo4j9bnvj/dist/.mpa/runtime\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpo4j9bnvj/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpo4j9bnvj/dist/.mpa/runtime\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpo4j9bnvj/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpo4j9bnvj/dist/.mpa/runtime\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpo4j9bnvj/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmpo4j9bnvj/dist/.mpa/runtime\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp6t71mb_3/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp6t71mb_3/dist/.mpa/runtime\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp6t71mb_3/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp6t71mb_3/dist/.mpa/runtime\n20260821065000-6e3aaebc\nworkspace/receipts/deployments/target/dry-run-20260821065000-6e3aaebc-20260821T065000Z-0fe550f7.json\n{\"backup\": \".mpa/backups/20260821065000-6e3aaebc-20260821T065000Z-96d9f62e\", \"issue_collection\": {\"status\": \"collected\", \"count\": 1}}\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp7i2ykytk/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp7i2ykytk/dist/.mpa/runtime\nsynced runtime: /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp7i2ykytk/.mpa/runtime -> /var/folders/dd/q_skqkqx43n4y3nq2wlv11y80000gn/T/tmp7i2ykytk/dist/.mpa/runtime\n20260821065000-99e47224\nworkspace/receipts/deployments/target/dry-run-20260821065000-99e47224-20260821T065000Z-f3755b26.json\n",
+    "stderr": "..........................................................................\n----------------------------------------------------------------------\nRan 74 tests in 2.930s\n\nOK\n",
+    "executed_at": "2026-08-21T06:50:00+00:00"
+  }
+}

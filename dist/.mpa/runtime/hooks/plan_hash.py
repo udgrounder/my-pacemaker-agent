@@ -32,7 +32,9 @@ REQUIRED_FIELDS = ["태스크", "생성일", "타입", "실패비용", "상태",
 SPEC_FORMAT_FIELD = "승인대상"
 SPEC_FORMAT_VALUE = "요구사항 명세"
 SPEC_HASH_PREFIX = "reqspec-v1:"
+SPEC_HASH_RE = re.compile(r"^reqspec-v1:[0-9a-f]{16}$")
 VALID_STATUS = {"작성 중", "설계 중", "설계 완료", "구현 중", "검증 중", "테스트 중", "검토 완료", "완료 승인"}
+HASH_REQUIRED_STATUSES = {"구현 중", "검증 중", "테스트 중", "검토 완료", "완료 승인"}
 VALID_TYPE = {"major", "minor"}
 VALID_COST = {"critical", "major", "minor"}
 
@@ -130,6 +132,37 @@ def compute_for_plan(front_matter, body):
     return compute_legacy(body)
 
 
+def approval_hash_issue(front_matter, body):
+    """승인 이후 상태의 승인해시 형식·현재 명세 일치 문제를 반환한다.
+
+    최신 plan(`승인대상: 요구사항 명세`)의 승인해시는 반드시
+    `plan_hash.py approve` 또는 사용자 승인 뒤 `renew-spec`가 만든
+    `reqspec-v1:<16자리 소문자 16진수>`여야 한다. 구형 plan은 기존 본문
+    해시와의 일치만 검사해 과거 이력의 읽기 호환성을 유지한다.
+    """
+    status = get_field(front_matter, "상태")
+    if status not in HASH_REQUIRED_STATUSES:
+        return None
+
+    approved_hash = get_field(front_matter, "승인해시")
+    if not approved_hash:
+        return "승인 이후 상태에는 승인해시가 필요합니다"
+
+    if not SPEC_HASH_RE.fullmatch(approved_hash):
+        return (
+            "승인 이후 상태의 승인해시는 `reqspec-v1:<16자리 소문자 16진수>` 형식이어야 합니다 "
+            "(`approve` 또는 사용자 승인 뒤 `renew-spec`만 기록 가능)"
+        )
+
+    try:
+        current_hash = compute_for_plan(front_matter, body)
+    except ValueError as error:
+        return str(error)
+    if approved_hash != current_hash:
+        return f"승인해시가 현재 승인 대상과 일치하지 않습니다 (현재: {current_hash})"
+    return None
+
+
 def get_field(front_matter, key):
     if not front_matter:
         return None
@@ -202,7 +235,7 @@ def audit(plan_path):
     """프론트매터 필드 상태를 검사한다.
     반환: dict {"frontmatter_exists": bool, "missing": [...], "invalid": [{field, value, reason}]}
     """
-    front_matter, _, _ = parse(plan_path)
+    front_matter, body, _ = parse(plan_path)
     result = {"frontmatter_exists": front_matter is not None, "missing": [], "invalid": []}
     if front_matter is None:
         result["missing"] = list(REQUIRED_FIELDS)
@@ -224,6 +257,14 @@ def audit(plan_path):
             result["invalid"].append({"field": key, "value": val, "reason": f"유효하지 않은 타입. 허용: {sorted(VALID_TYPE)}"})
         elif key == "실패비용" and val not in VALID_COST:
             result["invalid"].append({"field": key, "value": val, "reason": f"유효하지 않은 실패비용. 허용: {sorted(VALID_COST)}"})
+
+    issue = approval_hash_issue(front_matter, body)
+    if issue:
+        result["invalid"].append({
+            "field": "승인해시",
+            "value": get_field(front_matter, "승인해시") or "",
+            "reason": issue,
+        })
     return result
 
 
@@ -294,13 +335,27 @@ def main():
     elif cmd == "approve":
         front_matter, body, _ = parse(plan_path)
         status = get_field(front_matter, "상태") if front_matter else None
-        # minor 자동 승인: 상태가 없거나 '설계 중'/'작성 중'인 경우도 허용
-        ALLOWED_STATUSES = {"설계 완료", "설계 중", "작성 중", None}
+        task_type = get_field(front_matter, "타입") if front_matter else None
+        # major는 설계 완료 후에만, minor는 경량 흐름상 설계 중에도 승인한다.
+        ALLOWED_STATUSES = {"설계 완료"}
+        if task_type == "minor":
+            ALLOWED_STATUSES.update({"설계 중", "작성 중", None})
         if status not in ALLOWED_STATUSES:
             sys.stderr.write(
                 f"⛔ approve 거부: 현재 상태가 '{status}'입니다.\n"
-                "approve는 '설계 완료' 상태에서만 실행할 수 있습니다.\n"
+                "major approve는 '설계 완료' 상태에서만 실행할 수 있습니다.\n"
                 "이미 '구현 중'이라면 승인해시가 이미 기록된 상태입니다.\n"
+            )
+            sys.exit(2)
+        if (
+            get_field(front_matter, SPEC_FORMAT_FIELD) != SPEC_FORMAT_VALUE
+            or extract_specification(body) is None
+        ):
+            sys.stderr.write(
+                "⛔ approve 거부: 새 승인에는 `승인대상: 요구사항 명세`와 "
+                "`## 요구사항 명세` 섹션이 필요합니다.\n"
+                "구형 plan은 자동 변환하지 않습니다. 최신 템플릿 구조로 요구사항 명세를 정리하고 "
+                "사용자 승인을 다시 받은 뒤 approve를 실행하세요.\n"
             )
             sys.exit(2)
         try:

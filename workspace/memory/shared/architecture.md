@@ -12,7 +12,9 @@
 | 설치 고유 설정 | 대상 `.mpa/config/config.yaml` | 최초 install에서 없을 때 생성, 기존 파일은 누락 필드만 additive 보강. release의 `runtime.*` migration만 deploy transaction에서 추가하며 release ZIP에는 포함하지 않음 |
 | 대상 사용자 데이터 | 대상 `workspace/`, 루트 `docs/`, agent 설정, 일반 소스 | install/deploy/rollback이 보존하며 release에 포함하지 않음 |
 
-release는 `workspace/releases/<release-id>/`의 `package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json` 단일 immutable bundle로 고정한다. deployment는 ZIP을 안전하게 해제한 뒤 dry-run·승인·rollback 책임자 검증을 거쳐 대상 `.mpa/runtime`를 교체하고, manifest에 있는 `runtime.*` migration만 config에 additive 적용하며 대상 history와 receipt를 남긴다. Git은 scoped source 식별 보조 정보일 뿐 dirty worktree 차단 Gate가 아니다.
+release는 `workspace/releases/<release-id>/`의 `package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json` 단일 immutable bundle로 고정한다. deployment는 ZIP을 안전하게 해제한 뒤 dry-run·승인·rollback 책임자 검증을 거쳐 대상 `.mpa/runtime`를 교체하고, manifest에 있는 `runtime.*` migration만 config에 additive 적용하며 대상 history와 receipt를 남긴다. Git은 scoped source 식별 보조 정보일 뿐 dirty worktree 차단 Gate가 아니다. Runtime 변경·검증만으로 release를 자동 생성하지 않으며, 사용자 명시 릴리즈 요청 또는 배포 요청 시 현재 source Runtime을 담은 최신 유효 release가 없을 때만 `prepare-release`를 실행한다.
+
+설치·업그레이드의 활성 구조는 `.mpa/runtime`, `.mpa/config`, `.mpa/backups`뿐이다. Runtime이 이 위치에 없으면 deploy는 자동 구조 변환을 시도하지 않고 중단한다. `prepare-release`와 `release-audit`은 ZIP을 임시 Runtime으로 풀어 asset map과 `session_start.py`·`code_gate.py`의 정적 Python 문법을 검증한다. 실제 hook 실행은 배포 후 대상 Runtime 검증에서만 수행한다.
 
 ### 보관·복구 자산의 용도 구분
 
@@ -100,7 +102,7 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 - 라우팅 키워드: "규칙 바꿔줘", "inject 수정", "페르소나 수정", "MPA 시스템 파일 수정"
 
 ### 요구사항 명세 체크섬
-새 형식 plan은 `승인해시`의 `reqspec-v1:` 접두사와 프론트매터 `승인대상: 요구사항 명세`, `## 요구사항 명세` 블록의 조합으로 식별한다. 접두사가 없는 기존 해시는 구형 방식으로 유지한다. `hooks/plan_hash.py`가 최신 명세 블록 또는 구형 본문 규칙의 체크섬을 계산하고, `hooks/code_gate.py`는 같은 함수를 호출해 검증한다. 실행 계획·변경 기록·검증 결과는 최신 명세 체크섬 대상이 아니며, 명세 변경은 사용자 승인 뒤 `renew-spec`으로 이력을 남긴다.
+새 major·minor plan은 `승인해시`의 `reqspec-v1:<16자리 소문자 16진수>` 접두사와 프론트매터 `승인대상: 요구사항 명세`, `## 요구사항 명세` 블록의 조합으로 식별한다. 최초 해시는 `approve`, 사용자 승인 뒤 명세 변경은 `renew-spec`만 기록하며 사람이 날짜·문구·임의 문자열을 직접 쓰지 않는다. `구현 중` 이후 상태에서는 이 형식과 현재 명세의 일치가 필수다. 접두사 없는 기존 해시는 보존된 과거 이력의 읽기에서만 구형 방식으로 유지한다. `hooks/plan_hash.py`가 최신 명세 블록 또는 구형 본문 규칙의 체크섬을 계산하고, `hooks/code_gate.py`는 같은 함수를 호출해 검증한다. 실행 계획·변경 기록·검증 결과는 최신 명세 체크섬 대상이 아니며, 명세 변경은 사용자 승인 뒤 `renew-spec`으로 이력을 남긴다.
 
 ---
 

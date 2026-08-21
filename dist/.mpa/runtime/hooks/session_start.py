@@ -69,30 +69,13 @@ def _read_field(plan_path, key):
 
 
 def audit_frontmatter(plan_path):
-    """plan.md 프론트매터 필드 검사. (missing 리스트, has_frontmatter bool) 반환."""
-    import re
+    """plan.md 프론트매터·승인해시 검사. (missing, invalid, has_frontmatter) 반환."""
     try:
-        with open(plan_path, encoding="utf-8") as f:
-            content = f.read()
-        match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
-        if not match:
-            return REQUIRED_FIELDS[:], False
-        front = match.group(1)
-        existing = {}
-        for line in front.splitlines():
-            if ":" in line:
-                k, v = line.split(":", 1)
-                existing[k.strip()] = v.strip()
-        missing = []
-        for key in REQUIRED_FIELDS:
-            val = existing.get(key)
-            if val is None:
-                missing.append(key)
-            elif not val and key != "승인해시":
-                missing.append(key)
-        return missing, True
+        from plan_hash import audit
+        result = audit(plan_path)
+        return result["missing"], result["invalid"], result["frontmatter_exists"]
     except Exception:
-        return [], False
+        return [], [], False
 
 
 def active_tasks(cwd):
@@ -111,13 +94,16 @@ def active_tasks(cwd):
             rows.append(f"  - {name} — plan.md 없음")
             continue
         status = read_status(plan)
-        missing, has_front = audit_frontmatter(plan)
+        missing, invalid, has_front = audit_frontmatter(plan)
         task_type = _read_field(plan, "타입") if has_front else ""
         type_tag = f" [{task_type}]" if task_type else ""
         if not has_front:
             rows.append(f"  - {name} — {status}  ⚠️ 프론트매터 없음 (구버전 plan.md)")
         elif missing:
             rows.append(f"  - {name} — {status}{type_tag}  ⚠️ 누락 필드: {', '.join(missing)}")
+        elif invalid:
+            fields = ", ".join(item["field"] for item in invalid)
+            rows.append(f"  - {name} — {status}{type_tag}  ⚠️ 유효하지 않은 필드: {fields}")
         else:
             rows.append(f"  - {name} — {status}{type_tag}")
     return rows
@@ -142,11 +128,11 @@ def build_message(cwd):
         # 프론트매터 누락 항목이 있으면 처리 지시 추가
         if any("⚠️" in row for row in rows):
             lines.append("")
-            lines.append("⚠️ 일부 plan.md의 프론트매터가 누락됐습니다.")
+            lines.append("⚠️ 일부 plan.md의 프론트매터 또는 승인해시가 유효하지 않습니다.")
             lines.append("해당 작업 항목 진입 시 다음 절차를 따르세요:")
-            lines.append("  1. plan.md 본문을 읽고 누락 필드를 추론 (`plan_hash.py audit <path>`로 정확한 누락 목록 확인)")
-            lines.append("  2. 추론한 값과 근거를 사용자에게 짧게 보여주고 확인")
-            lines.append("  3. 확인 후 `plan_hash.py init <path> --field key=value ...` 로 주입")
+            lines.append("  1. `plan_hash.py audit <path>`로 누락·형식·일치 문제를 확인")
+            lines.append("  2. 누락 필드는 본문 근거와 사용자 확인 후 `init`으로 주입")
+            lines.append("  3. 승인해시는 직접 입력하지 않고, 상태를 '설계 완료'으로 복구한 뒤 사용자 승인 후 `approve` 또는 `renew-spec`으로 기록")
             lines.append("  4. 추론 기준은 agent_rules.md '프론트매터 누락 처리' 섹션 참조")
     else:
         lines.append("진행 중인 작업 항목 없음.")

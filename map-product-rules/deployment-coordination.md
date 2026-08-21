@@ -18,7 +18,7 @@ Runtime release의 ZIP은 배포 기준이자 릴리즈 이력·감사용 불변
 
 ## Checks
 
-dry-run의 release·target·target-ref와 실제 apply 입력, package checksum, 대상 asset map, config checksum 및 migration 후보를 비교한다.
+dry-run의 release·target·target-ref와 실제 apply 입력, package checksum, 대상 asset map, config checksum 및 migration 후보를 비교한다. 대상은 `.mpa/runtime/`이 있는 현재 설치 구조여야 하며, 자동 구조 변환은 수행하지 않는다.
 
 ## Gates
 

@@ -20,6 +20,7 @@
 - map-product 규칙·도구·`workspace/issues/`·release receipt는 source 전용이다.
 - Runtime release는 `dist/.mpa/runtime/`만 대상으로 한다.
 - release는 `workspace/releases/<release-id>/` 아래의 `package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json` 번들이다. 배포는 현재 `dist/`가 아니라 ZIP과 manifest가 검증한 불변 번들만 사용한다.
+- **릴리즈 생성은 사용자 요청 기반이다.** Runtime 변경·검증만으로 `prepare-release`를 실행하지 않는다. 사용자가 명시적으로 릴리즈를 요청하거나 배포를 요청했을 때, 현재 source Runtime을 담은 최신 유효 release가 없을 경우에만 새 release를 생성한다. 기존 immutable release는 삭제·재작성하지 않는다.
 - Runtime deploy가 만드는 대상 `.mpa/backups/`는 배포 직전 `.mpa/runtime`와 릴리즈가 갱신할 MPA 관리 설정 snapshot을 보존하는 marker-backed 디렉터리 snapshot이며, release ZIP의 장기 보관 용도와 구분한다. 성공 백업 최신 3개만 정리하고 실패·사용자 snapshot은 보존한다.
 - 대상 프로젝트의 `workspace/`, `docs/`, agent 설정, 일반 소스는 Runtime deployment와 rollback에서 읽거나 변경하지 않는다. 단, 없는 `workspace/`, `workspace/issues/`, `docs/`, `docs/INDEX.md`는 초기화할 수 있다.
 - 대상 프로젝트의 `.mpa/config/config.yaml`은 설치 고유 설정이다. 최초 설치 시 없으면 기본 프로젝트명·초기화 시각·절대 root path로 만들고, 있으면 누락 필드만 추가한다. 릴리즈가 `runtime_config` additive migration을 명시한 경우 deploy가 `runtime.*` 누락값만 추가하며 기존 project/user 값은 덮어쓰지 않는다. 이때 배포 전 config를 Runtime과 함께 백업하고 rollback 때 함께 복원한다. `${project.name}`, `${project.root_path}`, `${project.initialized_at}` 참조는 대상 로컬 값으로 해석하고, config의 절대 경로 원문은 release asset·manifest checksum·issue·중앙 receipt에 복사하지 않는다.

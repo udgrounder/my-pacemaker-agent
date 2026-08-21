@@ -74,7 +74,7 @@ agent가 진행하는 절차:
 
 설치되면 프로젝트에 `.mpa/runtime/`(방법론 파일), `workspace/`(프로젝트 데이터 골격), 빈 루트 `docs/`, 설치 고유 설정 `.mpa/config/config.yaml`이 준비되고, 자동 연결이 확인된 선택 agent의 진입점이 루트 설정 파일에 추가된다. `openagent`는 예외로 Runtime만 설치하며, 연결은 [OpenAgent spec](agent-specs/openagent/spec.md)의 확인 절차 뒤 수동으로 설정한다. config가 없으면 기본 프로젝트명·초기화 시각·절대 root path를 기록하며, 기존 config가 있으면 누락 필드만 보강한다. Runtime이 사용할 초기 `runtime.*` 값이 필요하면 신규 설치에서 `--runtime-config-json`으로 additive defaults를 제공할 수 있다. 기존 값과 사용자 파일은 변경하지 않는다. 자세한 절차와 옵션은 [`install.md`](install.md), 운영 맥락은 가이드북 9장을 참조한다.
 
-기존 설치본의 Runtime update는 `install.py`가 아니라 source 저장소의 `release_manager.py`를 사용한다. `prepare-release → release-audit → deployment-dry-run → deploy` 순서이며, `prepare-release`가 UTC `YYYYMMDDHHMMSS-uuid8` 단일 release ID를 생성하고 source/dist에 기록한다. 필요한 경우 `--runtime-config-json`으로 `runtime.*` additive 기본값을 release manifest에 포함할 수 있다. deploy는 `${project.name}`, `${project.root_path}`, `${project.initialized_at}`를 대상 `.mpa/config/config.yaml`의 현재 값으로 해석하고 누락값만 추가한다. 산출물은 `workspace/releases/<release-id>/` 아래 `package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json` 한 묶음으로 보관한다. deploy에는 명시 승인과 rollback 책임자가 필요하고, update 중 발견된 issue 후보는 dry-run에서 고지한 뒤 검증 성공 시 원자 수집하며 실패하면 원본을 보존한다. 대상의 `workspace/`·루트 `docs/`가 없으면 빈 폴더만 생성하고, 이미 존재하는 폴더·agent 설정은 변경하지 않는다.
+기존 설치본의 Runtime update는 `install.py`가 아니라 source 저장소의 `release_manager.py`를 사용한다. 사용자가 릴리즈를 명시 요청했거나 배포 요청에 현재 source Runtime을 담은 최신 유효 release가 없을 때만 `prepare-release → release-audit → deployment-dry-run → deploy` 순서로 진행한다. Runtime 변경·검증만으로 release를 자동 생성하지 않는다. `prepare-release`가 UTC `YYYYMMDDHHMMSS-uuid8` 단일 release ID를 생성하고 source/dist에 기록한다. 필요한 경우 `--runtime-config-json`으로 `runtime.*` additive 기본값을 release manifest에 포함할 수 있다. deploy는 `${project.name}`, `${project.root_path}`, `${project.initialized_at}`를 대상 `.mpa/config/config.yaml`의 현재 값으로 해석하고 누락값만 추가한다. 산출물은 `workspace/releases/<release-id>/` 아래 `package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json` 한 묶음으로 보관한다. deploy에는 명시 승인과 rollback 책임자가 필요하고, update 중 발견된 issue 후보는 dry-run에서 고지한 뒤 검증 성공 시 원자 수집하며 실패하면 원본을 보존한다. 대상의 `workspace/`·루트 `docs/`가 없으면 빈 폴더만 생성하고, 이미 존재하는 폴더·agent 설정은 변경하지 않는다.
 
 release ZIP은 릴리즈 상태를 장기 보존하는 기준본이며, deploy의 `.mpa/backups/`는 대상별 즉시 rollback snapshot이다. 둘은 같은 파일을 보관하더라도 용도가 다르므로 release ZIP을 대상 backup 대신 사용하지 않는다. deploy backup에는 `runtime/.mpa/runtime/`와 migration이 있는 경우 `runtime-config/config.yaml`을 함께 보존하고, 성공 백업 최신 3개를 유지한다. rollback은 두 snapshot을 함께 복원하며, 기존 사용자 설정 값은 migration에서도 덮어쓰지 않는다.
 
@@ -205,9 +205,12 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 
 ```
 [project]/
-├── .mpa/runtime/    ← 방법론 (승인된 Runtime release로 최신화; 원칙적 issue→review, 승인된 MPA 작업 항목에서만 직접 수정)
-│   ├── core/, personas/, skills/, workflows/, inject/
-│   ├── hooks/, templates/, knowledge/
+├── .mpa/
+│   ├── runtime/    ← 방법론 (승인된 Runtime release로 최신화; 원칙적 issue→review, 승인된 MPA 작업 항목에서만 직접 수정)
+│   │   ├── core/, personas/, skills/, workflows/, inject/
+│   │   └── hooks/, templates/, knowledge/
+│   ├── config/     ← 프로젝트 고유 설정 (배포가 기존 값 보존)
+│   └── backups/    ← 배포 직전 Runtime·설정 snapshot
 │
 └── workspace/            ← 프로젝트 데이터 (agent가 직접 관리)
     ├── README.md         ← 설치본 사용자용 안내 (workspace·.mpa/runtime 소개)
@@ -218,6 +221,8 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 | 폴더 | 역할 | 업데이트 방식 |
 |------|------|--------------|
 | `.mpa/runtime/` | 방법론 (HOW) | 승인된 Runtime release로만 최신화 / `mpa_system_designer` 프로세스로 직접 수정 가능 |
+| `.mpa/config/` | 프로젝트 고유 설정 | 기존 값 보존, release가 명시한 `runtime.*` 누락값만 추가 |
+| `.mpa/backups/` | Runtime·설정 rollback snapshot | deploy가 생성, 성공 snapshot 최신 3개만 관리 |
 | `workspace/` | 프로젝트 데이터 (WHAT) — agent가 관리 | 작업할 때마다 자동 업데이트 |
 
 ---
