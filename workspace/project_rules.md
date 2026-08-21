@@ -28,9 +28,9 @@
 
 ### 처리 흐름
 
-사용자가 수집 issue의 review·triage를 승인하면:
+사용자가 수집 issue의 검토 결과를 결정하면:
 
-1. `workspace/issues/inbox/`의 지정 issue를 읽는다
-2. `methodology_improvement`는 MPA 시스템 파일 수정 태스크로 등록하고, `knowledge_promotion`은 `.mpa-workspace/knowledge/[도메인].md` 반영 여부를 결정한다
-3. release·deployment·verification 근거를 연결한 뒤 issue를 archive한다
-4. Runtime 변경은 `release_manager.py sync-runtime`으로 `dist/.mpa-workspace/`에 동기화한다
+1. `workspace/issues/inbox/`의 지정 issue와 현재 MPA 규칙을 대조한 검토 내용을 사용자에게 제시한다
+2. 사용자가 채택하면 `methodology_improvement`는 MPA 시스템 파일 수정 태스크로, `knowledge_promotion`은 `.mpa-workspace/knowledge/[도메인].md` 반영 태스크로 등록하고 plan.md를 만든다
+3. 채택 이슈에는 새 task plan 경로와 판단 근거를 기록한 뒤 바로 archive한다. 사용자가 기각하면 판단 근거를 기록한 뒤 바로 archive한다
+4. 채택된 Runtime 변경은 구현·검증 뒤 `release_manager.py sync-runtime`으로 `dist/.mpa-workspace/`에 동기화한다

@@ -35,7 +35,6 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.LEGACY_ACTIVE_PACKAGES = release_manager.RELEASES / "packages"
         release_manager.LEGACY_ACTIVE_RECEIPTS = release_manager.WORKSPACE / "receipts" / "releases"
         release_manager.DEPLOYMENT_RECEIPTS = release_manager.WORKSPACE / "receipts" / "deployments"
-        release_manager.ISSUE_RECEIPTS = release_manager.WORKSPACE / "receipts" / "issues"
         release_manager.ISSUES = release_manager.WORKSPACE / "issues"
         self.write_runtime(release_manager.RUNTIME_SOURCE, "v1")
 
@@ -447,6 +446,7 @@ class ReleaseManagerTest(unittest.TestCase):
                                                   dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
         self.assertFalse(issue.exists())
         self.assertTrue((release_manager.ISSUES / "inbox" / "target" / "issue.md").is_file())
+        self.assertFalse((release_manager.WORKSPACE / "receipts" / "issues").exists())
 
     def test_update_issue_change_after_dry_run_preserves_source(self):
         manifest = self.prepare()
@@ -539,63 +539,65 @@ class ReleaseManagerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid release artifacts"):
             release_manager.audit_releases(argparse.Namespace())
 
-    def test_issue_requires_review_and_keeps_needs_information_in_inbox(self):
+    def test_rejected_issue_records_reason_and_archives_without_a_receipt(self):
         issue = release_manager.ISSUES / "inbox" / "test-project" / "issue.md"
         issue.parent.mkdir(parents=True)
         issue.write_text(release_manager.issue_text("test", "summary", "methodology_improvement"), encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "accepted review"):
-            release_manager.triage_issue(argparse.Namespace(
-                issue="test-project/issue.md", classification="methodology_improvement", triaged_by="test",
-                status="needs_information", reproduction="unknown", impact="unknown", priority="low",
-                relationship="undetermined", follow_up_task="none",
-            ))
-        release_manager.review_issue(argparse.Namespace(issue="test-project/issue.md", reviewed_by="test", approval_ref="unit", decision="accepted"))
-        release_manager.triage_issue(argparse.Namespace(
-            issue="test-project/issue.md", classification="methodology_improvement", triaged_by="test",
-            status="needs_information", reproduction="unknown", impact="unknown", priority="low",
-            relationship="undetermined", follow_up_task="none",
+        release_manager.archive_issue(argparse.Namespace(
+            issue="test-project/issue.md", decision="rejected", decided_by="user",
+            reason="global rule value is too low", task=None,
         ))
-        metadata, _ = release_manager.read_issue(issue)
-        self.assertEqual(metadata["status"], "needs_information")
+        archived = next((release_manager.ISSUES / "archived").rglob("issue.md"))
+        metadata, body = release_manager.read_issue(archived)
+        self.assertEqual(metadata["status"], "archived")
+        self.assertEqual(metadata["decision"], "rejected")
+        self.assertEqual(metadata["decision_reason"], "global rule value is too low")
+        self.assertIsNone(metadata["follow_up_task"])
+        self.assertIn("## 처리 결과", body)
+        self.assertFalse((release_manager.WORKSPACE / "receipts" / "issues").exists())
 
-    def test_archive_rejects_deployment_evidence_for_another_release(self):
-        manifest = self.prepare()
-        expected_release = json.loads(manifest.read_text(encoding="utf-8"))["release_id"]
-        issue = release_manager.ISSUES / "inbox" / "test-project" / "resolved.md"
+    def test_accepted_issue_requires_existing_task_plan_and_archives_with_link(self):
+        issue = release_manager.ISSUES / "inbox" / "test-project" / "issue.md"
         issue.parent.mkdir(parents=True)
-        deployment = release_manager.DEPLOYMENT_RECEIPTS / "test-project" / "deploy.json"
-        deployment.parent.mkdir(parents=True)
-        deployment.write_text(json.dumps({"release_id": "other-release"}), encoding="utf-8")
         issue.write_text(release_manager.issue_text("test", "summary", "methodology_improvement"), encoding="utf-8")
-        metadata, body = release_manager.read_issue(issue)
-        metadata.update({"status": "resolved", "release": expected_release,
-                         "deployment": str(deployment.relative_to(release_manager.ROOT)), "verification": "test"})
-        release_manager.write_issue(issue, metadata, body)
-        with self.assertRaisesRegex(ValueError, "does not match"):
-            release_manager.archive_issue(argparse.Namespace(issue="test-project/resolved.md", archived_by="test"))
-        self.assertTrue(issue.exists())
+        with self.assertRaisesRegex(ValueError, "active workspace task plan"):
+            release_manager.archive_issue(argparse.Namespace(
+                issue="test-project/issue.md", decision="accepted", decided_by="user",
+                reason="create a task", task="workspace/tasks/active/missing/plan.md",
+            ))
+        done_plan = release_manager.WORKSPACE / "tasks" / "done" / "task-0" / "plan.md"
+        done_plan.parent.mkdir(parents=True)
+        done_plan.write_text("# completed task\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "active workspace task plan"):
+            release_manager.archive_issue(argparse.Namespace(
+                issue="test-project/issue.md", decision="accepted", decided_by="user",
+                reason="must create a new task", task=str(done_plan.relative_to(release_manager.ROOT)),
+            ))
+        plan = release_manager.WORKSPACE / "tasks" / "active" / "task-1" / "plan.md"
+        plan.parent.mkdir(parents=True)
+        plan.write_text("# task\n", encoding="utf-8")
+        release_manager.archive_issue(argparse.Namespace(
+            issue="test-project/issue.md", decision="accepted", decided_by="user",
+            reason="create a task", task=str(plan.relative_to(release_manager.ROOT)),
+        ))
+        archived = next((release_manager.ISSUES / "archived").rglob("issue.md"))
+        metadata, _ = release_manager.read_issue(archived)
+        self.assertEqual(metadata["decision"], "accepted")
+        self.assertEqual(metadata["follow_up_task"], str(plan.relative_to(release_manager.ROOT)))
 
-    def test_issue_receipt_failure_restores_issue_and_rejected_review_blocks_triage(self):
+    def test_archive_write_failure_restores_open_issue(self):
         issue = release_manager.ISSUES / "inbox" / "test-project" / "issue.md"
         issue.parent.mkdir(parents=True)
         issue.write_text(release_manager.issue_text("test", "summary", "methodology_improvement"), encoding="utf-8")
         original = issue.read_text(encoding="utf-8")
-        original_receipt = release_manager.issue_receipt
-        release_manager.issue_receipt = lambda *_: (_ for _ in ()).throw(OSError("receipt write failed"))
-        try:
-            with self.assertRaisesRegex(OSError, "receipt"):
-                release_manager.review_issue(argparse.Namespace(
-                    issue="test-project/issue.md", reviewed_by="test", approval_ref="unit", decision="accepted"))
-        finally:
-            release_manager.issue_receipt = original_receipt
+        with mock.patch.object(release_manager, "write_issue", side_effect=OSError("write failed")):
+            with self.assertRaisesRegex(OSError, "write failed"):
+                release_manager.archive_issue(argparse.Namespace(
+                    issue="test-project/issue.md", decision="rejected", decided_by="user",
+                    reason="not applicable", task=None,
+                ))
         self.assertEqual(issue.read_text(encoding="utf-8"), original)
-        release_manager.review_issue(argparse.Namespace(
-            issue="test-project/issue.md", reviewed_by="test", approval_ref="unit", decision="rejected"))
-        with self.assertRaisesRegex(ValueError, "accepted review"):
-            release_manager.triage_issue(argparse.Namespace(
-                issue="test-project/issue.md", classification="methodology_improvement", triaged_by="test",
-                status="triaged", reproduction="yes", impact="low", priority="low",
-                relationship="new", follow_up_task="none"))
+        self.assertFalse(list((release_manager.ISSUES / "archived").rglob("issue.md")))
 
     def test_cross_filesystem_move_keeps_source_when_unlink_fails(self):
         source = self.root / "source.md"
@@ -617,16 +619,15 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertTrue(source.exists())
         self.assertFalse(destination.exists())
 
-    def test_collect_receipt_failure_returns_issue_to_project(self):
+    def test_collect_confirms_destination_and_source_removal_without_receipt(self):
         project = self.root / "project"
         source = project / "workspace" / "issues" / "issue.md"
         source.parent.mkdir(parents=True)
         source.write_text(release_manager.issue_text("test", "summary", "methodology_improvement"), encoding="utf-8")
-        with mock.patch.object(release_manager, "issue_receipt", side_effect=OSError("receipt failed")):
-            with self.assertRaisesRegex(OSError, "receipt failed"):
-                release_manager.collect_issue(argparse.Namespace(project=str(project), project_ref="project", issue="issue.md"))
-        self.assertTrue(source.exists())
-        self.assertFalse((release_manager.ISSUES / "inbox" / "project" / "issue.md").exists())
+        release_manager.collect_issue(argparse.Namespace(project=str(project), project_ref="project", issue="issue.md"))
+        self.assertFalse(source.exists())
+        self.assertTrue((release_manager.ISSUES / "inbox" / "project" / "issue.md").is_file())
+        self.assertFalse((release_manager.WORKSPACE / "receipts" / "issues").exists())
 
     def test_create_issue_rejects_sensitive_content_before_writing(self):
         project = self.root / "project"
@@ -637,18 +638,88 @@ class ReleaseManagerTest(unittest.TestCase):
                 observed_release="unknown", collection_purpose="review"))
         self.assertFalse(list((project / "workspace" / "issues").glob("*.md")))
 
-    def test_collection_receipt_uses_project_fingerprint_not_absolute_path(self):
+    def test_collect_verification_failure_restores_project_issue(self):
         project = self.root / "project"
         source = project / "workspace" / "issues" / "issue.md"
         source.parent.mkdir(parents=True)
         source.write_text(release_manager.issue_text("test", "summary", "methodology_improvement"), encoding="utf-8")
-        release_manager.collect_issue(argparse.Namespace(project=str(project), project_ref="project", issue=source.name))
-        receipts = list((release_manager.ISSUE_RECEIPTS / "collections").glob("*.json"))
-        self.assertEqual(len(receipts), 1)
-        data = json.loads(receipts[0].read_text(encoding="utf-8"))
-        self.assertNotIn(str(project), json.dumps(data))
-        self.assertIn("project_fingerprint", data)
-        self.assertIn("issue_identity", data)
+        with mock.patch.object(release_manager, "confirm_issue_move", side_effect=OSError("verification failed")):
+            with self.assertRaisesRegex(OSError, "verification failed"):
+                release_manager.collect_issue(argparse.Namespace(project=str(project), project_ref="project", issue=source.name))
+        self.assertTrue(source.exists())
+        self.assertFalse((release_manager.ISSUES / "inbox" / "project" / "issue.md").exists())
+
+    def test_collect_source_delete_failure_removes_verified_destination(self):
+        project = self.root / "project"
+        source = project / "workspace" / "issues" / "issue.md"
+        source.parent.mkdir(parents=True)
+        source.write_text(release_manager.issue_text("test", "summary", "methodology_improvement"), encoding="utf-8")
+        destination = release_manager.ISSUES / "inbox" / "project" / "issue.md"
+        with mock.patch.object(release_manager, "delete_issue_source", side_effect=OSError("source deletion failed")):
+            with self.assertRaisesRegex(OSError, "source deletion failed"):
+                release_manager.collect_issue(argparse.Namespace(project=str(project), project_ref="project", issue=source.name))
+        self.assertTrue(source.is_file())
+        self.assertFalse(destination.exists())
+
+    def test_collect_destination_race_preserves_existing_destination_and_source(self):
+        project = self.root / "project"
+        source = project / "workspace" / "issues" / "issue.md"
+        source.parent.mkdir(parents=True)
+        source.write_text(release_manager.issue_text("source", "summary", "methodology_improvement"), encoding="utf-8")
+        destination = release_manager.ISSUES / "inbox" / "project" / "issue.md"
+        original_link = os.link
+
+        def create_destination_then_link(temporary, actual_destination):
+            Path(actual_destination).write_text("existing destination", encoding="utf-8")
+            return original_link(temporary, actual_destination)
+
+        with mock.patch.object(release_manager.os, "link", side_effect=create_destination_then_link):
+            with self.assertRaises(FileExistsError):
+                release_manager.collect_issue(argparse.Namespace(project=str(project), project_ref="project", issue=source.name))
+        self.assertTrue(source.is_file())
+        self.assertEqual(destination.read_text(encoding="utf-8"), "existing destination")
+
+    def test_collect_temporary_cleanup_failure_removes_destination_and_preserves_source(self):
+        project = self.root / "project"
+        source = project / "workspace" / "issues" / "issue.md"
+        source.parent.mkdir(parents=True)
+        source.write_text(release_manager.issue_text("source", "summary", "methodology_improvement"), encoding="utf-8")
+        destination = release_manager.ISSUES / "inbox" / "project" / "issue.md"
+        original_unlink = Path.unlink
+        failed_once = False
+
+        def fail_first_temporary_unlink(path, *args, **kwargs):
+            nonlocal failed_once
+            if path.name.startswith(".issue.md.new-") and not failed_once:
+                failed_once = True
+                raise OSError("temporary cleanup failed")
+            return original_unlink(path, *args, **kwargs)
+
+        with mock.patch.object(Path, "unlink", new=fail_first_temporary_unlink):
+            with self.assertRaisesRegex(OSError, "temporary cleanup failed"):
+                release_manager.collect_issue(argparse.Namespace(project=str(project), project_ref="project", issue=source.name))
+        self.assertTrue(source.is_file())
+        self.assertFalse(destination.exists())
+
+    def test_collect_source_reappearance_preserves_both_files_for_reconciliation(self):
+        project = self.root / "project"
+        source = project / "workspace" / "issues" / "issue.md"
+        source.parent.mkdir(parents=True)
+        source.write_text(release_manager.issue_text("original", "summary", "methodology_improvement"), encoding="utf-8")
+        destination = release_manager.ISSUES / "inbox" / "project" / "issue.md"
+        original_confirm = release_manager.confirm_issue_move
+
+        def reappear_then_confirm(actual_source, actual_destination):
+            actual_source.write_text(release_manager.issue_text("new observation", "summary", "methodology_improvement"), encoding="utf-8")
+            return original_confirm(actual_source, actual_destination)
+
+        with mock.patch.object(release_manager, "confirm_issue_move", side_effect=reappear_then_confirm):
+            with self.assertRaisesRegex(OSError, "source reappeared"):
+                release_manager.collect_issue(argparse.Namespace(project=str(project), project_ref="project", issue=source.name))
+        self.assertTrue(source.is_file())
+        self.assertTrue(destination.is_file())
+        self.assertIn("new observation", source.read_text(encoding="utf-8"))
+        self.assertIn("original", destination.read_text(encoding="utf-8"))
 
     def test_deploy_collection_failure_restores_runtime_and_issue(self):
         manifest = self.prepare()
@@ -701,33 +772,26 @@ class ReleaseManagerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "bundle file inventory"):
             release_manager.audit_releases(argparse.Namespace())
 
-    def test_issue_full_lifecycle_links_release_and_deployment_evidence(self):
-        manifest = self.prepare()
-        release_id = json.loads(manifest.read_text(encoding="utf-8"))["release_id"]
-        target = self.root / "target"
-        self.write_runtime(target / ".mpa-workspace", "old")
-        release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target"))
-        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
-        release_manager.deploy(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
-        deployment = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("deploy-*.json"))
+    def test_collection_and_accepted_task_archive_preserve_issue_identity(self):
         project = self.root / "project"
         release_manager.create_issue(argparse.Namespace(project=str(project), title="test", summary="summary", kind="methodology_improvement",
                                                         key="methodology-improvement", occurrence="first_observed", area="release",
-                                                        observed_release=release_id, collection_purpose="improve"))
+                                                        observed_release="unknown", collection_purpose="improve"))
         source = next((project / "workspace" / "issues").glob("*.md"))
         release_manager.collect_issue(argparse.Namespace(project=str(project), project_ref="project", issue=source.name))
         issue = f"project/{source.name}"
-        release_manager.review_issue(argparse.Namespace(issue=issue, reviewed_by="test", approval_ref="unit", decision="accepted"))
-        release_manager.triage_issue(argparse.Namespace(issue=issue, classification="methodology_improvement", triaged_by="test",
-                                                        status="triaged", reproduction="yes", impact="low", priority="low",
-                                                        relationship="new", follow_up_task="task-1"))
-        release_manager.resolve_issue(argparse.Namespace(issue=issue, task="task-1", release=release_id,
-                                                         deployment=str(deployment.relative_to(release_manager.ROOT)), verification="unit",
-                                                         resolved_by="test"))
-        release_manager.archive_issue(argparse.Namespace(issue=issue, archived_by="test"))
+        plan = release_manager.WORKSPACE / "tasks" / "active" / "task-1" / "plan.md"
+        plan.parent.mkdir(parents=True)
+        plan.write_text("# task\n", encoding="utf-8")
+        release_manager.archive_issue(argparse.Namespace(
+            issue=issue, decision="accepted", decided_by="user", reason="approved for implementation",
+            task=str(plan.relative_to(release_manager.ROOT)),
+        ))
         self.assertFalse((release_manager.ISSUES / "inbox" / issue).exists())
-        self.assertTrue(list((release_manager.ISSUES / "archived").rglob(source.name)))
+        archived = next((release_manager.ISSUES / "archived").rglob(source.name))
+        metadata, _ = release_manager.read_issue(archived)
+        self.assertEqual(metadata["source_issue_id"], source.stem)
+        self.assertEqual(metadata["decision"], "accepted")
 
 
 if __name__ == "__main__":

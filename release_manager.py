@@ -38,7 +38,6 @@ MANIFESTS = RELEASES
 PACKAGES = RELEASES
 RELEASE_RECEIPTS = RELEASES
 DEPLOYMENT_RECEIPTS = WORKSPACE / "receipts" / "deployments"
-ISSUE_RECEIPTS = WORKSPACE / "receipts" / "issues"
 ISSUES = WORKSPACE / "issues"
 SAFE_REF = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 SECRET = re.compile(r"(?i)(api[_-]?key|secret|password|token)\s*[:=]\s*\S+")
@@ -853,8 +852,48 @@ def _rollback_issue_moves(moved: list[tuple[Path, Path]]) -> None:
             move_issue_atomically(destination, source)
 
 
+def confirm_issue_move(source: Path, destination: Path) -> None:
+    """Confirm that an issue move completed without retaining a second receipt."""
+    if destination.is_file() and not source.exists():
+        return
+    if destination.is_file() and source.exists():
+        raise OSError("issue move verification failed: source reappeared; preserved both files for reconciliation")
+    raise OSError("issue move verification failed")
+
+
+def delete_issue_source(source: Path) -> None:
+    source.unlink()
+
+
+def transfer_issue_after_verification(source: Path, destination: Path) -> None:
+    """Create and confirm the destination before deleting the collection source."""
+    temporary = destination.with_name(f".{destination.name}.new-{uuid.uuid4().hex[:8]}")
+    destination_created = False
+    source_deleted = False
+    try:
+        with source.open("rb") as input_file, temporary.open("xb") as output_file:
+            shutil.copyfileobj(input_file, output_file)
+            output_file.flush()
+            os.fsync(output_file.fileno())
+        os.link(temporary, destination)
+        destination_created = True
+        temporary.unlink()
+        if not destination.is_file():
+            raise OSError("issue destination verification failed")
+        delete_issue_source(source)
+        source_deleted = True
+        confirm_issue_move(source, destination)
+    except Exception:
+        if not source_deleted and source.exists() and destination_created and destination.exists():
+            destination.unlink()
+        raise
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
 def collect_update_issues_transaction(root: Path, project_ref: str,
-                                      expected: list[dict[str, str]]) -> tuple[list[str], list[tuple[Path, Path]], Path | None]:
+                                      expected: list[dict[str, str]]) -> tuple[list[str], list[tuple[Path, Path]]]:
     """Collect a verified update batch and return rollback handles for the caller."""
     if update_issue_inventory(root) != expected:
         raise ValueError("project issues changed after dry-run")
@@ -872,25 +911,19 @@ def collect_update_issues_transaction(root: Path, project_ref: str,
             raise ValueError("update issue already exists in inbox or archive")
         destinations.append((source, destination))
     moved: list[tuple[Path, Path]] = []
-    identities = []
     try:
         for source, destination in destinations:
             destination.parent.mkdir(parents=True, exist_ok=True)
-            move_issue_atomically(source, destination)
+            transfer_issue_after_verification(source, destination)
             moved.append((source, destination))
-            identities.append(_issue_identity(destination))
-        receipt_path = ISSUE_RECEIPTS / "update-collections" / f"{receipt_suffix()}.json"
-        write_json(receipt_path, {"project_ref": project_ref, "project_fingerprint": project_fingerprint(root),
-                                  "issues": [str(destination.relative_to(ROOT)) for _, destination in moved],
-                                  "issue_identities": identities, "at": now()})
     except Exception:
         _rollback_issue_moves(moved)
         raise
-    return [str(destination.relative_to(ROOT)) for _, destination in moved], moved, receipt_path
+    return [str(destination.relative_to(ROOT)) for _, destination in moved], moved
 
 
 def collect_update_issues(root: Path, project_ref: str, expected: list[dict[str, str]]) -> list[str]:
-    collected, _, _ = collect_update_issues_transaction(root, project_ref, expected)
+    collected, _ = collect_update_issues_transaction(root, project_ref, expected)
     return collected
 
 
@@ -961,7 +994,6 @@ def deploy(args: argparse.Namespace) -> None:
         previous = None
         created_paths: list[str] = []
         moved_issues: list[tuple[Path, Path]] = []
-        collection_receipt: Path | None = None
         deployment_receipt: Path | None = None
         history_path: Path | None = None
         config_snapshot: dict[str, object] = {"included": False, "existed": False, "checksum": None}
@@ -992,7 +1024,7 @@ def deploy(args: argparse.Namespace) -> None:
                 config_migration = {"status": "none", "add": [], "skipped": []}
                 if runtime_config is not None:
                     config_migration = project_config.apply_runtime_config_migration(root, runtime_config)
-                collected, moved_issues, collection_receipt = collect_update_issues_transaction(
+                collected, moved_issues = collect_update_issues_transaction(
                     root, target_ref, dry_run_data["issue_inventory"])
                 receipt = {
                     "status": "applied", "release_id": manifest["release_id"],
@@ -1021,8 +1053,6 @@ def deploy(args: argparse.Namespace) -> None:
                 except OSError as error:
                     print(f"warning: runtime backup retention deferred: {error}", file=sys.stderr)
             except Exception as error:
-                if collection_receipt and collection_receipt.exists():
-                    collection_receipt.unlink()
                 _rollback_issue_moves(moved_issues)
                 if previous and previous.exists():
                     if target.exists():
@@ -1205,25 +1235,18 @@ def collect_issue(args: argparse.Namespace) -> None:
     text = source.read_text(encoding="utf-8")
     check_issue_text(text)
     read_issue(source)
-    identity = _issue_identity(source)
     destination = ISSUES / "inbox" / project_ref / source.name
     archived = list((ISSUES / "archived").rglob(source.name)) if (ISSUES / "archived").exists() else []
     identity_matches = _existing_issue_identity_matches(_issue_identity(source))
     if destination.exists() or archived or identity_matches:
         raise ValueError("issue already exists in inbox or archive")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    move_issue_atomically(source, destination)
-    similar = [str(path.relative_to(ROOT)) for path in (ISSUES / "archived").rglob(f"*{source.stem}*")]
     try:
-        issue_receipt("collections", f"{project_ref}/{source.name}", {
-            "project_ref": project_ref,
-            "project_fingerprint": project_fingerprint(Path(args.project).resolve()),
-            "issue_identity": identity,
-            "similar_archives": similar,
-        })
+        transfer_issue_after_verification(source, destination)
     except Exception:
-        move_issue_atomically(destination, source)
+        _rollback_issue_moves([(source, destination)])
         raise
+    similar = [str(path.relative_to(ROOT)) for path in (ISSUES / "archived").rglob(f"*{source.stem}*")]
     print(json.dumps({"issue": str(destination.relative_to(ROOT)), "similar_archives": similar}, ensure_ascii=False))
 
 
@@ -1285,102 +1308,55 @@ def write_issue(path: Path, metadata: dict, body: str) -> None:
                     encoding="utf-8")
 
 
-def issue_receipt(kind: str, issue: str, value: dict) -> None:
-    write_json(ISSUE_RECEIPTS / kind / f"{receipt_suffix()}.json", {"issue": issue, "at": now(), **value})
-
-
-def review_issue(args: argparse.Namespace) -> None:
-    path, issue = inbox_issue(args.issue)
-    metadata, body = read_issue(path)
-    original = path.read_text(encoding="utf-8")
-    metadata.update({"review_status": args.decision, "reviewed_at": now(),
-                     "approved_by": args.reviewed_by, "approval_ref": args.approval_ref})
-    try:
-        write_issue(path, metadata, body)
-        issue_receipt("reviews", issue, {"reviewed_by": args.reviewed_by,
-                      "approved_by": args.reviewed_by, "approval_ref": args.approval_ref,
-                      "decision": args.decision})
-    except Exception:
-        path.write_text(original, encoding="utf-8")
-        raise
-    print(issue)
-
-
-def triage_issue(args: argparse.Namespace) -> None:
-    path, issue = inbox_issue(args.issue)
-    metadata, body = read_issue(path)
-    if metadata.get("review_status") != "accepted" or not metadata.get("approval_ref"):
-        raise ValueError("an accepted review receipt is required before triage")
-    original = path.read_text(encoding="utf-8")
-    metadata.update({"status": args.status, "classification": args.classification, "triaged_at": now(),
-                     "reproduction": args.reproduction, "impact": args.impact, "priority": args.priority,
-                     "relationship": args.relationship, "follow_up_task": args.follow_up_task})
-    try:
-        write_issue(path, metadata, body)
-        issue_receipt("triages", issue, {"classification": args.classification, "triaged_by": args.triaged_by,
-                                          "status": args.status, "reproduction": args.reproduction,
-                                          "impact": args.impact, "priority": args.priority,
-                                          "relationship": args.relationship, "follow_up_task": args.follow_up_task})
-    except Exception:
-        path.write_text(original, encoding="utf-8")
-        raise
-    print(issue)
-
-
-def resolve_issue(args: argparse.Namespace) -> None:
-    path, issue = inbox_issue(args.issue)
-    metadata, body = read_issue(path)
-    if metadata.get("status") != "triaged":
-        raise ValueError("issue must be triaged before resolution")
-    manifest = _bundle_paths(args.release)["manifest"].resolve()
-    deployment = (ROOT / args.deployment).resolve()
-    if DEPLOYMENT_RECEIPTS.resolve() not in deployment.parents or not deployment.is_file():
-        raise ValueError("resolution requires an existing release manifest and deployment receipt")
-    load_manifest(str(manifest))
-    deployment_data = json.loads(deployment.read_text(encoding="utf-8"))
-    if (deployment_data.get("release_id") != args.release or
-            deployment_data.get("status") != "applied" or
-            deployment_data.get("manifest") != relative_to_root(manifest)):
-        raise ValueError("deployment receipt must belong to the resolved release")
-    original = path.read_text(encoding="utf-8")
-    metadata.update({"status": "resolved", "resolved_at": now(), "task": args.task,
-                     "release": args.release, "deployment": relative_to_root(deployment),
-                     "verification": args.verification})
-    try:
-        write_issue(path, metadata, body)
-        issue_receipt("resolutions", issue, {"resolved_by": args.resolved_by, "release": args.release,
-                                               "deployment": relative_to_root(deployment), "verification": args.verification})
-    except Exception:
-        path.write_text(original, encoding="utf-8")
-        raise
-    print(issue)
+def task_plan_reference(value: str) -> str:
+    candidate = (ROOT / value).resolve()
+    active_tasks_root = (WORKSPACE / "tasks" / "active").resolve()
+    if (active_tasks_root not in candidate.parents or candidate.name != "plan.md" or
+            not candidate.is_file()):
+        raise ValueError("accepted issue requires an existing active workspace task plan")
+    return str(candidate.relative_to(ROOT.resolve()))
 
 
 def archive_issue(args: argparse.Namespace) -> None:
+    """Archive a user-decided issue, preserving the decision in the issue itself."""
+    if args.decision not in ("accepted", "rejected"):
+        raise ValueError("decision must be accepted or rejected")
+    if not args.decided_by.strip() or not args.reason.strip():
+        raise ValueError("decided-by and reason are required")
     path, issue = inbox_issue(args.issue)
-    metadata, _ = read_issue(path)
-    if metadata.get("status") != "resolved" or not all(metadata.get(key) for key in ("release", "deployment", "verification")):
-        raise ValueError("only resolved issues with release, deployment, and verification evidence may be archived")
-    manifest = _bundle_paths(metadata["release"])["manifest"]
-    deployment = (ROOT / metadata["deployment"]).resolve()
-    if DEPLOYMENT_RECEIPTS.resolve() not in deployment.parents or not deployment.is_file():
-        raise ValueError("archive evidence no longer exists")
-    load_manifest(str(manifest))
-    deployment_data = json.loads(deployment.read_text(encoding="utf-8"))
-    if (deployment_data.get("release_id") != metadata["release"] or
-            deployment_data.get("status") != "applied" or
-            deployment_data.get("manifest") != relative_to_root(manifest)):
-        raise ValueError("archive deployment evidence does not match release")
+    metadata, body = read_issue(path)
+    if metadata.get("status") != "open":
+        raise ValueError("only open inbox issues may be archived by decision")
+    task = None
+    if args.decision == "accepted":
+        if not args.task:
+            raise ValueError("accepted issue requires a task plan")
+        task = task_plan_reference(args.task)
+    elif args.task:
+        raise ValueError("rejected issue must not link a task")
     project_ref = issue.split("/", 1)[0]
     destination = ISSUES / "archived" / dt.datetime.now(dt.timezone.utc).strftime("%Y/%m") / project_ref / path.name
     if destination.exists():
         raise ValueError("archive destination already exists")
+    decided_at = now()
+    metadata.update({"status": "archived", "decision": args.decision,
+                     "decided_by": args.decided_by, "decided_at": decided_at,
+                     "decision_reason": args.reason, "follow_up_task": task})
+    result = ("\n\n## 처리 결과\n\n"
+              f"- 사용자 결정: `{args.decision}`\n"
+              f"- 판단자: {args.decided_by}\n"
+              f"- 판단 근거: {args.reason}\n")
+    if task:
+        result += f"- 연결 작업: `{task}`\n"
+    original = path.read_text(encoding="utf-8")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    move_issue_atomically(path, destination)
     try:
-        issue_receipt("archives", issue, {"archive": str(destination.relative_to(ROOT)), "archived_by": args.archived_by})
+        write_issue(path, metadata, body.rstrip() + result)
+        move_issue_atomically(path, destination)
     except Exception:
-        move_issue_atomically(destination, path)
+        if destination.exists():
+            move_issue_atomically(destination, path)
+        path.write_text(original, encoding="utf-8")
         raise
     print(destination.relative_to(ROOT))
 
@@ -1413,14 +1389,11 @@ def main() -> int:
     roll.set_defaults(func=rollback)
     create = commands.add_parser("issue-create"); create.add_argument("--project", required=True); create.add_argument("--title", required=True); create.add_argument("--summary", required=True); create.add_argument("--kind", default="observation"); create.add_argument("--key"); create.add_argument("--occurrence", default="first_observed"); create.add_argument("--area", default="unspecified"); create.add_argument("--observed-release", default="unknown"); create.add_argument("--collection-purpose", default="review"); create.set_defaults(func=create_issue)
     collect = commands.add_parser("issue-collect"); collect.add_argument("--project", required=True); collect.add_argument("--project-ref", required=True); collect.add_argument("--issue", required=True); collect.set_defaults(func=collect_issue)
-    review = commands.add_parser("issue-review"); review.add_argument("--issue", required=True); review.add_argument("--reviewed-by", required=True); review.add_argument("--approval-ref", required=True); review.add_argument("--decision", choices=("accepted", "rejected"), required=True); review.set_defaults(func=review_issue)
-    triage = commands.add_parser("issue-triage"); triage.add_argument("--issue", required=True); triage.add_argument("--classification", required=True); triage.add_argument("--triaged-by", required=True)
-    triage.add_argument("--status", choices=("triaged", "needs_information", "undetermined"), default="triaged")
-    triage.add_argument("--reproduction", required=True); triage.add_argument("--impact", required=True); triage.add_argument("--priority", choices=("low", "medium", "high", "critical"), required=True)
-    triage.add_argument("--relationship", choices=("recurrence", "regression", "duplicate", "related", "new", "undetermined"), required=True); triage.add_argument("--follow-up-task", default="none")
-    triage.set_defaults(func=triage_issue)
-    resolve = commands.add_parser("issue-resolve"); resolve.add_argument("--issue", required=True); resolve.add_argument("--task", required=True); resolve.add_argument("--release", required=True); resolve.add_argument("--deployment", required=True); resolve.add_argument("--verification", required=True); resolve.add_argument("--resolved-by", required=True); resolve.set_defaults(func=resolve_issue)
-    archive = commands.add_parser("issue-archive"); archive.add_argument("--issue", required=True); archive.add_argument("--archived-by", required=True); archive.set_defaults(func=archive_issue)
+    archive = commands.add_parser("issue-archive"); archive.add_argument("--issue", required=True)
+    archive.add_argument("--decision", choices=("accepted", "rejected"), required=True)
+    archive.add_argument("--decided-by", required=True); archive.add_argument("--reason", required=True)
+    archive.add_argument("--task", help="required for accepted issues; existing workspace task plan path")
+    archive.set_defaults(func=archive_issue)
     args = parser.parse_args()
     try:
         args.func(args)

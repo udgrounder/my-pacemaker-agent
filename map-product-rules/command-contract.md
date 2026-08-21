@@ -12,6 +12,5 @@
 | `deployment-dry-run` | manifest, target, target-ref | release package·target release/history·issue inventory·config checksum/migration 후보 확인 | 만료 가능한 dry-run receipt와 수집 후보·설정 추가 후보 고지 | 대상 변경 |
 | `deploy` | recorded dry-run, 승인·rollback 책임 | target release/asset/history/receipt/issue inventory/config/만료 재검증; 배포 전 `.mpa-workspace`와 migration 대상 config backup | `from_release → to_release`, 설정 migration·수집·원본 정리 결과 고지, Runtime+config backup; 성공 후 최신 3개 유지; 없는 `workspace/`·`workspace/issues/`·`docs/INDEX.md` 생성 | 기존 user config 값·workspace·docs·agent 설정·일반 소스 변경 |
 | `rollback` | backup, release ID, 승인·책임 | target history와 backup 범위 검사, Runtime 및 config snapshot 무결성 확인 | Runtime과 MPA config를 함께 rolled_back receipt/history로 복원 | backup 범위 밖 읽기·복원 |
-| `issue-create` / `issue-collect` | 명시 프로젝트·issue 또는 승인된 update batch | canonical metadata, 민감정보·중복·inventory 검사 | project issue 또는 inbox/collection receipt와 사용자 고지 | dry-run 고지 없는 자동 수집·덮어쓰기 |
-| `issue-review` / `issue-triage` | inbox issue, review approval | accepted review·재현성·영향·우선순위 확인 | review/triage receipt 또는 inbox 보존 | review 없는 triage/archive |
-| `issue-resolve` / `issue-archive` | triaged issue, release/deploy/verification evidence | evidence release ID와 archive 대상 대조 | resolution/archive receipt | 근거 없는 archive |
+| `issue-create` / `issue-collect` | 명시 프로젝트·issue 또는 승인된 update batch | canonical metadata, 민감정보·중복·inventory 검사, 목적지 생성·존재 확인 뒤 원본 삭제·부재 확인 | project issue 또는 inbox와 사용자 고지 | dry-run 고지 없는 자동 수집·덮어쓰기·별도 collection receipt |
+| `issue-archive` | 사용자 검토 뒤 inbox issue, 결정·근거, 채택 시 task plan | 채택 task plan 존재·archive 충돌 확인 | 이슈 파일에 사용자 결정·근거·연결 작업을 기록한 archive / 실패 시 inbox 보존 | 별도 review·triage receipt, 결정 없는 archive |
