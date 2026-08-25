@@ -1,6 +1,6 @@
 # my pacemaker agent
 
-> **상위 원칙:** LLM의 한계는 주어진 것이다. 구조는 설계하는 것이다.
+> **AI agent와의 협업은 구조가 있어야 이어진다. my pacemaker agent는 그 구조를 프로젝트에 만들고 유지하는 도구다.**
 
 ## 무엇인가
 
