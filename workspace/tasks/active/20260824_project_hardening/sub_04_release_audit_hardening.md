@@ -12,6 +12,7 @@
 - manifest·release receipt·audit 출력에 machine absolute path가 남지 않는 회귀 테스트
 - `map-product-rules/release-preparation.md`의 package 검증·로그 정제 규칙 반영
 - release package 생성 전에 전체 단위 테스트, source/runtime-dist parity, release audit을 순서대로 실행하는 검증 계약 반영
+- 직전 유효 release와 `.mpa-version` 외 Runtime asset이 같은 version-only package 기본 거부 및 명시 override 제공
 
 ## 제외
 
@@ -25,6 +26,7 @@
 - 정상 bundle의 `release-audit` 통과
 - 전체 단위 테스트·runtime/dist parity 통과
 - package 생성 검증이 실패하면 release artifact를 만들지 않는 테스트
+- version-only 거부 후 source/runtime-dist version이 원복되고, 명시 override는 package를 생성하는 테스트
 
 ## 의존성
 

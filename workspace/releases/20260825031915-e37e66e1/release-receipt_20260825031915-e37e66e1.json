@@ -1,0 +1,55 @@
+{
+  "schema_version": 4,
+  "bundle_schema_version": 1,
+  "release_id": "20260825031915-e37e66e1",
+  "manifest": "workspace/releases/20260825031915-e37e66e1/manifest_20260825031915-e37e66e1.json",
+  "package": "workspace/releases/20260825031915-e37e66e1/package_20260825031915-e37e66e1.zip",
+  "note": "workspace/releases/20260825031915-e37e66e1/note_20260825031915-e37e66e1.md",
+  "created_at": "2026-08-25T03:19:18+00:00",
+  "verified_by": "user",
+  "package_checksum": "0520e64c0cc78bef2d2cd411092cbf08570c283c240a6b7766d732f9b8ccf2df",
+  "asset_checksum": "7ec22e155862b0b93421d7f5bf0e0e4c64a536c991ca04122e42b9718fde6c6e",
+  "preflight": {
+    "command": [
+      "release-preflight"
+    ],
+    "exit_code": 0,
+    "steps": [
+      {
+        "command": [
+          "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "tests",
+          "-v"
+        ],
+        "exit_code": 0,
+        "executed_at": "2026-08-25T03:19:18+00:00"
+      },
+      {
+        "command": [
+          "runtime-dist-parity"
+        ],
+        "exit_code": 0
+      },
+      {
+        "command": [
+          "release-audit"
+        ],
+        "exit_code": 0
+      }
+    ],
+    "executed_at": "2026-08-25T03:19:18+00:00"
+  },
+  "validation": {
+    "command": [
+      "python3",
+      "-c",
+      "print(\"operator validation passed\")"
+    ],
+    "exit_code": 0,
+    "executed_at": "2026-08-25T03:19:18+00:00"
+  }
+}

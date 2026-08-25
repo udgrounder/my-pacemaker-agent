@@ -2,7 +2,7 @@
 
 ## Trigger
 
-사용자가 명시적으로 릴리즈를 요청했거나 배포 요청에 현재 source Runtime을 담은 최신 유효 release가 없을 때. Runtime 변경·검증만으로는 실행하지 않는다. `prepare-release`가 UTC `YYYYMMDDHHMMSS-uuid8` 단일 release ID를 생성한다.
+사용자가 명시적으로 릴리즈를 요청했거나 배포 요청에 현재 source Runtime을 담은 최신 유효 release가 없을 때. Runtime 변경·검증만으로는 실행하지 않는다. 직전 유효 release와 `.mpa-version`을 제외한 Runtime asset이 같으면 기본적으로 생성하지 않으며, 의도적인 재발행만 `--allow-version-only`로 명시한다. `prepare-release`가 UTC `YYYYMMDDHHMMSS-uuid8` 단일 release ID를 생성한다.
 
 ## Input
 
@@ -10,15 +10,15 @@ Runtime asset, 검증 명령, compatibility·breaking change·migration·rollbac
 
 ## Allowed Actions
 
-`sync-runtime`, validation 실행, 선택적 Runtime config migration 검증, immutable ZIP·manifest·note·release receipt 생성, `release-audit` 실행. ZIP은 임시 Runtime으로 해제해 asset checksum과 핵심 hook의 정적 Python 문법을 확인한다.
+`sync-runtime` 뒤 표준 preflight(전체 단위 테스트, source/runtime-dist parity, 기존 release audit)와 사용자가 제공한 추가 validation을 실행하고, 선택적 Runtime config migration을 검증한 뒤 immutable ZIP·manifest·note·release receipt를 생성한다. ZIP은 임시 Runtime으로 해제해 asset checksum, 모든 Python hook의 정적 문법, retired 실행 경로와 민감한 절대 경로 노출을 확인한다.
 
 ## Checks
 
-validation exit code, asset checksum, manifest/package 대응, ZIP 임시 Runtime의 `session_start.py`·`code_gate.py` 정적 문법, Runtime config migration의 additive-only·민감정보·경로 규칙, scoped Git 식별자를 확인한다.
+표준 preflight와 추가 validation의 exit code, 직전 유효 release 대비 `.mpa-version` 외 Runtime asset 변경, asset checksum, manifest/package 대응, ZIP 임시 Runtime의 모든 Python hook 정적 문법, active source/package의 retired `.mpa-workspace` 실행 참조, manifest·receipt·validation 기록의 credential·machine absolute path, Runtime config migration의 additive-only 규칙, scoped Git 식별자를 확인한다.
 
 ## Gates
 
-필수 metadata와 성공한 validation command 없이는 manifest를 생성하지 않는다. Git은 차단 Gate가 아니라 보조 식별자다.
+필수 metadata, 성공한 표준 preflight, 성공한 추가 validation command, 그리고 `.mpa-version` 외 Runtime asset 변경 없이는 manifest를 생성하지 않는다. version-only 재발행은 `--allow-version-only`를 명시해야 한다. Git은 차단 Gate가 아니라 보조 식별자다.
 
 ## Output
 
@@ -36,7 +36,7 @@ manifest와 receipt는 기계 검증용이고 note는 사람이 읽는 변경 �
 
 ## Failure State
 
-package·manifest·receipt를 만들지 않고 validation 또는 metadata 오류를 보고한다.
+package·manifest·receipt를 만들지 않고 validation·metadata·version-only release 오류를 보고한다. version-only 거부 뒤에는 source와 dist Runtime version을 원래 상태로 되돌린다.
 
 ## Prohibited
 

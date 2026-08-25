@@ -158,11 +158,13 @@ python3 release_manager.py deploy \
 보관 자산은 용도별로 분리한다. `workspace/releases/<release-id>/package_<release-id>.zip`은 배포 기준과 릴리즈 이력을 보존하는 불변 release archive이고, deploy가 대상에 만드는 `.mpa/backups/` 디렉터리는 `runtime/.mpa/runtime/`와 migration 대상인 경우 `runtime-config/config.yaml`을 보존하는 운영 snapshot이다. 기존 사용자 설정은 Runtime 프로젝트 자체의 버전 관리·백업으로 관리하며 MPA deploy가 덮어쓰지 않는다.
 
 ```bash
-# 1. source 동기화·검증 후 불변 package와 manifest 생성 (출력된 단일 release ID를 기록)
+# 1. source 동기화 후 표준 preflight(전체 테스트·runtime/dist parity·기존 release audit)와 추가 검증을 통과해야 불변 package와 manifest를 생성한다. 직전 release와 .mpa-version 외 Runtime asset이 같으면 기본 거부된다.
 python3 release_manager.py prepare-release \
   --verified-by <검증자> --compatibility <호환성> --breaking-change <없음/내용> \
   --migration <없음/절차> --rollback-condition <조건> --release-note <요약> \
-  --validation-command '["python3", "-m", "unittest", "discover", "-s", "tests"]'
+  --validation-command '["python3", "-c", "print(\"operator validation passed\")"]'
+
+# 의도적으로 version-only package를 다시 만들 때만 --allow-version-only를 추가한다.
 
 # Runtime이 사용할 새 기본값이 필요한 release만 추가
 # runtime-config.json: {"schema_version": 2, "additive_defaults": {

@@ -16,6 +16,12 @@
 | `tests/test_install.py` | 수정 | clean-install native wiring 및 current marker 회귀 테스트 추가 |
 | `project_config.py`, `release_manager.py` | 수정 | config·Runtime·backup·필수 설치 경로의 symlink 및 package 특수 파일 방어 |
 | `tests/test_release_manager.py` | 수정 | Runtime parent·backup symlink와 package 특수 파일 거부 회귀 테스트 추가 |
+| `release_manager.py` | 수정 | release package 표준 preflight, active source/package content policy, 모든 Python hook 정적 검사, 민감 기록 최소화 추가 |
+| `tests/test_release_manager.py` | 수정 | preflight 호출, retired 실행 참조, metadata 절대 경로, 추가 hook 문법 오류 회귀 테스트 추가 |
+| `release_manager.py` | 수정 | 직전 유효 bundle과 `.mpa-version` 외 asset map이 같은 package를 기본 거부하고, 명시 override 및 실패 원복 추가 |
+| `tests/test_release_manager.py` | 수정 | version-only 거부·source/dist 원복·명시 override 회귀 테스트 추가 |
+| `README.md`, `install.md`, `map-product-rules/release-preparation.md` | 수정 | package 생성 시 표준 preflight와 추가 validation의 운영 계약 반영 |
+| `workspace/releases/20260825031915-e37e66e1/` | 추가 | 사용자 요청으로 생성한 immutable Runtime release bundle |
 
 ---
 
@@ -39,6 +45,24 @@
 - **변경 유형:** 수정
 - **내역:** Runtime·backup 및 install이 생성하는 사용자 루트의 symlink를 사전 거부하고, config path의 symlink는 외부 파일을 읽지 않는 warning으로 처리한다. ZIP extraction은 symlink·traversal뿐 아니라 특수 파일도 거부한다.
 
+### release package preflight와 content policy
+
+- **대상:** `release_manager.py`, release 문서, 회귀 테스트
+- **변경 유형:** 수정
+- **내역:** `prepare-release`는 source 동기화 후 전체 단위 테스트, runtime/dist parity, 기존 bundle audit을 표준 preflight로 실행한다. 새 source/package는 retired `.mpa-workspace` 실행 참조, 민감 경로·credential, 모든 Python hook 문법을 검사하며, 기존 immutable bundle은 구조·무결성·hook 문법 audit만 유지한다.
+
+### Runtime release 생성
+
+- **대상:** `workspace/releases/20260825031915-e37e66e1/`
+- **변경 유형:** 추가
+- **내역:** 사용자의 명시 요청으로 standard preflight와 추가 validation을 통과한 package·manifest·note·release receipt immutable bundle을 생성했다.
+
+### version-only release 방지
+
+- **대상:** `release_manager.py`, release 운영 문서, 회귀 테스트
+- **변경 유형:** 수정
+- **내역:** 직전 유효 release와 `.mpa-version`을 제외한 Runtime asset map이 같으면 artifact 생성 전에 거부한다. 의도적인 재발행만 `--allow-version-only`로 허용하며, 거부 또는 검증 실패 뒤 source와 dist의 Runtime version을 함께 원복한다.
+
 ---
 
 ## 요구사항 명세 대비 변경 사항
@@ -47,6 +71,8 @@
 |---|---|---|---|
 | current hook marker 회귀 테스트 추가 | 현재 `.mpa/runtime` hook이 이미 등록됐을 때의 중복 등록을 막기 위함 | 없음 | 1단계 완료 보고에 포함 |
 | backup·config·package 파일 유형 경계 회귀 테스트 추가 | deploy/rollback이 target root 밖을 읽거나 쓰지 않게 하기 위함 | 없음 | 최소 preflight 완료 보고에 포함 |
+| release package 표준 preflight와 content policy | 상시 CI 없이 package 생성 시점에 회귀·parity·audit을 강제하기 위함 | 없음 | release audit 단계 완료 보고에 포함 |
+| version-only package 기본 거부와 명시 override | source 전용 release 도구 변경을 Runtime 배포 변경으로 오인한 불필요한 package 생성을 막기 위함 | 사용자 요청 반영 | release 생성 후 발견사항 보완에 포함 |
 
 ---
 
@@ -57,3 +83,6 @@
 - [x] 실패 경로 확인: Runtime parent·backup·config symlink 및 ZIP 특수 파일이 변경 전 거부된다.
 - [x] plan.md 완료 기준 충족 여부: Runtime wiring과 최소 boundary preflight 완료. 전체 계획은 계속 진행 중.
 - [x] 독립 검증 후속: config 상위 경로·deploy/rollback symlink·ZIP symlink/type mismatch 회귀 테스트를 보강했다. — install 17개, release manager 51개 통과
+- [x] release package 검증: 표준 preflight, retired 실행 참조·절대 경로·전체 hook 문법 거부 회귀를 추가했다. — release manager 55개, 전체 105개, release audit 20 bundles 통과
+- [x] Runtime release 생성: `20260825031915-e37e66e1` — 새 bundle 포함 release audit 21개 통과
+- [x] version-only release 검증: 기본 거부 뒤 source/dist asset map 원복, `--allow-version-only` 명시 시 생성 — release manager 58개·전체 108개 통과

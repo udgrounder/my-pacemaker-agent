@@ -43,6 +43,8 @@ ISSUES = WORKSPACE / "issues"
 SAFE_REF = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 SECRET = re.compile(r"(?i)(api[_-]?key|secret|password|token)\s*[:=]\s*\S+")
 ABSOLUTE_PATH = re.compile(r"(?<![\w.-])/(?:Users|home|var|private|tmp|etc)/")
+RETIRED_RUNTIME_REFERENCE = ".mpa-workspace"
+TEXT_RUNTIME_SUFFIXES = {".json", ".md", ".py", ".toml"}
 IGNORED_RUNTIME_NAMES = {"__pycache__", ".DS_Store", "history"}
 RELEASE_METADATA = ("compatibility", "breaking_change", "migration", "rollback_condition", "release_note")
 RELEASE_SCHEMA_VERSION = 4
@@ -87,6 +89,21 @@ def relative_to_root(path: Path) -> str:
     return str(path.resolve().relative_to(ROOT.resolve()))
 
 
+def redact_sensitive_text(value: str) -> str:
+    """Keep release records useful without persisting credentials or local paths."""
+    value = SECRET.sub("<redacted-secret>", value)
+    return ABSOLUTE_PATH.sub("<redacted-path>/", value)
+
+
+def assert_release_text_is_safe(value: str, label: str) -> None:
+    if SECRET.search(value) or ABSOLUTE_PATH.search(value):
+        raise ValueError(f"{label} contains a credential-like value or machine absolute path")
+
+
+def assert_release_record_is_safe(value: object, label: str) -> None:
+    assert_release_text_is_safe(json.dumps(value, ensure_ascii=False, sort_keys=True), label)
+
+
 def sha(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as file:
@@ -118,6 +135,36 @@ def asset_map(root: Path) -> dict[str, str]:
         for path in sorted(root.rglob("*"))
         if path.is_file() and not any(part in IGNORED_RUNTIME_NAMES for part in path.relative_to(root).parts)
     }
+
+
+def assert_runtime_content_is_safe(root: Path, label: str) -> None:
+    """Reject retired execution paths and sensitive literals from shipped Runtime text."""
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.suffix not in TEXT_RUNTIME_SUFFIXES:
+            continue
+        relative = path.relative_to(root).as_posix()
+        assert_text_asset_is_safe(path, relative, label)
+
+
+def assert_text_asset_is_safe(path: Path, relative: str, label: str) -> None:
+    try:
+        content = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError(f"{label} text asset is not UTF-8: {relative}") from error
+    if RETIRED_RUNTIME_REFERENCE in content:
+        raise ValueError(f"{label} contains a retired Runtime execution reference: {relative}")
+    assert_release_text_is_safe(content, f"{label} text asset: {relative}")
+
+
+def assert_active_execution_references_are_current() -> None:
+    """Check only active source registration roots, never immutable release history."""
+    roots = (ROOT / ".claude/agents", ROOT / ".codex/agents", ROOT / ".agents/rules", ROOT / "agent-specs", RUNTIME_SOURCE)
+    for root in roots:
+        if root.is_dir():
+            assert_runtime_content_is_safe(root, f"active source {root.relative_to(ROOT).as_posix()}")
+    for path in (ROOT / ".claude/settings.json", ROOT / ".codex/hooks.json"):
+        if path.is_file():
+            assert_text_asset_is_safe(path, path.relative_to(ROOT).as_posix(), "active source")
 
 
 def runtime_ignore(_: str, names: list[str]) -> set[str]:
@@ -444,11 +491,55 @@ def run_validation(command: list[str]) -> dict:
                                 timeout=VALIDATION_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired as error:
         raise ValueError(f"validation command timed out after {VALIDATION_TIMEOUT_SECONDS}s") from error
-    record = {"command": command, "exit_code": result.returncode,
-              "stdout": result.stdout[-4000:], "stderr": result.stderr[-4000:], "executed_at": now()}
+    record = {"command": [redact_sensitive_text(arg) for arg in command],
+              "exit_code": result.returncode, "executed_at": now()}
     if result.returncode:
-        raise ValueError(f"validation command failed: {record}")
+        diagnostic = {
+            **record,
+            "stdout": redact_sensitive_text(result.stdout[-4000:]),
+            "stderr": redact_sensitive_text(result.stderr[-4000:]),
+        }
+        raise ValueError(f"validation command failed: {diagnostic}")
     return record
+
+
+def assert_runtime_dist_parity() -> None:
+    if asset_map(RUNTIME_SOURCE) != asset_map(RUNTIME_DIST):
+        raise ValueError("source Runtime and dist Runtime differ")
+
+
+def latest_release_assets() -> tuple[str, dict[str, str]] | None:
+    """Return the newest already-audited immutable Runtime asset map, if present."""
+    bundles = _release_bundle_dirs()
+    if not bundles:
+        return None
+    _, manifest = load_manifest(str(_bundle_paths(bundles[-1].name)["manifest"]))
+    return manifest["release_id"], manifest["assets"]
+
+
+def is_version_only_release(assets: dict[str, str]) -> tuple[bool, str | None]:
+    """Treat a changed release ID alone as no deployable Runtime change."""
+    latest = latest_release_assets()
+    if latest is None:
+        return False, None
+    release_id, previous_assets = latest
+    current = {path: digest for path, digest in assets.items() if path != ".mpa-version"}
+    previous = {path: digest for path, digest in previous_assets.items() if path != ".mpa-version"}
+    return current == previous, release_id
+
+
+def run_release_preflight() -> dict:
+    """Run the non-optional checks that make a package releasable."""
+    unit_tests = run_validation([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"])
+    assert_runtime_dist_parity()
+    audit_releases(argparse.Namespace())
+    return {
+        "command": ["release-preflight"],
+        "exit_code": 0,
+        "steps": [unit_tests, {"command": ["runtime-dist-parity"], "exit_code": 0},
+                  {"command": ["release-audit"], "exit_code": 0}],
+        "executed_at": now(),
+    }
 
 
 def load_runtime_config_migration(value: object) -> dict[str, object] | None:
@@ -478,6 +569,8 @@ def prepare_release(args: argparse.Namespace) -> None:
     metadata = {field: getattr(args, field) for field in RELEASE_METADATA}
     if any(not value.strip() for value in metadata.values()):
         raise ValueError("release metadata fields must not be empty")
+    assert_release_record_is_safe(metadata, "release metadata")
+    assert_active_execution_references_are_current()
     runtime_config = load_runtime_config_migration(getattr(args, "runtime_config_json", None))
     migrate_legacy_active_releases()
     version_file = RUNTIME_SOURCE / ".mpa-version"
@@ -486,11 +579,20 @@ def prepare_release(args: argparse.Namespace) -> None:
     try:
         set_current_release(RUNTIME_SOURCE, ident)
         sync_runtime(argparse.Namespace())
+        preflight = run_release_preflight()
         validation = run_validation(validation_command)
+        assets = asset_map(RUNTIME_DIST)
+        version_only, previous_release_id = is_version_only_release(assets)
+        if version_only and not getattr(args, "allow_version_only", False):
+            raise ValueError(
+                "Runtime assets are unchanged from the latest release "
+                f"({previous_release_id}) except .mpa-version; "
+                "refusing version-only release without --allow-version-only"
+            )
     except Exception:
         restore_release_version(version_file, original_version)
+        sync_runtime(argparse.Namespace())
         raise
-    assets = asset_map(RUNTIME_DIST)
     if current_release(RUNTIME_DIST) != ident:
         raise ValueError("Runtime release ID does not match prepared release")
     paths = _bundle_paths(ident)
@@ -519,7 +621,8 @@ def prepare_release(args: argparse.Namespace) -> None:
             "## Release metadata\n\n"
             + "\n".join(f"- {field}: {metadata[field]}" for field in RELEASE_METADATA)
             + "\n\n## Validation\n\n"
-            + f"- command: `{json.dumps(validation['command'], ensure_ascii=False)}`\n"
+            + f"- release preflight: `{json.dumps(preflight['command'], ensure_ascii=False)}`\n"
+            + f"- validation command: `{json.dumps(validation['command'], ensure_ascii=False)}`\n"
             + f"- exit_code: `{validation['exit_code']}`\n"
         )
         if runtime_config is not None:
@@ -543,6 +646,7 @@ def prepare_release(args: argparse.Namespace) -> None:
             "verified_by": args.verified_by,
             "package_checksum": package_checksum,
             "asset_checksum": asset_checksum,
+            "preflight": preflight,
             "validation": validation,
         }
         if runtime_config is not None:
@@ -565,11 +669,14 @@ def prepare_release(args: argparse.Namespace) -> None:
             "source_snapshot": {"allowlist": sorted(assets), "asset_checksum": asset_checksum, "validation": validation, "metadata": metadata},
             "source_git": scoped_git(),
             "metadata": metadata,
+            "preflight": preflight,
             "validation": validation,
             "release_receipt": relative_to_root(final_receipt),
         }
         if runtime_config is not None:
             manifest["runtime_config"] = runtime_config
+        assert_release_record_is_safe(receipt, "release receipt")
+        assert_release_record_is_safe(manifest, "release manifest")
         write_json(staged_paths["manifest"], manifest)
         staging.replace(final_paths["bundle"])
     except Exception:
@@ -625,6 +732,7 @@ def load_manifest(value: str) -> tuple[Path, dict]:
             receipt_data.get("manifest") != relative_to_root(path) or
             receipt_data.get("package") != data["package"] or
             receipt_data.get("note") != data["note"] or
+            receipt_data.get("preflight") != data.get("preflight") or
             receipt_data.get("validation") != data["validation"] or
             receipt_data.get("package_checksum") != data.get("package_checksum") or
             receipt_data.get("asset_checksum") != data.get("asset_checksum") or
@@ -645,20 +753,23 @@ def release_package(manifest: dict) -> Path:
     return package
 
 
-def validate_packaged_runtime(package: Path, expected_assets: dict[str, str]) -> None:
+def validate_packaged_runtime(package: Path, expected_assets: dict[str, str], *, enforce_content_policy: bool = True) -> None:
     """Verify a release archive without executing its hook code."""
     with tempfile.TemporaryDirectory(prefix="package-verify-") as directory:
         runtime = Path(directory) / "runtime"
         _extract_runtime(package, runtime)
         verify_target(runtime, expected_assets)
-        for relative in ("hooks/session_start.py", "hooks/code_gate.py"):
-            hook = runtime / relative
-            if not hook.is_file():
-                raise ValueError(f"packaged Runtime hook is missing: {relative}")
+        if enforce_content_policy:
+            assert_runtime_content_is_safe(runtime, "packaged Runtime")
+        hooks = sorted((runtime / "hooks").rglob("*.py")) if (runtime / "hooks").is_dir() else []
+        if not hooks:
+            raise ValueError("packaged Runtime has no Python hooks")
+        for hook in hooks:
+            relative = hook.relative_to(runtime).as_posix()
             try:
                 compile(hook.read_text(encoding="utf-8"), str(hook), "exec")
             except (OSError, UnicodeDecodeError, SyntaxError) as error:
-                raise ValueError(f"packaged Runtime hook is not valid Python: {relative}: {error}") from error
+                raise ValueError(f"packaged Runtime hook is not valid Python: {relative}") from error
 
 
 def audit_releases(_: argparse.Namespace) -> None:
@@ -678,7 +789,7 @@ def audit_releases(_: argparse.Namespace) -> None:
         try:
             _, manifest = load_manifest(str(paths["manifest"]))
             package = release_package(manifest)
-            validate_packaged_runtime(package, manifest["assets"])
+            validate_packaged_runtime(package, manifest["assets"], enforce_content_policy=False)
         except (OSError, ValueError, json.JSONDecodeError) as error:
             invalid.append(f"{release_id}: {error}")
     if invalid:
@@ -1418,6 +1529,8 @@ def main() -> int:
     release.add_argument("--migration", required=True); release.add_argument("--rollback-condition", required=True)
     release.add_argument("--release-note", required=True)
     release.add_argument("--runtime-config-json", help="optional additive runtime.* defaults JSON file")
+    release.add_argument("--allow-version-only", action="store_true",
+                         help="allow a deliberate package whose only Runtime asset change is .mpa-version")
     release.add_argument("--validation-command", required=True, help="argv JSON array; executed without a shell")
     release.set_defaults(func=prepare_release)
     deploy_parser = commands.add_parser("deploy")

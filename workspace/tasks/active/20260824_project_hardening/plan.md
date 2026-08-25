@@ -4,7 +4,7 @@
 타입: major
 실패비용: critical
 상태: 구현 중
-승인해시: reqspec-v1:213bf42c63c21c0c
+승인해시: reqspec-v1:aace0330a5166c4e
 승인대상: 요구사항 명세
 ---
 
@@ -30,7 +30,7 @@
 - 범위: active plan의 승인해시·상태·legacy 경로 정합성 감사 및 정상 복구 절차 정리
 - 범위: code gate의 기본 모드·승인 상태·작업 범위 검증 정책 정렬
 - 범위: runtime/config/workspace/docs 및 백업 경계의 symlink·path traversal 방어와 설정 symlink 오류 수정
-- 범위: release package 검증, legacy 경로 탐지, hook 문법 검증, 로그·receipt의 민감 경로 노출 최소화
+- 범위: release package 검증, legacy 경로 탐지, hook 문법 검증, 로그·receipt의 민감 경로 노출 최소화 및 실질 Runtime 변경 없는 version-only package의 기본 차단
 - 범위: Claude/Codex/Antigravity/OpenAgent 설치·hook 회귀 테스트와 release package 생성 시의 자동 검증 추가
 - 범위: agent별 지원 수준, memory 초기화·보존 정책, guardrail의 한계를 문서에 명확히 표시
 - 제외 범위: 대상 프로젝트의 업무 코드·사용자 데이터·기존 immutable release/receipt/backup 이력 재작성 또는 삭제
@@ -45,7 +45,7 @@
 - active plan의 승인 이후 상태는 현재 요구사항 명세와 일치하는 `reqspec-v1` 승인해시를 갖고, 불일치 plan은 사용자 승인 절차를 거친 복구 경로로만 정상화된다.
 - code gate의 기본 동작이 문서·agent spec·테스트와 일치하고, 위험한 우회 경로와 적용 범위가 명시된 검증으로 탐지된다.
 - runtime/config/관리 대상 디렉터리의 symlink 및 대상 root 외부 접근이 preflight에서 안전하게 거부되며, 설정 symlink가 예외를 발생시키지 않는다.
-- release audit가 모든 활성 hook의 정적 문법과 legacy 경로·민감한 절대 경로 노출을 검증하고, 원본 immutable 이력은 보존한다.
+- release audit가 모든 활성 hook의 정적 문법과 legacy 경로·민감한 절대 경로 노출을 검증하고, 원본 immutable 이력은 보존한다. 직전 유효 release와 `.mpa-version` 외 asset이 같으면 `prepare-release`는 artifact 생성 전에 중단하며, 운영자가 명시적으로 `--allow-version-only`를 지정한 경우에만 예외로 허용한다.
 - 지원 대상 agent별 설치·hook 실행 회귀 테스트와 release package 생성 시의 검증 명령이 재현 가능하며, 전체 테스트·release audit·runtime/dist parity 검증이 통과한다.
 
 ### 사용자 결정
@@ -58,6 +58,7 @@
 - legacy 문자열 검사는 활성 source·agent 설정·배포 package에만 적용한다. immutable release·receipt·backup·완료 task 이력은 보존하고 검사 실패 대상으로 삼지 않는다.
 - 외부 파일 보관·수정 권한은 현재 사용 사례가 없으므로 이번 작업에서 폐기한다. 실제 요구가 생기면 사용 목적·보관 위치·수정 대상·rollback을 명시한 새 critical 작업으로 다룬다.
 - GitHub Actions 같은 상시 CI는 추가하지 않는다. release package 생성 시 전체 테스트·runtime/dist parity·release audit을 실행하는 검증 계약으로 충분하다.
+- source 전용 release manager·문서 변경은 Runtime ZIP 배포 변경으로 간주하지 않는다. Runtime asset 변경이 없는 version-only package는 기본적으로 만들지 않으며, 의도적인 재발행은 `--allow-version-only`로 명시한다.
 
 ### 변경 불가 제약
 
@@ -112,7 +113,8 @@
 - [x] Step 2 — active source·agent spec·설치 결과의 실행 경로를 `.mpa/runtime` 하나로 고정하고 clean-install E2E를 추가한다. / 이유: 설치 성공 표시와 실제 native agent/hook 실행의 차이를 제거한다. — `test_install.py` 15개 통과
 - [x] Step 3 — 기본 경고, 선택된 critical·release/deploy 보호, 명시적 strict mode와 진행 중 task의 승인 무결성 진단을 하나의 판정 경로로 구현·문서화한다. / 이유: 일상 작업의 흐름을 지키면서 승인 우회와 일시적 정책 불일치를 막는다. — `CURRENT_TASK` 기반 회귀 테스트와 `README.md`·`agent_rules.md` 반영
 - [x] ~~Step 4 — 사용자 지정 외부 입력의 읽기·보관·수정 권한 구현~~ / 폐기 이유: 현재 제품에 호출 경로가 없어, 가상의 권한 API를 추가하는 비용이 위험 감소보다 크다. 실제 사용 사례가 생기면 새 critical 작업으로 설계한다.
-- [ ] Step 5 — [release audit hardening](sub_04_release_audit_hardening.md): 활성 package의 legacy 실행 참조·모든 hook 문법·민감한 절대 경로 노출을 검증하고, release package 생성 시 전체 테스트·parity·audit을 실행하도록 한다. / 이유: 재발 방지 검증은 유지하되 immutable 감사 이력은 훼손하지 않고, 상시 CI 운영 비용은 피한다.
+- [x] Step 5 — [release audit hardening](sub_04_release_audit_hardening.md): 활성 package의 legacy 실행 참조·모든 hook 문법·민감한 절대 경로 노출을 검증하고, release package 생성 시 전체 테스트·parity·audit을 실행하도록 한다. / 이유: 재발 방지 검증은 유지하되 immutable 감사 이력은 훼손하지 않고, 상시 CI 운영 비용은 피한다. — release manager 55개·전체 105개·20 bundles audit 통과
+- [x] Step 5a — 직전 유효 release와 `.mpa-version`을 제외한 Runtime asset이 같으면 package 생성을 기본 거부하고, `--allow-version-only` 명시 시에만 허용한다. / 이유: source 전용 운영 도구 변경을 Runtime 배포 변경으로 오인한 빈 package release를 막는다. — version-only 거부·원복 및 명시 override 회귀 테스트 통과
 - [x] ~~Step 6 — CI regression automation~~ / 폐기 이유: 현재 프로젝트는 release 중심 운영이며, GitHub Actions의 상시 실행보다 package 생성 시 검증이 비용 대비 적절하다.
 
 ### 위험도 적응형 gate 정책
@@ -166,9 +168,10 @@
 
 - [x] 하위 작업 1: Runtime wiring 구현 및 clean-install E2E 통과 — `python3 -m unittest discover -s tests -p 'test_install.py' -v` (15 tests OK)
 - [x] 하위 작업 2: adaptive gate·plan integrity 구현 및 정상/경고/차단 회귀 테스트 통과 — 선택된 critical task만 기본 차단, `test_plan_hash.py` 26개 통과
-- [ ] 하위 작업 3: release audit hardening 및 release package 생성 검증 구현·package/hook/로그 검증 통과
+- [x] 하위 작업 3: release audit hardening 및 release package 생성 검증 구현·package/hook/로그 검증 통과 — release manager 55개, 전체 105개, 20 bundles audit 통과
+- [x] 하위 작업 3a: version-only Runtime release 기본 거부와 명시 override 회귀 테스트 통과 — release manager 58개, 전체 108개, release audit 21 bundles 통과
 - [x] source/runtime-dist parity, 전체 단위 테스트, release audit 통과 — parity 일치, 전체 101 tests OK, release audit 20 bundles 통과
-- [ ] 독립 비평 결과를 반영하고 critical 변경의 검증 증빙 기록
+- [x] 독립 비평 결과를 반영하고 critical 변경의 검증 증빙 기록 — 새 package에는 content policy, immutable 과거 bundle에는 구조·무결성·hook 문법 audit만 적용
 
 ### 사용자 결정·승인 필요
 
@@ -189,13 +192,16 @@
 - [x] 독립 검증: `test_install.py` 16개·`test_release_manager.py` 48개 및 `git diff --check` 통과. 상세: [independent_validation.md](independent_validation.md)
 - [x] 독립 검증 보완: config 상위 symlink·deploy/rollback symlink·ZIP symlink/type mismatch 회귀 테스트 추가 후 install 17개·release manager 51개 통과
 - [x] 구현 후 정상·실패·엣지 케이스 검증 — 선택 critical의 승인 전·해시 불일치 차단, 미선택 critical 경고, CURRENT_TASK traversal 거부 회귀 테스트 통과
+- [x] release package 정상 경로: 표준 preflight·추가 validation·package 검증을 모두 통과해야 bundle 생성 가능
+- [x] release package 실패 경로: retired 실행 참조, 모든 Python hook 중 문법 오류, release metadata의 절대 경로는 artifact 생성 전 거부
+- [x] immutable 이력 경계: 20개 기존 bundle은 구조·checksum·전체 hook 문법 audit을 통과하며 historical retired 문자열은 재작성·차단하지 않음
 
 ### 완료 시 문서 업데이트 대상
 
 - [x] `README.md` — 안전 게이트 기본값·선택 task 기반 guardrail 동작 반영
 - [x] `install.md` — 기본 warn·선택 critical 차단 정책과 실제 hook/agent 경로 확인 절차 반영
-- [ ] `map-product-rules/release-preparation.md` — package 검증·로그 정제 규칙 (sub_04에서 처리)
-- [ ] `workspace/memory/shared/architecture.md` — 보완 결과가 기존 경계 결정을 바꿀 때만 현재 상태로 갱신
+- [x] `map-product-rules/release-preparation.md` — package 검증·로그 정제 규칙
+- [x] `workspace/memory/shared/architecture.md` — release preflight와 immutable history audit 경계 반영
 
 ## 운영 시 안내 사항
 
@@ -219,6 +225,10 @@
 | 실행 상태 최신화 | 완료된 Step 3·전체 검증·설치 문서 증빙을 체크하고, 외부 입력·package/로그·CI 작업은 미완료로 유지 | 없음 |
 | 외부 입력 권한 기능 폐기 및 release audit·CI 하위 작업 분리 | 현재 제품에 외부 파일 권한 호출 경로가 없고, 남은 두 검증 투자가 독립적으로 완료·검증 가능함을 확인 | 사용자 승인 반영 |
 | 상시 CI 자동화 폐기 및 release package 검증으로 흡수 | release 중심 운영에서는 package 생성 시 검증이 비용 대비 충분하며 GitHub Actions 운영은 과함 | 사용자 승인 반영 |
+| release package preflight·content policy 구현 | package 생성 전에 전체 테스트·parity·기존 bundle audit을 강제하고, 새 source/package의 retired 경로·민감 경로·모든 hook 문법을 검증 | 없음 |
+| immutable bundle의 historical 문자열은 content policy에서 제외 | 새 정책을 과거 감사 이력에 소급 적용하면 정상 이력을 차단하므로, 기존 bundle은 구조·무결성·hook 문법 audit만 유지 | 없음 |
+| Runtime release `20260825031915-e37e66e1` 생성 | 사용자의 명시적 릴리즈 요청에 따라 표준 preflight·추가 validation을 통과한 immutable bundle 생성 | 사용자 요청 반영 |
+| version-only Runtime release 기본 거부와 명시 override | 직전 bundle과 비교해 `.mpa-version`만 바뀐 package가 생성된 사실을 확인 | 사용자 요청 반영 |
 
 ## 명세 변경 이력
 
@@ -241,3 +251,4 @@
 | 2026-08-25T01:55:21Z | reqspec-v1:c40c43beaadff725 | reqspec-v1:fb71ee35cdfdbbc5 | 비-Git 하위 폴더 Codex hook 경로 보완 및 누락된 Claude·Codex·Gemini guide 문서 공통 생성 |
 | 2026-08-25T03:00:15Z | reqspec-v1:fb71ee35cdfdbbc5 | reqspec-v1:fda5226b4733aaf3 | 외부 파일 권한 기능을 실제 사용 사례 전까지 폐기하고, release audit hardening과 CI regression automation을 독립 하위 작업으로 분리 |
 | 2026-08-25T03:06:57Z | reqspec-v1:fda5226b4733aaf3 | reqspec-v1:213bf42c63c21c0c | 상시 CI 자동화를 폐기하고 전체 테스트·runtime-dist parity·release audit을 release package 생성 시 검증으로 흡수 |
+| 2026-08-25T03:22:31Z | reqspec-v1:213bf42c63c21c0c | reqspec-v1:aace0330a5166c4e | 실질 Runtime asset 변경이 없는 version-only package release를 기본 거부하고 명시 override만 허용 |

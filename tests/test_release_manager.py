@@ -39,8 +39,15 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.DEPLOYMENT_RECEIPTS = release_manager.WORKSPACE / "receipts" / "deployments"
         release_manager.ISSUES = release_manager.WORKSPACE / "issues"
         self.write_runtime(release_manager.RUNTIME_SOURCE, "v1")
+        self.release_preflight_patch = mock.patch.object(
+            release_manager,
+            "run_release_preflight",
+            return_value={"command": ["release-preflight"], "exit_code": 0, "steps": [], "executed_at": "test"},
+        )
+        self.release_preflight = self.release_preflight_patch.start()
 
     def tearDown(self):
+        self.release_preflight_patch.stop()
         self.temp.cleanup()
 
     @staticmethod
@@ -56,21 +63,22 @@ class ReleaseManagerTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-    def prepare(self, runtime_config=None):
+    def prepare(self, runtime_config=None, allow_version_only=False):
         release_manager.sync_runtime(argparse.Namespace())
         args = argparse.Namespace(
             verified_by="test", compatibility="compatible", breaking_change="none", migration="none",
             rollback_condition="verification failure", release_note="test release",
             validation_command=[sys.executable, "-c", "print('ok')"],
+            allow_version_only=allow_version_only,
         )
         if runtime_config is not None:
             migration = self.root / "runtime-config.json"
             migration.write_text(json.dumps(runtime_config), encoding="utf-8")
             args.runtime_config_json = str(migration)
         release_manager.prepare_release(args)
-        manifests = list(release_manager.RELEASES.glob("*/manifest_*.json"))
-        self.assertEqual(len(manifests), 1)
-        return manifests[0]
+        manifests = sorted(release_manager.RELEASES.glob("*/manifest_*.json"))
+        self.assertTrue(manifests)
+        return manifests[-1]
 
     def test_deploy_uses_immutable_package_not_current_dist(self):
         manifest = self.prepare()
@@ -209,6 +217,57 @@ class ReleaseManagerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "hook is not valid Python: hooks/session_start.py"):
             self.prepare()
         self.assertFalse(any(release_manager.RELEASES.glob("*/manifest_*.json")))
+
+    def test_prepare_release_runs_standard_preflight_before_creating_artifacts(self):
+        self.prepare()
+        self.release_preflight.assert_called_once_with()
+
+    def test_prepare_release_rejects_version_only_runtime_package_and_restores_dist(self):
+        manifest = self.prepare()
+        prior_release_id = json.loads(manifest.read_text(encoding="utf-8"))["release_id"]
+
+        with self.assertRaisesRegex(ValueError, "refusing version-only release without --allow-version-only"):
+            self.prepare()
+
+        self.assertEqual(len(list(release_manager.RELEASES.glob("*/manifest_*.json"))), 1)
+        self.assertEqual(release_manager.current_release(release_manager.RUNTIME_SOURCE), prior_release_id)
+        self.assertEqual(release_manager.asset_map(release_manager.RUNTIME_SOURCE),
+                         release_manager.asset_map(release_manager.RUNTIME_DIST))
+
+    def test_prepare_release_allows_explicit_version_only_runtime_package(self):
+        self.prepare()
+        self.prepare(allow_version_only=True)
+
+        self.assertEqual(len(list(release_manager.RELEASES.glob("*/manifest_*.json"))), 2)
+
+    def test_prepare_release_rejects_retired_active_execution_reference(self):
+        rule = self.root / "agent-specs" / "codex" / "files" / "AGENTS.md"
+        rule.parent.mkdir(parents=True)
+        rule.write_text("load .mpa-workspace/runtime", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "retired Runtime execution reference"):
+            self.prepare()
+        self.assertFalse(list(release_manager._release_bundle_dirs()))
+
+    def test_prepare_release_ignores_local_agent_settings(self):
+        local_settings = self.root / ".claude" / "settings.local.json"
+        local_settings.parent.mkdir(parents=True)
+        local_settings.write_text('{"token": "local-secret", "path": "/Users/operator/local"}', encoding="utf-8")
+        self.prepare()
+
+    def test_prepare_release_rejects_sensitive_release_metadata(self):
+        release_manager.sync_runtime(argparse.Namespace())
+        with self.assertRaisesRegex(ValueError, "release metadata contains"):
+            release_manager.prepare_release(argparse.Namespace(
+                verified_by="test", compatibility="compatible", breaking_change="none", migration="none",
+                rollback_condition="verification failure", release_note="see /Users/operator/private-note",
+                validation_command=[sys.executable, "-c", "print('ok')"],
+            ))
+        self.assertFalse(list(release_manager._release_bundle_dirs()))
+
+    def test_packaged_runtime_validates_all_python_hooks(self):
+        (release_manager.RUNTIME_SOURCE / "hooks" / "turn_end.py").write_text("def invalid(:\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "hook is not valid Python: hooks/turn_end.py"):
+            self.prepare()
 
     def test_deploy_and_rollback_preserve_user_owned_paths(self):
         manifest = self.prepare()
@@ -523,11 +582,8 @@ class ReleaseManagerTest(unittest.TestCase):
     def test_repeated_preparation_creates_distinct_immutable_release_ids(self):
         manifest = self.prepare()
         original = json.loads(manifest.read_text(encoding="utf-8"))
-        release_manager.prepare_release(argparse.Namespace(
-            verified_by="test", compatibility="compatible", breaking_change="none", migration="none",
-            rollback_condition="verification failure", release_note="test release",
-            validation_command=[sys.executable, "-c", "print('ok')"],
-        ))
+        (release_manager.RUNTIME_SOURCE / "rule.md").write_text("v2", encoding="utf-8")
+        self.prepare()
 
         manifests = list(release_manager.RELEASES.glob("*/manifest_*.json"))
         self.assertEqual(len(manifests), 2)
