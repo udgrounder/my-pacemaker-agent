@@ -17,3 +17,7 @@
 - `python3 -m unittest tests.test_release_manager -q` — 68 tests passed
 - 각 대상 `runtime.zip` — `unzip -tqq` passed
 - `backup-metadata.json` — `archive_migration`에 ZIP archive 경로, 완료/실패 시각, 원본 `runtime/` 삭제 여부와 실패 원인을 기록하도록 보완했다. 기존 3개 backup 모두 `completed`로 갱신됐다.
+- `history-cleanup` — 사용자 승인 뒤 오래된 release bundle 11개를 정리해 10개를 보관했다. 두 등록 대상의 history·receipt·Runtime backup은 후보가 없어 변경하지 않았으며, 사후 dry-run과 `release-audit`이 모두 통과했다.
+- `release_manager.py` — 후보가 없는 등록 대상에는 cleanup lock을 만들지 않도록 보완했다. README는 명시 정리 요청·dry-run·승인 apply와 보존 제외 규칙을 분리해 설명하도록 갱신했다.
+- `python3 -m unittest tests.test_release_manager -q` — 70 tests passed
+- `python3 release_manager.py release-audit` — 10 retained release bundles passed

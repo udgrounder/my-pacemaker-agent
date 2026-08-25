@@ -3,7 +3,7 @@
 생성일: 2026-08-25
 타입: major
 실패비용: major
-상태: 검증 중
+상태: 완료 승인
 승인해시: reqspec-v1:14afb0f1d5818993
 승인대상: 요구사항 명세
 ---
@@ -119,7 +119,7 @@
 ### 사용자 결정·승인 필요
 
 - [x] 요구사항 명세와 구현 계획을 승인했다.
-- [ ] 실제 대상 배포 전 최종 확인 — source 변경만 완료했다. 릴리즈 생성·`campingtalk-proj` 배포는 사용자 명시 요청이 있을 때 진행한다.
+- [x] 실제 대상 확인 — Runtime asset은 변경되지 않아 새 release·deploy는 불필요하다. 기존 `campingtalk-proj` backup 3개 전환과 사용자 승인 이력 정리를 완료했다.
 
 ## 검증 결과
 
@@ -152,6 +152,8 @@
 | ZIP 보관 단위를 version backup 전체에서 내부 `runtime/`으로 변경 | 사용자 정정: version backup metadata와 폴더는 유지 | 요구사항 명세 갱신·재승인 |
 | backup metadata에 ZIP 전환 결과를 기록 | 사용자 결정: 별도 receipt 대신 backup-metadata.json 사용 | 요구사항 명세 갱신·재승인 |
 | 자동 retention을 명시 요청형 `history-cleanup`으로 전환 | 사용자 결정: 정리 요청 시 전체 후보 확인·승인 후 일괄 처리 | 요구사항 명세 갱신·재승인 |
+| root README의 이력 정리 설명을 사용자 요청 흐름과 현재 보관 정책으로 재구성 | 검토에서 `.mpa/backups/` 표가 자동 정리처럼 읽히는 불일치를 발견 | 없음 |
+| 삭제 후보가 없는 대상은 history-cleanup apply에서 lock을 만들지 않도록 보완 | 실제 정리에서 대상 삭제 후보가 없는데 lock 생성 권한 오류가 발생 | 없음 |
 
 ## 명세 변경 이력
 

@@ -76,7 +76,14 @@ agent가 진행하는 절차:
 
 기존 설치본의 Runtime update는 `install.py`가 아니라 source 저장소의 `release_manager.py`를 사용한다. 사용자가 릴리즈를 명시 요청했거나 배포 요청에 현재 source Runtime을 담은 최신 유효 release가 없을 때만 `prepare-release → release-audit → deployment-dry-run → deploy` 순서로 진행한다. Runtime 변경·검증만으로 release를 자동 생성하지 않는다. `prepare-release`는 package 생성 전에 전체 단위 테스트, source/runtime-dist parity, 기존 release audit을 표준 preflight로 실행하고, 사용자가 제공한 추가 validation도 통과해야 한다. 직전 유효 release와 `.mpa-version` 외 Runtime asset이 같으면 기본 거부하며, 의도적인 재발행만 `--allow-version-only`로 허용한다. `prepare-release`가 UTC `YYYYMMDDHHMMSS-uuid8` 단일 release ID를 생성하고 source/dist에 기록한다. 필요한 경우 `--runtime-config-json`으로 `runtime.*` additive 기본값을 release manifest에 포함할 수 있다. deploy는 `${project.name}`, `${project.root_path}`, `${project.initialized_at}`를 대상 `.mpa/config/config.yaml`의 현재 값으로 해석하고 누락값만 추가한다. 산출물은 `workspace/releases/<release-id>/` 아래 `package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json` 한 묶음으로 보관한다. deploy에는 명시 승인과 rollback 책임자가 필요하고, update 중 발견된 issue 후보는 dry-run에서 고지한 뒤 검증 성공 시 원자 수집하며 실패하면 원본을 보존한다. 대상의 `workspace/`·루트 `docs/`가 없으면 빈 폴더만 생성하고, 이미 존재하는 폴더·agent 설정은 변경하지 않는다.
 
-release ZIP은 릴리즈 상태를 장기 보존하는 기준본이며, deploy의 `.mpa/backups/`는 대상별 rollback snapshot이다. 둘은 같은 파일을 보관하더라도 용도가 다르므로 release ZIP을 대상 backup 대신 사용하지 않는다. deploy는 배포 중 version backup의 `runtime/.mpa/runtime/`와 migration이 있는 경우 `runtime-config/config.yaml`을 보존하고, 성공 검증 뒤 `runtime.zip`만 남긴다. 일반 배포·업그레이드는 이력을 자동 삭제하지 않는다. 사용자가 이력 정리를 요청하면 `history-cleanup`의 dry-run이 release, 등록 대상의 history/receipt, 성공 backup 후보를 모두 제시하고, 검토·승인 뒤 `--apply`로만 정리한다(기본 보관: release/history/receipt 10개, 성공 backup 3개). rollback은 version backup의 marker와 `runtime.zip`을 안전 해제·검증한 뒤 복원하며, 기존 사용자 설정 값은 migration에서도 덮어쓰지 않는다.
+### Runtime 릴리즈·백업·이력 정리
+
+release ZIP은 릴리즈 상태를 장기 보존하는 기준본이며, deploy의 `.mpa/backups/`는 대상별 rollback snapshot이다. 둘은 같은 파일을 보관하더라도 용도가 다르므로 release ZIP을 대상 backup 대신 사용하지 않는다.
+
+- **배포와 rollback:** deploy는 배포 중 version backup의 `runtime/.mpa/runtime/`와 migration이 있는 경우 `runtime-config/config.yaml`을 보존하고, 성공 검증 뒤 `runtime.zip`만 남긴다. rollback은 version backup의 marker와 `runtime.zip`을 안전 해제·검증한 뒤 복원하며, 기존 사용자 설정 값은 migration에서도 덮어쓰지 않는다.
+- **이력 정리:** 일반 배포·업그레이드는 release, deployment history·receipt, Runtime backup을 자동 삭제하지 않는다. 사용자가 agent에게 `이력 정리해줘`라고 요청하면 `history-cleanup`이 전체 후보를 dry-run으로 제시한다. 사용자가 삭제 후보를 승인한 뒤에만 apply한다. 후보는 각 그룹의 수정 시각을 기준으로 오래된 항목부터 계산한다.
+- **삭제 범위:** release는 `package`, `manifest`, `note`, `release-receipt`로 이루어진 version bundle 전체를 함께 정리한다. deployment history·receipt는 등록된 대상별로, Runtime backup은 검증된 성공 `runtime.zip` backup만 정리 대상이 된다.
+- **기본 보관·실패 처리·제외:** release·deployment history·receipt는 각 10개, 검증된 성공 Runtime ZIP backup은 대상별 3개를 기본 보관한다. apply 중 오류가 발생하면 명령을 중단하며, 남은 정리는 다시 dry-run으로 후보를 확인한 뒤 진행한다. 실패 backup, marker 없는 사용자 수동 snapshot, 등록되지 않았거나 fingerprint가 일치하지 않는 대상은 정리하지 않는다.
 
 ---
 
@@ -222,7 +229,7 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 |------|------|--------------|
 | `.mpa/runtime/` | 방법론 (HOW) | 승인된 Runtime release로만 최신화 / `mpa_system_designer` 프로세스로 직접 수정 가능 |
 | `.mpa/config/` | 프로젝트 고유 설정 | 기존 값 보존, release가 명시한 `runtime.*` 누락값만 추가 |
-| `.mpa/backups/` | Runtime·설정 rollback snapshot | deploy가 생성, 성공 snapshot 최신 3개만 관리 |
+| `.mpa/backups/` | Runtime·설정 rollback snapshot | deploy가 생성. 일반 배포에서는 삭제하지 않으며, 명시 이력 정리에서 검증된 성공 ZIP backup만 대상별 3개 보관 기준으로 정리 |
 | `workspace/` | 프로젝트 데이터 (WHAT) — agent가 관리 | 작업할 때마다 자동 업데이트 |
 
 ---

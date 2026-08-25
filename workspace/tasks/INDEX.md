@@ -3,7 +3,6 @@
 | 태스크명 | 타입 | 상태 | 요약 | 생성일 |
 |---------|------|------|------|--------|
 | circled_wiki_zip_backup_migration | major | hold | 대상 오인으로 실행하지 않은 작업 기록 | 2026-08-25 |
-| zip_runtime_backups | major | active | version backup 내부 Runtime을 ZIP으로 보관하고 ZIP 전용 rollback 적용 | 2026-08-25 |
 
 [Layer 2 완료] 2026-06-04
 [Layer 2 완료] 2026-06-05
