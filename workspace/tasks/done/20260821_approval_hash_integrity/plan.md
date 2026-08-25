@@ -3,7 +3,7 @@
 생성일: 2026-08-21
 타입: major
 실패비용: major
-상태: 검토 완료
+상태: 완료 승인
 승인해시: reqspec-v1:08810e80c55081c6
 승인대상: 요구사항 명세
 ---
@@ -135,7 +135,7 @@ MPA major 계획서의 승인 기록을 `plan_hash.py approve` 및 사용자 승
 
 ### 완료 시 문서 업데이트 대상
 
-- [ ] `README.md` 또는 설치 문서 — 사용자 조작 절차가 바뀌지 않으면 변경하지 않음
+- [x] `README.md` 또는 설치 문서 — 사용자 조작 절차가 바뀌지 않아 변경하지 않음
 - [x] `.mpa/runtime/core/agent_rules.md` — 승인해시 생성·release 요청 규칙
 - [x] `.mpa/runtime/templates/*_plan_template.md` — major/minor 승인해시 안내
 
@@ -160,6 +160,7 @@ MPA major 계획서의 승인 기록을 `plan_hash.py approve` 및 사용자 승
 | 공통 템플릿 전환 뒤 “두 템플릿” 문구 정정 | 독립 검토에서 발견된 활성 규칙 표현 불일치 해소 | 없음 |
 | release `20260821085459-5314021a` 생성 | 사용자의 명시 릴리즈 요청에 따라 source Runtime을 dist·immutable bundle에 동기화 | 없음 |
 | (구현 중 채움) |  | 없음 / 확인 필요 |
+| 완료 승인 및 done 이동 | 사용자 요청에 따라 완료 근거를 재확인하고 작업 항목을 정리 | 없음 |
 
 ## 명세 변경 이력
 

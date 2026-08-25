@@ -111,7 +111,7 @@
 
 - [x] Step 1 — install·deploy·rollback·audit의 허용 경로와 symlink 검사 지점을 명령별로 구현하고, ZIP의 symlink·special file·traversal 항목을 거부한다. / 이유: clean-install·package 실행 전에 대상 root 경계와 archive 안전성을 먼저 고정한다. — install 16개·release manager 48개 회귀 테스트 통과
 - [x] Step 2 — active source·agent spec·설치 결과의 실행 경로를 `.mpa/runtime` 하나로 고정하고 clean-install E2E를 추가한다. / 이유: 설치 성공 표시와 실제 native agent/hook 실행의 차이를 제거한다. — `test_install.py` 15개 통과
-- [ ] Step 3 — 기본 경고, critical·release/deploy 보호, 명시적 strict mode와 진행 중 task의 승인 무결성 진단을 하나의 판정 경로로 구현·문서화한다. / 이유: 일상 작업의 흐름을 지키면서 승인 우회와 일시적 정책 불일치를 막는다.
+- [x] Step 3 — 기본 경고, 선택된 critical·release/deploy 보호, 명시적 strict mode와 진행 중 task의 승인 무결성 진단을 하나의 판정 경로로 구현·문서화한다. / 이유: 일상 작업의 흐름을 지키면서 승인 우회와 일시적 정책 불일치를 막는다. — `CURRENT_TASK` 기반 회귀 테스트와 `README.md`·`agent_rules.md` 반영
 - [ ] Step 4 — 사용자 지정 외부 입력의 읽기·보관·수정 권한을 구현하고, 승인 시점과 수정 직전의 실경로·무결성을 재확인한다. / 이유: 외부 작업 근거 사용은 보장하면서 symlink 교체로 다른 파일을 수정하는 위험을 막는다.
 - [ ] Step 5 — 활성 package의 legacy 실행 참조·모든 hook 문법·민감한 절대 경로 노출을 검증하고, receipt 기록을 최소화한다. / 이유: 재발 방지 검증은 유지하되 immutable 감사 이력은 훼손하지 않는다.
 - [ ] Step 6 — agent별 E2E, symlink·gate·package 회귀 테스트와 CI 명령을 추가하고 source/runtime-dist parity·전체 테스트·release audit을 실행한다. / 이유: 향후 경로 드리프트와 안전 경계 회귀를 자동으로 발견한다.
@@ -169,7 +169,7 @@
 - [x] 하위 작업 1: Runtime wiring 구현 및 clean-install E2E 통과 — `python3 -m unittest discover -s tests -p 'test_install.py' -v` (15 tests OK)
 - [x] 하위 작업 2: adaptive gate·plan integrity 구현 및 정상/경고/차단 회귀 테스트 통과 — 선택된 critical task만 기본 차단, `test_plan_hash.py` 26개 통과
 - [ ] 하위 작업 3: release boundary·CI 구현 및 symlink/package/로그 검증 통과
-- [ ] source/runtime-dist parity, 전체 단위 테스트, release audit 통과
+- [x] source/runtime-dist parity, 전체 단위 테스트, release audit 통과 — parity 일치, 전체 101 tests OK, release audit 20 bundles 통과
 - [ ] 독립 비평 결과를 반영하고 critical 변경의 검증 증빙 기록
 
 ### 사용자 결정·승인 필요
@@ -195,7 +195,7 @@
 ### 완료 시 문서 업데이트 대상
 
 - [x] `README.md` — 안전 게이트 기본값·선택 task 기반 guardrail 동작 반영
-- [ ] `install.md` — 설치 후 실제 hook/agent 경로 확인 절차
+- [x] `install.md` — 기본 warn·선택 critical 차단 정책과 실제 hook/agent 경로 확인 절차 반영
 - [ ] `map-product-rules/release-preparation.md` — package 검증·로그 정제 규칙
 - [ ] `workspace/memory/shared/architecture.md` — 보완 결과가 기존 경계 결정을 바꿀 때만 현재 상태로 갱신
 
@@ -218,6 +218,7 @@
 | 독립 검증에서 발견된 경계 분기를 회귀 테스트로 추가 | config parent·deploy/rollback·archive type 분기까지 차단 증빙을 완결 | 없음 |
 | CURRENT_TASK로 사용자 선택 task를 식별하고 선택된 critical task의 승인 전·승인해시 오류만 기본 차단 | 과거 active critical task의 오류가 관련 없는 일상 수정을 전역 차단하지 않게 하면서 재개한 고위험 작업은 보호 | 사용자 정책 명확화·승인 반영 |
 | 비-Git 프로젝트 하위 폴더에서 Codex hook이 상위 `.mpa/runtime`을 찾도록 보완하고, 신규 설치의 누락 guide 문서를 3개 agent용으로 생성 | 설치 검토에서 hook 경로 실패와 agent 전환 시 guide 문서 누락을 재현 | 사용자 요청 반영 |
+| 실행 상태 최신화 | 완료된 Step 3·전체 검증·설치 문서 증빙을 체크하고, 외부 입력·package/로그·CI 작업은 미완료로 유지 | 없음 |
 
 ## 명세 변경 이력
 
