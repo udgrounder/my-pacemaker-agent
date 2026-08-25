@@ -1,6 +1,6 @@
 # my pacemaker agent
 
-> **AI agent와의 협업은 구조가 있어야 이어진다. my pacemaker agent는 그 구조를 프로젝트에 만들고 유지하는 도구다.**
+> **AI agent와 협업하려면, 일의 시작부터 끝까지 함께 확인하고 기록할 공통의 채널이 필요하다. my pacemaker agent는 작업 계획서를 중심으로 그 소통이 이어지게 돕는 도구다.**
 
 ## 무엇인가
 
