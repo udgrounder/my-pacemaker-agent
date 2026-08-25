@@ -994,6 +994,8 @@ def history_cleanup(args: argparse.Namespace) -> None:
         shutil.rmtree(path)
     for target in result["targets"]:
         target_ref = str(target["target_ref"])
+        if not any(target[key] for key in ("deployment_history", "deployment_receipts", "runtime_backups")):
+            continue
         root = local_target(target_ref)
         with target_lock(root):
             for name in target["deployment_history"]:

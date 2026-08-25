@@ -545,11 +545,16 @@ class ReleaseManagerTest(unittest.TestCase):
             bundle = release_manager.RELEASES / f"release-{index}"
             bundle.mkdir(parents=True)
             os.utime(bundle, (1_700_000_000 + index, 1_700_000_000 + index))
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        release_manager.remember_local_target(target, "target")
         with self.assertRaisesRegex(ValueError, "approved-by, approval-ref, and rollback-owner are required"):
             release_manager.history_cleanup(argparse.Namespace(
                 keep=1, backup_keep=1, apply=True, approved_by="", approval_ref="unit", rollback_owner="test"))
-        release_manager.history_cleanup(argparse.Namespace(
-            keep=1, backup_keep=1, apply=True, approved_by="test", approval_ref="unit", rollback_owner="test"))
+        with mock.patch.object(release_manager, "target_lock") as target_lock:
+            release_manager.history_cleanup(argparse.Namespace(
+                keep=1, backup_keep=1, apply=True, approved_by="test", approval_ref="unit", rollback_owner="test"))
+        target_lock.assert_not_called()
         self.assertFalse((release_manager.RELEASES / "release-0").exists())
         self.assertTrue((release_manager.RELEASES / "release-1").exists())
 
