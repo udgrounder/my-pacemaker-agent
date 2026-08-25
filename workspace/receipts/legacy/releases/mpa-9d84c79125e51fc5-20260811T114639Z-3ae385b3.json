@@ -1,7 +1,0 @@
-{
-  "release_id": "mpa-9d84c79125e51fc5",
-  "manifest": "workspace/releases/manifests/mpa-9d84c79125e51fc5.json",
-  "created_at": "2026-08-11T11:46:39+00:00",
-  "verified_by": "codex",
-  "validation": "unittest"
-}
