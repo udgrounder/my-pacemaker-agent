@@ -32,7 +32,7 @@ workspace/releases/<release-id>/
 └── release-receipt_<release-id>.json
 ```
 
-manifest와 receipt는 기계 검증용이고 note는 사람이 읽는 변경 설명이다. 대상별 배포 receipt/history는 번들 밖 `workspace/receipts/deployments/<target-ref>/`에 둔다.
+manifest와 receipt는 기계 검증용이고 note는 사람이 읽는 변경 설명이다. 대상별 배포 receipt는 Git 비추적 `workspace/.local/receipts/deployments/<target-ref>/`에, 대상 Runtime history는 대상 `.mpa/runtime/history/`에 둔다.
 
 ## Failure State
 

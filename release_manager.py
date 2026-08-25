@@ -38,7 +38,7 @@ LEGACY_ACTIVE_RECEIPTS = WORKSPACE / "receipts" / "releases"
 MANIFESTS = RELEASES
 PACKAGES = RELEASES
 RELEASE_RECEIPTS = RELEASES
-DEPLOYMENT_RECEIPTS = WORKSPACE / "receipts" / "deployments"
+DEPLOYMENT_RECEIPTS = WORKSPACE / ".local" / "receipts" / "deployments"
 ISSUES = WORKSPACE / "issues"
 SAFE_REF = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 SECRET = re.compile(r"(?i)(api[_-]?key|secret|password|token)\s*[:=]\s*\S+")
@@ -102,6 +102,23 @@ def assert_release_text_is_safe(value: str, label: str) -> None:
 
 def assert_release_record_is_safe(value: object, label: str) -> None:
     assert_release_text_is_safe(json.dumps(value, ensure_ascii=False, sort_keys=True), label)
+
+
+def redact_record_value(value: object) -> object:
+    """Sanitize operator-supplied text before writing a source or target receipt."""
+    if isinstance(value, str):
+        return redact_sensitive_text(value)
+    if isinstance(value, list):
+        return [redact_record_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: redact_record_value(item) for key, item in value.items()}
+    return value
+
+
+def write_safe_receipt(path: Path, value: dict) -> None:
+    sanitized = redact_record_value(value)
+    assert_release_record_is_safe(sanitized, "deployment receipt")
+    write_json(path, sanitized)
 
 
 def sha(path: Path) -> str:
@@ -973,6 +990,46 @@ def project_fingerprint(root: Path) -> str:
     return sha_bytes(str(root.resolve()).encode("utf-8"))[:16]
 
 
+def local_target_locator_path(target_ref: str) -> Path:
+    target_ref = require_safe_ref(target_ref, "target-ref")
+    _reject_symlink_components(WORKSPACE, ".local/deployment-targets", "local deployment target registry")
+    return WORKSPACE / ".local" / "deployment-targets" / f"{target_ref}.json"
+
+
+def remember_local_target(root: Path, target_ref: str) -> None:
+    """Keep the path needed for rollback only in an ignored, local registry."""
+    path = local_target_locator_path(target_ref)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink():
+        raise ValueError("local deployment target registry entry must not be a symlink")
+    write_json(path, {"schema_version": 1, "target_ref": target_ref,
+                      "target": str(root.resolve()), "target_fingerprint": project_fingerprint(root),
+                      "updated_at": now()})
+
+
+def local_target(target_ref: str) -> Path:
+    path = local_target_locator_path(target_ref)
+    if path.is_symlink():
+        raise ValueError("local deployment target registry entry must not be a symlink")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise ValueError(f"target is required; no local target registry entry exists for {target_ref}") from error
+    except json.JSONDecodeError as error:
+        raise ValueError("local deployment target registry entry is invalid") from error
+    if data.get("schema_version") != 1 or data.get("target_ref") != target_ref or not isinstance(data.get("target"), str):
+        raise ValueError("local deployment target registry entry is invalid")
+    root = Path(data["target"]).resolve()
+    if data.get("target_fingerprint") != project_fingerprint(root):
+        raise ValueError("local deployment target registry no longer matches the target")
+    return root
+
+
+def deployment_target_root(args: argparse.Namespace, target_ref: str) -> Path:
+    value = getattr(args, "target", None)
+    return Path(str(value)).resolve() if value not in (None, "") else local_target(target_ref)
+
+
 def _issue_identity(path: Path) -> dict[str, str]:
     metadata, _ = read_issue(path)
     return {
@@ -1086,19 +1143,20 @@ def deployment_dry_run(args: argparse.Namespace) -> None:
     target_ref = require_safe_ref(args.target_ref, "target-ref")
     manifest_path, manifest = load_manifest(args.manifest)
     release_package(manifest)
-    root = Path(args.target).resolve()
+    root = deployment_target_root(args, target_ref)
     target = resolve_runtime(root)
     created_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
     result = {"release_id": manifest["release_id"],
               "from_release": current_release(target), "to_release": manifest["release_id"], "manifest": relative_to_root(manifest_path),
               "release_receipt": manifest["release_receipt"],
-              "target": str(root), "target_ref": target_ref, "current_assets": asset_map(target),
+              "target_ref": target_ref, "target_fingerprint": project_fingerprint(root), "current_assets": asset_map(target),
               "release_assets": manifest["assets"], "history": target_history(target), "issue_inventory": update_issue_inventory(root),
               "runtime_config": _runtime_config_summary(root, manifest.get("runtime_config")),
               "created_at": created_at.isoformat(),
               "expires_at": (created_at + dt.timedelta(minutes=30)).isoformat()}
     path = DEPLOYMENT_RECEIPTS / target_ref / f"dry-run-{manifest['release_id']}-{receipt_suffix()}.json"
-    write_json(path, result)
+    write_safe_receipt(path, result)
+    remember_local_target(root, target_ref)
     print(relative_to_root(path))
 
 
@@ -1106,7 +1164,7 @@ def deploy(args: argparse.Namespace) -> None:
     target_ref = require_safe_ref(args.target_ref, "target-ref")
     manifest_path, manifest = load_manifest(args.manifest)
     package = release_package(manifest)
-    root = Path(args.target).resolve()
+    root = deployment_target_root(args, target_ref)
     target = resolve_runtime(root)
     _reject_symlink_components(root, ".mpa/backups", "Runtime backup")
     original_target = target
@@ -1117,7 +1175,7 @@ def deploy(args: argparse.Namespace) -> None:
     with target_lock(root):
         dry_run_data = json.loads(dry_run.read_text(encoding="utf-8"))
         if (dry_run_data.get("release_id") != manifest["release_id"] or dry_run_data.get("to_release") != manifest["release_id"] or
-                dry_run_data.get("target") != str(root) or dry_run_data.get("target_ref") != target_ref):
+                dry_run_data.get("target_fingerprint") != project_fingerprint(root) or dry_run_data.get("target_ref") != target_ref):
             raise ValueError("dry-run does not match deployment inputs")
         if dry_run_data.get("release_receipt") != manifest.get("release_receipt"):
             raise ValueError("dry-run release receipt does not match manifest")
@@ -1196,8 +1254,8 @@ def deploy(args: argparse.Namespace) -> None:
                 }
                 deployment_receipt = DEPLOYMENT_RECEIPTS / target_ref / f"deploy-{manifest['release_id']}-{receipt_suffix()}.json"
                 history_path = target / "history" / "releases" / f"{manifest['release_id']}.json"
-                write_json(deployment_receipt, receipt)
-                write_json(history_path, receipt)
+                write_safe_receipt(deployment_receipt, receipt)
+                write_safe_receipt(history_path, receipt)
                 _write_backup_marker(backup, manifest["release_id"], manifest["assets"], config_snapshot)
                 if previous and previous.exists():
                     shutil.rmtree(previous)
@@ -1231,12 +1289,12 @@ def deploy(args: argparse.Namespace) -> None:
                            "failed_at": now(), "error": str(error), "dry_run": relative_to_root(dry_run),
                            "recovery": {"runtime_restored": not previous or target.is_dir(), "issues_restored": not moved_issues}}
                 try:
-                    write_json(DEPLOYMENT_RECEIPTS / target_ref / f"deploy-failed-{manifest['release_id']}-{receipt_suffix()}.json", failure)
+                    write_safe_receipt(DEPLOYMENT_RECEIPTS / target_ref / f"deploy-failed-{manifest['release_id']}-{receipt_suffix()}.json", failure)
                 except OSError:
                     pass
                 if target.is_dir():
                     try:
-                        write_json(target / "history" / "releases" / f"{manifest['release_id']}.json", failure)
+                        write_safe_receipt(target / "history" / "releases" / f"{manifest['release_id']}.json", failure)
                     except OSError:
                         pass
                 raise
@@ -1263,7 +1321,7 @@ def target_history(target: Path) -> dict[str, dict]:
 
 def rollback(args: argparse.Namespace) -> None:
     target_ref = require_safe_ref(args.target_ref, "target-ref")
-    root = Path(args.target).resolve()
+    root = deployment_target_root(args, target_ref)
     _reject_symlink_components(root, RUNTIME_DIR, "Runtime")
     _reject_symlink_components(root, ".mpa/backups", "Runtime backup")
     with target_lock(root):
@@ -1315,8 +1373,8 @@ def rollback(args: argparse.Namespace) -> None:
                        "verification": {"asset_map": asset_map(root / ".mpa/runtime"), "verified_at": now()}}
             receipt_path = DEPLOYMENT_RECEIPTS / target_ref / f"rollback-{receipt_suffix()}.json"
             history_path = root / ".mpa/runtime" / "history" / "releases" / f"{release_id}.json"
-            write_json(receipt_path, receipt)
-            write_json(history_path, receipt)
+            write_safe_receipt(receipt_path, receipt)
+            write_safe_receipt(history_path, receipt)
         except Exception as error:
             if previous and previous.exists():
                 if target.exists():
@@ -1332,11 +1390,11 @@ def rollback(args: argparse.Namespace) -> None:
                 history_path.unlink()
             _remove_created_project_paths(root, created_paths)
             try:
-                write_json(DEPLOYMENT_RECEIPTS / target_ref / f"rollback-failed-{receipt_suffix()}.json",
-                           {"status": "failed", "release_id": release_id, "target_ref": target_ref,
-                            "target_fingerprint": project_fingerprint(root), "backup": args.backup,
-                            "failed_at": now(), "error": str(error),
-                            "recovery": {"runtime_restored": not previous or target.is_dir()}})
+                write_safe_receipt(DEPLOYMENT_RECEIPTS / target_ref / f"rollback-failed-{receipt_suffix()}.json",
+                                   {"status": "failed", "release_id": release_id, "target_ref": target_ref,
+                                    "target_fingerprint": project_fingerprint(root), "backup": args.backup,
+                                    "failed_at": now(), "error": str(error),
+                                    "recovery": {"runtime_restored": not previous or target.is_dir()}})
             except OSError:
                 pass
             raise
@@ -1543,7 +1601,7 @@ def main() -> int:
     dry_run.add_argument("--manifest", required=True); dry_run.add_argument("--target", required=True); dry_run.add_argument("--target-ref", required=True)
     dry_run.set_defaults(func=deployment_dry_run)
     roll = commands.add_parser("rollback")
-    roll.add_argument("--target", required=True); roll.add_argument("--backup", required=True); roll.add_argument("--target-ref", required=True); roll.add_argument("--release-id", required=True)
+    roll.add_argument("--target", help="optional when target-ref is registered in the local deployment target registry"); roll.add_argument("--backup", required=True); roll.add_argument("--target-ref", required=True); roll.add_argument("--release-id", required=True)
     roll.add_argument("--verified-by", required=True); roll.add_argument("--approved-by", required=True); roll.add_argument("--approval-ref", required=True); roll.add_argument("--rollback-owner", required=True)
     roll.set_defaults(func=rollback)
     create = commands.add_parser("issue-create"); create.add_argument("--project", required=True); create.add_argument("--title", required=True); create.add_argument("--summary", required=True); create.add_argument("--kind", default="observation"); create.add_argument("--key"); create.add_argument("--occurrence", default="first_observed"); create.add_argument("--area", default="unspecified"); create.add_argument("--observed-release", default="unknown"); create.add_argument("--collection-purpose", default="review"); create.set_defaults(func=create_issue)

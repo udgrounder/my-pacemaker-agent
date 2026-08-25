@@ -18,7 +18,7 @@ Runtime release의 ZIP은 배포 기준이자 릴리즈 이력·감사용 불변
 
 ## Checks
 
-dry-run의 release·target·target-ref와 실제 apply 입력, package checksum, 대상 asset map, config checksum 및 migration 후보를 비교한다. 대상은 `.mpa/runtime/`이 있는 현재 설치 구조여야 하며, 자동 구조 변환은 수행하지 않는다.
+dry-run의 release·target fingerprint·target-ref와 실제 apply 입력, package checksum, 대상 asset map, config checksum 및 migration 후보를 비교한다. dry-run은 Git 비추적 `workspace/.local/deployment-targets/<target-ref>.json`에만 절대경로·fingerprint를 기록한다. 대상 절대경로와 사용자 입력에 포함된 credential·machine path는 deployment/rollback receipt와 대상 history에 저장하지 않는다. rollback에서 `--target`을 생략하면 이 로컬 등록부를 사용하며, 없거나 fingerprint가 달라지면 중단한다. 대상은 `.mpa/runtime/`이 있는 현재 설치 구조여야 하며, 자동 구조 변환은 수행하지 않는다.
 
 ## Gates
 
@@ -26,7 +26,7 @@ dry-run·승인·rollback 책임자 없이는 apply하지 않는다. rollback �
 
 ## Output
 
-deployment 또는 rollback receipt와 대상 history.
+Git 비추적 `workspace/.local/receipts/deployments/<target-ref>/`의 deployment 또는 rollback receipt와 대상 history.
 
 ## Failure State
 

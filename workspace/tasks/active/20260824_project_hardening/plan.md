@@ -4,7 +4,7 @@
 타입: major
 실패비용: critical
 상태: 구현 중
-승인해시: reqspec-v1:aace0330a5166c4e
+승인해시: reqspec-v1:516374cf0d9f9a3d
 승인대상: 요구사항 명세
 ---
 
@@ -30,10 +30,10 @@
 - 범위: active plan의 승인해시·상태·legacy 경로 정합성 감사 및 정상 복구 절차 정리
 - 범위: code gate의 기본 모드·승인 상태·작업 범위 검증 정책 정렬
 - 범위: runtime/config/workspace/docs 및 백업 경계의 symlink·path traversal 방어와 설정 symlink 오류 수정
-- 범위: release package 검증, legacy 경로 탐지, hook 문법 검증, 로그·receipt의 민감 경로 노출 최소화 및 실질 Runtime 변경 없는 version-only package의 기본 차단
+- 범위: release package 검증, legacy 경로 탐지, hook 문법 검증, deployment receipt의 Git 비추적 로컬 보관과 민감 경로 노출 최소화, 로컬 전용 rollback 대상 등록부 및 실질 Runtime 변경 없는 version-only package의 기본 차단
 - 범위: Claude/Codex/Antigravity/OpenAgent 설치·hook 회귀 테스트와 release package 생성 시의 자동 검증 추가
 - 범위: agent별 지원 수준, memory 초기화·보존 정책, guardrail의 한계를 문서에 명확히 표시
-- 제외 범위: 대상 프로젝트의 업무 코드·사용자 데이터·기존 immutable release/receipt/backup 이력 재작성 또는 삭제
+- 제외 범위: 대상 프로젝트의 업무 코드·사용자 데이터·기존 immutable release/backup 이력 재작성 또는 삭제. 단, 사용자가 명시 승인한 이번 정리에서는 tracked deployment receipt 이력을 제거하고 검증된 운영 대상의 최신 receipt 쌍만 Git 비추적 로컬 보관소로 보정한다.
 - 제외 범위: 사용자의 명시적 요청 없는 새 release 생성·실제 대상 프로젝트 배포·rollback 실행
 - 제외 범위: 기존 active plan을 승인 없이 직접 완료·삭제·재작성하는 처리
 - 제외 범위: 사용자가 명시한 외부 파일의 보관·수정 권한 기능. 현재 제품에 호출 경로가 없으므로 실제 사용 사례가 생길 때 별도 critical 작업으로 설계한다.
@@ -46,6 +46,8 @@
 - code gate의 기본 동작이 문서·agent spec·테스트와 일치하고, 위험한 우회 경로와 적용 범위가 명시된 검증으로 탐지된다.
 - runtime/config/관리 대상 디렉터리의 symlink 및 대상 root 외부 접근이 preflight에서 안전하게 거부되며, 설정 symlink가 예외를 발생시키지 않는다.
 - release audit가 모든 활성 hook의 정적 문법과 legacy 경로·민감한 절대 경로 노출을 검증하고, 원본 immutable 이력은 보존한다. 직전 유효 release와 `.mpa-version` 외 asset이 같으면 `prepare-release`는 artifact 생성 전에 중단하며, 운영자가 명시적으로 `--allow-version-only`를 지정한 경우에만 예외로 허용한다.
+- rollback은 공유 receipt의 대상 절대경로 없이도 수행 가능해야 한다. `target_ref`와 fingerprint에 대응하는 절대경로는 Git 비추적 로컬 등록부에만 저장하고, rollback에서 `--target`이 생략되면 해당 등록부를 사용한다.
+- deployment dry-run·deploy·rollback receipt는 Git 비추적 `workspace/.local/receipts/deployments/`에 보관한다. 사용자 승인에 따라 기존 tracked deployment receipt는 제거하며, 실제 운영 대상 `campingtalk-proj`의 최신 dry-run·deploy receipt 쌍만 경로를 정제해 로컬 보관소로 옮긴다.
 - 지원 대상 agent별 설치·hook 실행 회귀 테스트와 release package 생성 시의 검증 명령이 재현 가능하며, 전체 테스트·release audit·runtime/dist parity 검증이 통과한다.
 
 ### 사용자 결정
@@ -59,13 +61,15 @@
 - 외부 파일 보관·수정 권한은 현재 사용 사례가 없으므로 이번 작업에서 폐기한다. 실제 요구가 생기면 사용 목적·보관 위치·수정 대상·rollback을 명시한 새 critical 작업으로 다룬다.
 - GitHub Actions 같은 상시 CI는 추가하지 않는다. release package 생성 시 전체 테스트·runtime/dist parity·release audit을 실행하는 검증 계약으로 충분하다.
 - source 전용 release manager·문서 변경은 Runtime ZIP 배포 변경으로 간주하지 않는다. Runtime asset 변경이 없는 version-only package는 기본적으로 만들지 않으며, 의도적인 재발행은 `--allow-version-only`로 명시한다.
+- rollback 대상 위치는 공유 receipt·history가 아니라 source workspace의 Git 비추적 로컬 등록부에만 보관한다. 등록부가 없거나 fingerprint가 달라지면 rollback은 경로를 명시하도록 중단한다.
+- 과거 tracked deployment receipt 정리는 사용자의 명시 승인 때만 수행한다. 이 경우 현재 Runtime의 버전·target fingerprint가 최신 applied record와 일치하는 실제 운영 대상만 보정해 보존하고, 그 밖의 대상·이전 receipt는 제거한다.
 
 ### 변경 불가 제약
 
 - Runtime 배포 소스는 source `.mpa/runtime/`이며, 변경 후 `dist/.mpa/runtime/`를 동기화한다.
 - 기존 대상 프로젝트의 사용자 설정·workspace·agent 사용자 정의·일반 소스는 보존하고, migration·정리 작업을 자동으로 수행하지 않는다.
 - MPA 관리 경로의 symlink는 허용하지 않으며, 외부 파일 권한 기능은 실제 사용 사례와 별도 승인 없이는 추가하지 않는다.
-- immutable release·receipt·backup·과거 task 이력은 감사 근거로 보존하며, 활성 실행 코드·문서와 분리해 검사한다.
+- immutable release·backup·과거 task 이력은 감사 근거로 보존하며, 활성 실행 코드·문서와 분리해 검사한다. deployment receipt는 Git 추적 보관을 하지 않으며, 과거 tracked receipt의 정리는 명시 사용자 승인 예외로 한다.
 - 사용자의 명시적 release/deploy 요청 없이 release 생성이나 대상 배포를 실행하지 않는다.
 - critical 작업은 계획 승인과 단계별 위험 확인 없이 구현을 시작하지 않는다.
 
@@ -115,6 +119,7 @@
 - [x] ~~Step 4 — 사용자 지정 외부 입력의 읽기·보관·수정 권한 구현~~ / 폐기 이유: 현재 제품에 호출 경로가 없어, 가상의 권한 API를 추가하는 비용이 위험 감소보다 크다. 실제 사용 사례가 생기면 새 critical 작업으로 설계한다.
 - [x] Step 5 — [release audit hardening](sub_04_release_audit_hardening.md): 활성 package의 legacy 실행 참조·모든 hook 문법·민감한 절대 경로 노출을 검증하고, release package 생성 시 전체 테스트·parity·audit을 실행하도록 한다. / 이유: 재발 방지 검증은 유지하되 immutable 감사 이력은 훼손하지 않고, 상시 CI 운영 비용은 피한다. — release manager 55개·전체 105개·20 bundles audit 통과
 - [x] Step 5a — 직전 유효 release와 `.mpa-version`을 제외한 Runtime asset이 같으면 package 생성을 기본 거부하고, `--allow-version-only` 명시 시에만 허용한다. / 이유: source 전용 운영 도구 변경을 Runtime 배포 변경으로 오인한 빈 package release를 막는다. — version-only 거부·원복 및 명시 override 회귀 테스트 통과
+- [x] Step 5b — deployment receipt를 Git 비추적 `workspace/.local/receipts/deployments/`에 보관하고, dry-run이 로컬 target 등록부를 `target_ref`·fingerprint와 함께 갱신하며, rollback은 `--target` 생략 시 일치하는 등록부로 대상을 찾는다. / 이유: receipt의 절대경로 노출 없이도 rollback의 실행 경로를 보존한다. — 전체 111개 테스트·release audit 21 bundles 통과
 - [x] ~~Step 6 — CI regression automation~~ / 폐기 이유: 현재 프로젝트는 release 중심 운영이며, GitHub Actions의 상시 실행보다 package 생성 시 검증이 비용 대비 적절하다.
 
 ### 위험도 적응형 gate 정책
@@ -141,6 +146,7 @@
 | `agent-specs/`, `.claude/`, `.codex/`, `.agents/` | 활성 agent rule·hook·설치 파일의 retired 경로 제거 및 설치 계약 정렬 |
 | `install.py` | hook marker를 현재 Runtime 경로로 정렬 |
 | `release_manager.py` | package·receipt audit과 민감 경로 노출 방지 보완 |
+| `.gitignore` | 로컬 deployment target 등록부를 Git 추적에서 제외 |
 | `.mpa/runtime/hooks/`, `.mpa/runtime/core/`, `.mpa/runtime/templates/` | adaptive gate와 plan integrity 진단·문서·테스트 계약 반영 |
 | `tests/` | clean install, agent별 hook, gate, symlink, package 검증 회귀 테스트 |
 | `README.md`, `install.md`, `map-product-rules/*.md` | 지원 범위, 안전 정책, 운영 절차와 guardrail 한계 설명 |
@@ -148,7 +154,7 @@
 
 ### 참고 파일 (수정 없음)
 
-- `workspace/releases/`, `workspace/receipts/` — immutable 감사 이력으로 보존
+- `workspace/releases/` — immutable 감사 이력으로 보존
 - `workspace/tasks/done/` — 완료 task 이력으로 보존
 - 기존 active task의 `plan.md` — 사용자가 해당 task 재개를 요청하기 전에는 변경하지 않음
 
@@ -170,6 +176,7 @@
 - [x] 하위 작업 2: adaptive gate·plan integrity 구현 및 정상/경고/차단 회귀 테스트 통과 — 선택된 critical task만 기본 차단, `test_plan_hash.py` 26개 통과
 - [x] 하위 작업 3: release audit hardening 및 release package 생성 검증 구현·package/hook/로그 검증 통과 — release manager 55개, 전체 105개, 20 bundles audit 통과
 - [x] 하위 작업 3a: version-only Runtime release 기본 거부와 명시 override 회귀 테스트 통과 — release manager 58개, 전체 108개, release audit 21 bundles 통과
+- [x] 하위 작업 3b: Git 비추적 local receipt·target 등록부 기반 rollback 및 stale fingerprint 거부 회귀 테스트 통과 — 전체 111개 테스트 통과
 - [x] source/runtime-dist parity, 전체 단위 테스트, release audit 통과 — parity 일치, 전체 101 tests OK, release audit 20 bundles 통과
 - [x] 독립 비평 결과를 반영하고 critical 변경의 검증 증빙 기록 — 새 package에는 content policy, immutable 과거 bundle에는 구조·무결성·hook 문법 audit만 적용
 
@@ -229,6 +236,7 @@
 | immutable bundle의 historical 문자열은 content policy에서 제외 | 새 정책을 과거 감사 이력에 소급 적용하면 정상 이력을 차단하므로, 기존 bundle은 구조·무결성·hook 문법 audit만 유지 | 없음 |
 | Runtime release `20260825031915-e37e66e1` 생성 | 사용자의 명시적 릴리즈 요청에 따라 표준 preflight·추가 validation을 통과한 immutable bundle 생성 | 사용자 요청 반영 |
 | version-only Runtime release 기본 거부와 명시 override | 직전 bundle과 비교해 `.mpa-version`만 바뀐 package가 생성된 사실을 확인 | 사용자 요청 반영 |
+| tracked deployment receipt 정리와 운영 대상 최신 receipt의 로컬 보정 | 사용자가 과거 감사 이력 제거를 승인했고 실제 운영 대상만 보존하도록 지정 | 사용자 요청 반영 |
 
 ## 명세 변경 이력
 
@@ -252,3 +260,6 @@
 | 2026-08-25T03:00:15Z | reqspec-v1:fb71ee35cdfdbbc5 | reqspec-v1:fda5226b4733aaf3 | 외부 파일 권한 기능을 실제 사용 사례 전까지 폐기하고, release audit hardening과 CI regression automation을 독립 하위 작업으로 분리 |
 | 2026-08-25T03:06:57Z | reqspec-v1:fda5226b4733aaf3 | reqspec-v1:213bf42c63c21c0c | 상시 CI 자동화를 폐기하고 전체 테스트·runtime-dist parity·release audit을 release package 생성 시 검증으로 흡수 |
 | 2026-08-25T03:22:31Z | reqspec-v1:213bf42c63c21c0c | reqspec-v1:aace0330a5166c4e | 실질 Runtime asset 변경이 없는 version-only package release를 기본 거부하고 명시 override만 허용 |
+| 2026-08-25T04:38:19Z | reqspec-v1:aace0330a5166c4e | reqspec-v1:c80f9f48e88fbe71 | rollback 대상 절대경로를 Git 비추적 로컬 등록부에만 저장하고 target-ref로 복원 |
+| 2026-08-25T04:52:44Z | reqspec-v1:c80f9f48e88fbe71 | reqspec-v1:586eae06006986a9 | deployment receipt를 Git 비추적 workspace/.local/receipts/deployments에 보관 |
+| 2026-08-25T04:56:20Z | reqspec-v1:586eae06006986a9 | reqspec-v1:516374cf0d9f9a3d | 사용자 승인에 따라 기존 tracked deployment receipt를 제거하고, 실제 운영 대상 campingtalk-proj의 최신 dry-run·deploy receipt만 민감 경로를 정제해 Git 비추적 로컬 보관소로 이관 |

@@ -186,15 +186,19 @@ python3 release_manager.py deployment-dry-run \
 python3 release_manager.py deploy \
   --manifest workspace/releases/<release-id>/manifest_<release-id>.json \
   --target <프로젝트-경로> --target-ref <소문자-식별자> --verified-by <검증자> \
-  --dry-run workspace/receipts/deployments/<대상>/dry-run-<release-id>-<id>.json \
+  --dry-run workspace/.local/receipts/deployments/<대상>/dry-run-<release-id>-<id>.json \
   --approved-by <승인자> --approval-ref <승인-기록> --rollback-owner <책임자>
 
 # 5. 문제가 있을 때, deploy 출력의 .mpa/backups/... 값을 그대로 사용해 rollback
 python3 release_manager.py rollback \
-  --target <프로젝트-경로> --target-ref <소문자-식별자> \
+  --target-ref <소문자-식별자> \
   --backup .mpa/backups/<release-id>-<timestamp>-<id> --release-id <release-id> \
   --verified-by <검증자> --approved-by <승인자> --approval-ref <승인-기록> \
   --rollback-owner <책임자>
+
+# --target은 선택 사항이다. 직전 deployment-dry-run이 이 source workspace의
+# Git 비추적 workspace/.local/deployment-targets/<target-ref>.json에 저장한
+# 동일 대상 fingerprint가 있으면 생략할 수 있다.
 ```
 
 ---
@@ -231,4 +235,4 @@ python3 release_manager.py rollback \
 > Codex는 `.codex/hooks.json`의 `PreToolUse` matcher에 `apply_patch|write_file|replace|edit` 등을 포함해 게이트 실효성을 확보한다.
 > 게이트 강도는 환경변수 `MPA_GATE`(block/warn/off)로 조절한다.
 
-기존 설치본의 Runtime 업데이트는 배포 전 `.mpa/runtime/`와 예정된 `runtime.*` 설정을 `.mpa/backups/`에 보관한 뒤 교체·추가한다. 성공한 deploy 뒤 대상 `.mpa/backups/`의 성공 Runtime backup은 최신 3개만 남기며, 실패 backup은 정리하지 않는다. 배포·rollback은 `.mpa/config/config.yaml`의 기존 project/user 값, agent 설정, `workspace/`, 루트 `docs/`, 일반 소스를 변경하지 않는다. migration으로 추가된 MPA 설정은 rollback 때 함께 복원하며, 그 밖의 설정 변경과 전체 프로젝트 백업은 Runtime 프로젝트 자체의 절차로 처리한다.
+기존 설치본의 Runtime 업데이트는 배포 전 `.mpa/runtime/`와 예정된 `runtime.*` 설정을 `.mpa/backups/`에 보관한 뒤 교체·추가한다. 성공한 deploy 뒤 대상 `.mpa/backups/`의 성공 Runtime backup은 최신 3개만 남기며, 실패 backup은 정리하지 않는다. deployment dry-run과 deploy·rollback receipt/history는 대상 절대경로를 저장하지 않고 fingerprint로 대상 동일성을 확인하며, operator 입력의 credential·machine path는 정제한다. 배포·rollback은 `.mpa/config/config.yaml`의 기존 project/user 값, agent 설정, `workspace/`, 루트 `docs/`, 일반 소스를 변경하지 않는다. migration으로 추가된 MPA 설정은 rollback 때 함께 복원하며, 그 밖의 설정 변경과 전체 프로젝트 백업은 Runtime 프로젝트 자체의 절차로 처리한다.

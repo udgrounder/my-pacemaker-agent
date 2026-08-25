@@ -36,7 +36,7 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.LEGACY_ACTIVE_MANIFESTS = release_manager.RELEASES / "manifests"
         release_manager.LEGACY_ACTIVE_PACKAGES = release_manager.RELEASES / "packages"
         release_manager.LEGACY_ACTIVE_RECEIPTS = release_manager.WORKSPACE / "receipts" / "releases"
-        release_manager.DEPLOYMENT_RECEIPTS = release_manager.WORKSPACE / "receipts" / "deployments"
+        release_manager.DEPLOYMENT_RECEIPTS = release_manager.WORKSPACE / ".local" / "receipts" / "deployments"
         release_manager.ISSUES = release_manager.WORKSPACE / "issues"
         self.write_runtime(release_manager.RUNTIME_SOURCE, "v1")
         self.release_preflight_patch = mock.patch.object(
@@ -99,6 +99,71 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertEqual((target_root / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "v1")
         self.assertTrue(any((target_root / ".mpa/backups").iterdir()))
         self.assertTrue((target_root / ".mpa/runtime" / "history" / "releases" / json.loads(manifest.read_text())["release_id"]).with_suffix(".json").is_file())
+
+    def test_deployment_receipts_redact_target_paths_and_operator_references(self):
+        manifest = self.prepare()
+        target = self.root / "local-target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        release_manager.deployment_dry_run(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target",
+        ))
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
+        dry_run_data = json.loads(dry_run.read_text(encoding="utf-8"))
+        self.assertNotIn("target", dry_run_data)
+        self.assertEqual(dry_run_data["target_fingerprint"], release_manager.project_fingerprint(target))
+        self.assertNotIn(str(target), dry_run.read_text(encoding="utf-8"))
+
+        release_manager.deploy(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
+            dry_run=str(dry_run), approved_by="test", approval_ref=f"operator request: {target}",
+            rollback_owner="test",
+        ))
+        receipt = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("deploy-*.json"))
+        receipt_text = receipt.read_text(encoding="utf-8")
+        self.assertNotIn(str(target), receipt_text)
+        self.assertIn("<redacted-path>", receipt_text)
+
+    def test_rollback_uses_local_target_registry_when_target_is_omitted(self):
+        manifest = self.prepare()
+        release_id = json.loads(manifest.read_text(encoding="utf-8"))["release_id"]
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        release_manager.deployment_dry_run(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target",
+        ))
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
+        release_manager.deploy(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
+            dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test",
+        ))
+        backup = next((target / ".mpa/backups").iterdir())
+
+        release_manager.rollback(argparse.Namespace(
+            target_ref="target", backup=str(backup.relative_to(target)), release_id=release_id,
+            verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test",
+        ))
+
+        self.assertEqual((target / ".mpa/runtime/rule.md").read_text(encoding="utf-8"), "old")
+        locator = release_manager.local_target_locator_path("target")
+        self.assertTrue(locator.is_file())
+
+    def test_rollback_rejects_stale_local_target_registry(self):
+        manifest = self.prepare()
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        release_manager.deployment_dry_run(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target",
+        ))
+        locator = release_manager.local_target_locator_path("target")
+        data = json.loads(locator.read_text(encoding="utf-8"))
+        data["target_fingerprint"] = "stale"
+        locator.write_text(json.dumps(data), encoding="utf-8")
+
+        with self.assertRaisesRegex(ValueError, "local deployment target registry no longer matches"):
+            release_manager.rollback(argparse.Namespace(
+                target_ref="target", backup=".mpa/backups/missing", release_id="release",
+                verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test",
+            ))
 
     def test_deployment_dry_run_requires_current_runtime_layout(self):
         manifest = self.prepare()
