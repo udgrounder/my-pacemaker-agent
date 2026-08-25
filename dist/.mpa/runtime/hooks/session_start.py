@@ -68,6 +68,19 @@ def _read_field(plan_path, key):
     return ""
 
 
+def read_current_task(cwd):
+    """현재 선택한 태스크명을 반환한다. 경로를 포함한 값은 무시한다."""
+    path = os.path.join(cwd, "workspace", "tasks", "CURRENT_TASK")
+    try:
+        with open(path, encoding="utf-8") as f:
+            name = f.read().strip()
+    except OSError:
+        return ""
+    if not name or name in {".", ".."} or os.path.basename(name) != name:
+        return ""
+    return name
+
+
 def audit_frontmatter(plan_path):
     """plan.md 프론트매터·승인해시 검사. (missing, invalid, has_frontmatter) 반환."""
     try:
@@ -125,6 +138,11 @@ def build_message(cwd):
             lines.append(f"  {i}.{row.lstrip()}")
         lines.append(f"  {len(rows) + 1}. 새 작업 항목 시작")
         lines.append("→ 번호를 말씀해 주시면 해당 작업 항목의 상태에 따라 진행합니다.")
+        current_task = read_current_task(cwd)
+        if current_task:
+            lines.append(f"현재 선택 작업 항목: {current_task}")
+        else:
+            lines.append("현재 선택 작업 항목 없음 — 재개할 항목을 선택하면 CURRENT_TASK에 기록하세요.")
         # 프론트매터 누락 항목이 있으면 처리 지시 추가
         if any("⚠️" in row for row in rows):
             lines.append("")

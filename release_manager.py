@@ -58,10 +58,20 @@ RUNTIME_CONFIG_BACKUP_ROOT = "runtime-config"
 
 def resolve_runtime(root: Path) -> Path:
     """Return the Runtime at the sole supported installed location."""
+    _reject_symlink_components(root, RUNTIME_DIR, "Runtime")
     runtime = root / RUNTIME_DIR
     if runtime.is_dir():
         return runtime
     raise ValueError("target .mpa/runtime is missing; initialize the current MPA layout before deployment")
+
+
+def _reject_symlink_components(root: Path, relative: str, label: str) -> None:
+    """Keep managed paths inside the target root instead of following links."""
+    current = root.resolve()
+    for part in Path(relative).parts:
+        current /= part
+        if current.is_symlink():
+            raise ValueError(f"{label} path contains an unsupported symlink: {relative}")
 
 
 def now() -> str:
@@ -132,6 +142,8 @@ def _runtime_config_migration(value: object) -> dict[str, object] | None:
 
 
 def _runtime_config_checksum(root: Path) -> str | None:
+    if project_config._has_symlink_component(root, project_config.CONFIG_RELATIVE):
+        raise ValueError("Runtime config path contains an unsupported symlink")
     path = project_config.config_path(root)
     return sha(path) if path.is_file() else None
 
@@ -221,8 +233,15 @@ def _extract_runtime(archive_path: Path, destination: Path) -> None:
                     raise ValueError(f"release package contains a duplicate path: {info.filename}")
                 names.add(info.filename)
                 mode = (info.external_attr >> 16) & 0xFFFF
-                if stat.S_IFMT(mode) == stat.S_IFLNK:
+                kind = stat.S_IFMT(mode)
+                if kind == stat.S_IFLNK:
                     raise ValueError(f"release package contains a symlink: {info.filename}")
+                if kind not in (0, stat.S_IFREG, stat.S_IFDIR):
+                    raise ValueError(f"release package contains an unsupported file type: {info.filename}")
+                if info.is_dir() and kind not in (0, stat.S_IFDIR):
+                    raise ValueError(f"release package directory has an invalid type: {info.filename}")
+                if not info.is_dir() and kind == stat.S_IFDIR:
+                    raise ValueError(f"release package file has an invalid type: {info.filename}")
                 target = (destination / info.filename).resolve()
                 if destination.resolve() not in target.parents and target != destination.resolve():
                     raise ValueError(f"release package path escapes staging: {info.filename}")
@@ -678,9 +697,11 @@ def ensure_required_project_directories(root: Path) -> list[str]:
     required = ("workspace", "workspace/issues", "docs")
     for name in required:
         path = root / name
+        _reject_symlink_components(root, name, "required project")
         if path.exists() and not path.is_dir():
             raise ValueError(f"required project path is not a directory: {name}")
     docs_index = root / "docs" / "INDEX.md"
+    _reject_symlink_components(root, "docs/INDEX.md", "required project")
     if docs_index.exists() and not docs_index.is_file():
         raise ValueError("required project path is not a file: docs/INDEX.md")
     for name in required:
@@ -736,6 +757,8 @@ def _backup_config_path(path: Path) -> Path:
 
 
 def _capture_config(root: Path) -> tuple[bool, bytes | None]:
+    if project_config._has_symlink_component(root, project_config.CONFIG_RELATIVE):
+        raise ValueError("Runtime config path contains an unsupported symlink")
     path = project_config.config_path(root)
     return path.is_file(), path.read_bytes() if path.is_file() else None
 
@@ -974,6 +997,7 @@ def deploy(args: argparse.Namespace) -> None:
     package = release_package(manifest)
     root = Path(args.target).resolve()
     target = resolve_runtime(root)
+    _reject_symlink_components(root, ".mpa/backups", "Runtime backup")
     original_target = target
     destination = root / RUNTIME_DIR
     dry_run = (ROOT / args.dry_run).resolve()
@@ -1129,6 +1153,8 @@ def target_history(target: Path) -> dict[str, dict]:
 def rollback(args: argparse.Namespace) -> None:
     target_ref = require_safe_ref(args.target_ref, "target-ref")
     root = Path(args.target).resolve()
+    _reject_symlink_components(root, RUNTIME_DIR, "Runtime")
+    _reject_symlink_components(root, ".mpa/backups", "Runtime backup")
     with target_lock(root):
         previous = None
         target = root / ".mpa/runtime"

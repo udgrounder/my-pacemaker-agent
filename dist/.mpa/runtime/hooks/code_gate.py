@@ -6,7 +6,8 @@ plan.md YAML 프론트매터의 '상태' 필드를 기준으로 소스 수정을
 
 GATE 1 — 소스 수정 (Edit/Write):
   active 태스크 중 상태 = '구현 중'인 것이 있어야 허용.
-  없으면 차단.
+  기본 warn 모드에서는 절차 경고만 주입한다. 단, CURRENT_TASK로 선택한
+  critical 태스크의 승인 누락·승인해시 무결성 오류는 차단한다.
 
 GATE 2 — 완료 이동 (Bash mv):
   tasks/active → tasks/done 이동 시
@@ -15,7 +16,8 @@ GATE 2 — 완료 이동 (Bash mv):
 
 동작 강도: MPA_GATE 환경변수
   - block (명시 설정 시) : 조건 불충족 시 차단 (exit 2)
-  - warn (기본) : 차단하지 않고 경고만 주입
+  - warn (기본) : 일반 절차 위반은 경고만 주입. 선택한 critical 태스크의
+                  승인 무결성 오류는 차단
   - off          : 게이트 비활성
 
 사용법: code_gate.py --agent {claude|codex|gemini}
@@ -50,6 +52,8 @@ EDIT_TOOLS = {
 
 # Bash 실행 도구
 BASH_TOOLS = {"Bash", "bash", "shell", "run_command"}
+
+CURRENT_TASK_PATH = ("workspace", "tasks", "CURRENT_TASK")
 
 
 def read_input():
@@ -145,8 +149,75 @@ def find_active_statuses(cwd):
     return results
 
 
+def read_current_task(cwd):
+    """사용자가 현재 선택·재개한 태스크명을 읽는다.
+
+    CURRENT_TASK는 agent가 사용자 선택을 받은 뒤 기록하는 한 줄 파일이다.
+    경로를 포함한 값은 무시해 task 경로 탈출이나 다른 파일의 우발적 참조를 막는다.
+    """
+    path = os.path.join(cwd, *CURRENT_TASK_PATH)
+    try:
+        with open(path, encoding="utf-8") as f:
+            name = f.read().strip()
+    except OSError:
+        return None
+    if not name or name in {".", ".."} or os.path.basename(name) != name:
+        return None
+    return name
+
+
+def current_task_plan(cwd):
+    """선택 태스크의 (이름, fields, body)를 반환한다. 없거나 잘못되면 None."""
+    name = read_current_task(cwd)
+    if not name:
+        return None
+    plan_path = os.path.join(cwd, "workspace", "tasks", "active", name, "plan.md")
+    if not os.path.isfile(plan_path):
+        return None
+    fields, body = parse_plan_fields(plan_path)
+    return name, fields, body
+
+
+def _approval_recovery_message(name, status, issue):
+    return (
+        f"⛔ 계획 승인 기록 복구 필요: '{name}' plan.md 상태는 '{status}'이며 승인해시가 유효하지 않습니다.\n"
+        f"  사유: {issue}\n"
+        "승인해시를 직접 입력하거나 날짜·승인 문구로 바꾸지 마세요. 아래 중 하나로 명시적으로 복구하세요:\n"
+        "  1. 사용자 승인 이력이 불명확함 → 상태를 '설계 완료'로 되돌리고 plan.md 검토 후 재승인\n"
+        "  2. 사용자 승인 뒤 기록만 누락됨 → 현재 변경 내용을 사용자에게 확인받은 뒤 approve 실행\n"
+        "  3. 승인된 요구사항 명세 변경 → 사용자 승인 후 renew-spec 실행\n"
+        "최초 승인 명령:\n"
+        f"  python3 .mpa/runtime/hooks/plan_hash.py approve workspace/tasks/active/{name}/plan.md"
+    )
+
+
+def check_selected_critical_integrity(cwd):
+    """선택한 critical 태스크만 기본 모드에서 하드 차단할 사유를 반환한다."""
+    current = current_task_plan(cwd)
+    if not current:
+        return None
+    name, fields, body = current
+    if fields.get("실패비용") != "critical":
+        return None
+    status = fields.get("상태")
+    if status not in HASH_REQUIRED_STATUSES:
+        return (
+            f"⛔ critical 작업 시작 전 승인 필요: '{name}'의 현재 상태는 '{status or '미상'}'입니다.\n"
+            "사용자에게 계획 승인을 받은 뒤 plan_hash.py approve로 '구현 중' 상태와 승인해시를 기록하세요."
+        )
+    front_matter = "\n".join(f"{k}: {v}" for k, v in fields.items())
+    issue = approval_hash_issue(front_matter, body)
+    if issue:
+        return _approval_recovery_message(name, status, issue)
+    return None
+
+
 def check_hash_integrity(cwd, mode, agent):
-    """GATE 1 재진입 — 승인 이후 상태 태스크의 승인해시를 검증한다."""
+    """승인해시를 검사한다.
+
+    기본 warn 모드는 선택되지 않은 기존 태스크의 이상을 경고로만 남긴다.
+    명시적 block 모드는 과거와 같이 모든 승인 이후 태스크를 하드 차단한다.
+    """
     base = os.path.join(cwd, "workspace", "tasks", "active")
     if not os.path.isdir(base):
         return
@@ -162,16 +233,7 @@ def check_hash_integrity(cwd, mode, agent):
         front_matter = "\n".join(f"{k}: {v}" for k, v in fields.items())
         issue = approval_hash_issue(front_matter, body)
         if issue:
-            msg = (
-                f"⛔ 계획 승인 기록 복구 필요: '{name}' plan.md 상태는 '{status}'이며 승인해시가 유효하지 않습니다.\n"
-                f"  사유: {issue}\n"
-                "승인해시를 직접 입력하거나 날짜·승인 문구로 바꾸지 마세요. 아래 중 하나로 명시적으로 복구하세요:\n"
-                "  1. 사용자 승인 이력이 불명확함 → 상태를 '설계 완료'로 되돌리고 plan.md 검토 후 재승인\n"
-                "  2. 사용자 승인 뒤 기록만 누락됨 → 현재 변경 내용을 사용자에게 확인받은 뒤 approve 실행\n"
-                "  3. 승인된 요구사항 명세 변경 → 사용자 승인 후 renew-spec 실행\n"
-                "최초 승인 명령:\n"
-                f"  python3 .mpa/runtime/hooks/plan_hash.py approve workspace/tasks/active/{name}/plan.md"
-            )
+            msg = _approval_recovery_message(name, status, issue)
             if mode == "warn":
                 emit_warn(agent, msg)
             else:
@@ -279,6 +341,11 @@ def main():
     if is_always_allowed(rel):
         sys.exit(0)
 
+    # 선택한 critical 태스크는 다른 active 태스크의 상태와 무관하게 먼저 보호한다.
+    critical_issue = check_selected_critical_integrity(cwd)
+    if critical_issue:
+        emit_block(critical_issue)
+
     statuses = find_active_statuses(cwd)
     implementing = [n for n, s in statuses if s == "구현 중"]
 
@@ -302,7 +369,7 @@ def main():
         emit_block(msg)
 
     # ── GATE 1 재진입: 승인해시 검증 ──────────────────────────────────
-    # '구현 중' 상태 태스크의 plan.md가 승인 후 변경됐는지 확인
+    # 명시적 strict 모드에서는 모든 승인 이후 태스크의 plan.md를 차단 검사한다.
     check_hash_integrity(cwd, mode, args.agent)
 
     sys.exit(0)

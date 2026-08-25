@@ -1,10 +1,13 @@
 import importlib.util
 import contextlib
 import io
+import json
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -93,10 +96,32 @@ class PlanHashTest(unittest.TestCase):
                 return error.code, stdout.getvalue(), stderr.getvalue()
         return None, stdout.getvalue(), stderr.getvalue()
 
+    def run_gate_main(self, root, mode):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        data = {
+            "cwd": str(root),
+            "tool_name": "apply_patch",
+            "tool_input": {"file_path": str(root / "src.py")},
+        }
+        with mock.patch.dict(os.environ, {"MPA_GATE": mode}, clear=False), \
+             mock.patch.object(sys, "argv", ["code_gate.py", "--agent", "codex"]), \
+             mock.patch.object(sys, "stdin", io.StringIO(json.dumps(data))), \
+             contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            try:
+                code_gate.main()
+            except SystemExit as error:
+                return error.code, stdout.getvalue(), stderr.getvalue()
+        return None, stdout.getvalue(), stderr.getvalue()
+
     def write_active_plan(self, root, content):
         path = root / "workspace/tasks/active/example/plan.md"
         path.parent.mkdir(parents=True)
         path.write_text(content, encoding="utf-8")
+
+    def write_current_task(self, root, name="example"):
+        path = root / "workspace/tasks/CURRENT_TASK"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(name + "\n", encoding="utf-8")
 
     def run_plan_hash_cli(self, *args):
         old_argv = sys.argv
@@ -294,7 +319,7 @@ class PlanHashTest(unittest.TestCase):
             approved = self.new_plan_hash()
             changed = NEW_PLAN.replace("oldhash", approved).replace("결과를 만든다.", "다른 결과를 만든다.")
             self.write_active_plan(root, changed)
-            code, output, error = self.run_gate(root, "warn")
+            code, output, error = self.run_gate_main(root, "warn")
             self.assertEqual(code, 0)
             self.assertIn("승인해시가 현재 승인 대상과 일치하지 않습니다", output)
             self.assertEqual(error, "")
@@ -302,6 +327,52 @@ class PlanHashTest(unittest.TestCase):
             self.assertEqual(code, 2)
             self.assertEqual(output, "")
             self.assertIn("승인해시가 현재 승인 대상과 일치하지 않습니다", error)
+
+    def test_warn_mode_blocks_selected_critical_task_with_hash_issue(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            approved = self.new_plan_hash()
+            critical = NEW_PLAN.replace("실패비용: major", "실패비용: critical").replace(
+                "oldhash", approved
+            ).replace("결과를 만든다.", "승인 뒤 변경된 결과를 만든다.")
+            self.write_active_plan(root, critical)
+            self.write_current_task(root)
+            code, output, error = self.run_gate_main(root, "warn")
+            self.assertEqual(code, 2)
+            self.assertEqual(output, "")
+            self.assertIn("계획 승인 기록 복구 필요", error)
+
+    def test_warn_mode_does_not_block_unselected_critical_task_with_hash_issue(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            approved = self.new_plan_hash()
+            critical = NEW_PLAN.replace("실패비용: major", "실패비용: critical").replace(
+                "oldhash", approved
+            ).replace("결과를 만든다.", "승인 뒤 변경된 결과를 만든다.")
+            self.write_active_plan(root, critical)
+            code, output, error = self.run_gate(root, "warn")
+            self.assertEqual(code, 0)
+            self.assertIn("계획 승인 기록 복구 필요", output)
+            self.assertEqual(error, "")
+
+    def test_warn_mode_blocks_selected_critical_task_before_approval(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pre_approval = NEW_PLAN.replace("실패비용: major", "실패비용: critical").replace(
+                "상태: 구현 중", "상태: 설계 완료"
+            ).replace("승인해시: oldhash", '승인해시: ""')
+            self.write_active_plan(root, pre_approval)
+            self.write_current_task(root)
+            code, output, error = self.run_gate_main(root, "warn")
+            self.assertEqual(code, 2)
+            self.assertEqual(output, "")
+            self.assertIn("critical 작업 시작 전 승인 필요", error)
+
+    def test_current_task_rejects_path_traversal_value(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_current_task(root, "../other-task")
+            self.assertIsNone(code_gate.read_current_task(str(root)))
 
     def test_gate_rejects_new_format_without_specification_heading(self):
         with tempfile.TemporaryDirectory() as directory:

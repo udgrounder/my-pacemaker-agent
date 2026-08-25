@@ -6,8 +6,10 @@ import subprocess
 import sys
 import errno
 import shutil
+import stat
 import tempfile
 import unittest
+import zipfile
 from unittest import mock
 from pathlib import Path
 
@@ -98,6 +100,108 @@ class ReleaseManagerTest(unittest.TestCase):
             release_manager.deployment_dry_run(argparse.Namespace(
                 manifest=str(manifest), target=str(target), target_ref="target"))
         self.assertFalse((release_manager.DEPLOYMENT_RECEIPTS / "target").exists())
+
+    def test_deployment_rejects_runtime_parent_symlink(self):
+        manifest = self.prepare()
+        target = self.root / "target"
+        external = self.root / "external-mpa"
+        self.write_runtime(external / "runtime", "old")
+        target.mkdir()
+        os.symlink(external, target / ".mpa")
+
+        with self.assertRaisesRegex(ValueError, "Runtime path contains an unsupported symlink"):
+            release_manager.deployment_dry_run(argparse.Namespace(
+                manifest=str(manifest), target=str(target), target_ref="target"))
+
+    def test_deploy_rejects_backup_symlink_before_writing(self):
+        manifest = self.prepare()
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        external = self.root / "external-backups"
+        external.mkdir()
+        os.symlink(external, target / ".mpa/backups")
+        release_manager.deployment_dry_run(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target"))
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
+
+        with self.assertRaisesRegex(ValueError, "Runtime backup path contains an unsupported symlink"):
+            release_manager.deploy(argparse.Namespace(
+                manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
+                dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+        self.assertFalse(any(external.iterdir()))
+
+    def test_deployment_dry_run_rejects_config_parent_symlink_for_migration(self):
+        manifest = self.prepare({"schema_version": 2, "additive_defaults": {"runtime.enabled": True}})
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        external = self.root / "external-config"
+        external.mkdir()
+        (target / ".mpa").mkdir(exist_ok=True)
+        os.symlink(external, target / ".mpa/config")
+
+        with self.assertRaisesRegex(ValueError, "does not follow config.yaml symlinks"):
+            release_manager.deployment_dry_run(argparse.Namespace(
+                manifest=str(manifest), target=str(target), target_ref="target"))
+
+    def test_rollback_rejects_runtime_and_backup_symlinks(self):
+        target = self.root / "target"
+        target.mkdir()
+        external_runtime = self.root / "external-runtime"
+        self.write_runtime(external_runtime, "old")
+        (target / ".mpa").mkdir()
+        os.symlink(external_runtime, target / ".mpa/runtime")
+
+        with self.assertRaisesRegex(ValueError, "Runtime path contains an unsupported symlink"):
+            release_manager.rollback(argparse.Namespace(
+                target=str(target), target_ref="target", backup=".mpa/backups/backup",
+                release_id="release", verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
+
+        (target / ".mpa/runtime").unlink()
+        self.write_runtime(target / ".mpa/runtime", "old")
+        external_backups = self.root / "external-backups"
+        external_backups.mkdir()
+        os.symlink(external_backups, target / ".mpa/backups")
+
+        with self.assertRaisesRegex(ValueError, "Runtime backup path contains an unsupported symlink"):
+            release_manager.rollback(argparse.Namespace(
+                target=str(target), target_ref="target", backup=".mpa/backups/backup",
+                release_id="release", verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
+
+    def test_required_directories_reject_symlink(self):
+        target = self.root / "target"
+        external = self.root / "external-workspace"
+        external.mkdir()
+        target.mkdir()
+        os.symlink(external, target / "workspace")
+
+        with self.assertRaisesRegex(ValueError, "required project path contains an unsupported symlink"):
+            release_manager.ensure_required_project_directories(target)
+
+    def test_extract_runtime_rejects_special_file(self):
+        archive = self.root / "special.zip"
+        with zipfile.ZipFile(archive, "w") as bundle:
+            info = zipfile.ZipInfo("named-pipe")
+            info.external_attr = (stat.S_IFIFO | 0o644) << 16
+            bundle.writestr(info, b"")
+
+        with self.assertRaisesRegex(ValueError, "release package extraction failed"):
+            release_manager._extract_runtime(archive, self.root / "staging")
+
+    def test_extract_runtime_rejects_symlink_and_type_mismatch(self):
+        cases = (
+            ("link", stat.S_IFLNK | 0o777),
+            ("directory-without-slash", stat.S_IFDIR | 0o755),
+            ("regular-file/", stat.S_IFREG | 0o644),
+        )
+        for index, (name, mode) in enumerate(cases):
+            with self.subTest(name=name):
+                archive = self.root / f"invalid-type-{index}.zip"
+                with zipfile.ZipFile(archive, "w") as bundle:
+                    info = zipfile.ZipInfo(name)
+                    info.external_attr = mode << 16
+                    bundle.writestr(info, b"")
+                with self.assertRaisesRegex(ValueError, "release package extraction failed"):
+                    release_manager._extract_runtime(archive, self.root / f"staging-{index}")
 
     def test_prepare_release_rejects_invalid_packaged_hook(self):
         hook = release_manager.RUNTIME_SOURCE / "hooks" / "session_start.py"

@@ -3,6 +3,7 @@ import tempfile
 import unittest
 import json
 import importlib.util
+import os
 from pathlib import Path
 
 import project_config
@@ -174,6 +175,42 @@ class InstallDryRunTest(unittest.TestCase):
             self.assertIn("differs from configured root_path", rendered)
             self.assertNotIn("/old/private/project", rendered)
 
+    def test_config_symlink_is_warning_instead_of_internal_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "target"
+            target.mkdir()
+            external = Path(directory) / "external.yaml"
+            external.write_text("schema_version: 1\nproject: {}\n", encoding="utf-8")
+            config = target / ".mpa/config/config.yaml"
+            config.parent.mkdir(parents=True)
+            os.symlink(external, config)
+
+            result = project_config.inspect_project_config(target)
+
+            self.assertEqual(result["status"], "warning")
+            self.assertIn("unsupported symlink", result["warnings"][0])
+            audit = project_config.audit_project_config(target)
+            self.assertEqual(audit["status"], "warning")
+            self.assertNotIn("semantic_checksum", audit)
+
+    def test_config_parent_symlink_is_warning_without_reading_external_config(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "target"
+            target.mkdir()
+            external = Path(directory) / "external-config"
+            external.mkdir()
+            (external / "config.yaml").write_text("schema_version: 1\nproject: {}\n", encoding="utf-8")
+            (target / ".mpa").mkdir()
+            os.symlink(external, target / ".mpa/config")
+
+            result = project_config.inspect_project_config(target)
+            audit = project_config.audit_project_config(target)
+
+            self.assertEqual(result["status"], "warning")
+            self.assertIn("unsupported symlink", result["warnings"][0])
+            self.assertEqual(audit["status"], "warning")
+            self.assertNotIn("semantic_checksum", audit)
+
     def test_existing_install_rejection_preserves_workspace_docs_and_agent_settings(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory)
@@ -204,6 +241,42 @@ class InstallDryRunTest(unittest.TestCase):
             self.assertIn("실험적·수동 설정 지원", result.stdout)
             self.assertIn("자동 진입점·규칙 파일·hook 연결은 수행하지 않습니다", result.stdout)
             self.assertFalse((target / "OPENAGENT.md").exists())
+
+    def test_clean_install_wires_native_agent_files_to_current_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            result = subprocess.run(
+                ["python3", "install.py", "--project", str(target),
+                 "--agents", "claude,codex,antigravity"],
+                cwd=ROOT, text=True, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            for path in (
+                target / "CLAUDE.md",
+                target / "AGENTS.md",
+                target / "GEMINI.md",
+                target / ".claude/agents/mpa_pacemaker.md",
+                target / ".codex/agents/mpa_pacemaker.toml",
+                target / ".agents/rules/mpa_pacemaker.md",
+            ):
+                content = path.read_text(encoding="utf-8")
+                self.assertIn(".mpa/runtime/core/agent_rules.md", content, path)
+                self.assertNotIn(".mpa-workspace", content, path)
+
+            for settings, scripts in (
+                (target / ".claude/settings.json", ("session_start.py", "code_gate.py", "turn_end.py")),
+                (target / ".codex/hooks.json", ("session_start.py", "code_gate.py", "turn_end.py")),
+            ):
+                rendered = settings.read_text(encoding="utf-8")
+                self.assertIn(".mpa/runtime/hooks", rendered, settings)
+                self.assertNotIn(".mpa-workspace", rendered, settings)
+                for script in scripts:
+                    self.assertTrue((target / ".mpa/runtime/hooks" / script).is_file(), script)
+
+    def test_current_hook_marker_recognizes_current_runtime_command(self):
+        entries = [{"hooks": [{"command": "python3 .mpa/runtime/hooks/code_gate.py --agent codex"}]}]
+        self.assertTrue(install._block_already_registered(entries))
 
     def test_codex_hook_commands_and_scripts_smoke(self):
         block = install.build_hook_block("codex")

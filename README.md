@@ -234,7 +234,7 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 | 스크립트 | 이벤트 | 차단 | 하는 일 |
 |---------|--------|------|--------|
 | `session_start.py` | SessionStart | ❌ | 진행 작업 항목 + 라우팅 규칙 주입 |
-| `code_gate.py` | PreToolUse(편집 도구) | ✅ | `구현 중` plan 없이 소스 수정 시 차단 |
+| `code_gate.py` | PreToolUse(편집 도구) | 조건부 | 기본은 절차 경고, 선택한 `critical` 작업의 승인 무결성 오류와 strict 모드에서는 차단 |
 | `turn_end.py` | Stop | ❌ | changelog/memory 갱신 리마인드 |
 
 하드 차단(실제로 작업을 막는 것)은 `code_gate.py` 하나뿐이고, 나머지는 컨텍스트 주입·리마인드(보조)다.
@@ -243,8 +243,8 @@ my-pacemaker-agent/                   ← 마스터 레포 (git)
 
 | 값 | 동작 |
 |----|------|
-| `block` (기본) | 조건 불충족 시 소스 수정 차단 |
-| `warn` | 차단하지 않고 경고만 주입 |
+| `block` | 모든 게이트 위반 시 소스 수정 차단 (명시적 strict 모드) |
+| `warn` (기본) | 일반 위반은 경고만 주입. 선택한 `critical` 작업의 승인 누락·승인해시 불일치는 차단 |
 | `off` | 게이트 비활성 |
 
 ```bash
@@ -261,6 +261,12 @@ MPA_GATE=off claude     # 또는 codex / gemini — 잠시 끄기
 | gemini(antigravity) | `.gemini/settings.json` | SessionStart / BeforeTool / AfterAgent |
 
 스크립트는 `--agent` 플래그로 이벤트 명칭 등 출력 형식을 맞춘다. 차단은 exit 2 + stderr로 3개 agent 공통이다.
+
+### 현재 작업 선택과 위험도 적응형 차단
+
+사용자가 기존 작업을 재개하거나 새 작업을 선택한 뒤, agent는 선택한 폴더명 한 줄을 `workspace/tasks/CURRENT_TASK`에 기록한다. 예: `20260824_project_hardening`.
+
+기본 `warn` 모드에서 과거 active 작업의 이상은 경고로만 남긴다. 다만 `CURRENT_TASK`가 가리키는 작업의 `실패비용`이 `critical`이면, 승인 전 상태 또는 승인해시 불일치에서 소스 수정을 차단한다. 이로써 오래된 작업의 기록 오류가 관련 없는 작업을 막지 않으면서, 실제로 재개한 고위험 작업은 승인 절차를 우회할 수 없다. `MPA_GATE=block`은 선택 여부와 관계없이 모든 active 작업에 엄격하게 적용한다.
 
 ### 알려진 한계 (정직하게)
 

@@ -43,6 +43,16 @@ def config_path(project_root: Path) -> Path:
     return project_root.resolve() / CONFIG_RELATIVE
 
 
+def _has_symlink_component(root: Path, relative: str) -> bool:
+    """Return whether an existing component below ``root`` is a symlink."""
+    current = root.resolve()
+    for part in Path(relative).parts:
+        current /= part
+        if current.is_symlink():
+            return True
+    return False
+
+
 def _quoted(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
@@ -165,9 +175,9 @@ def inspect_project_config(project_root: Path) -> dict[str, object]:
     """Return a non-mutating plan for config initialization or additive update."""
     root = project_root.resolve()
     path = config_path(root)
-    if path.is_symlink():
-        return {"status": "warning", "schema_version": normalized["schema_version"], "add": [],
-                "skipped": [], "warnings": ["config.yaml symlink is not supported for migration"]}
+    if _has_symlink_component(root, CONFIG_RELATIVE):
+        return {"path": CONFIG_RELATIVE, "status": "warning", "add": [], "skipped": [],
+                "warnings": ["config.yaml path contains an unsupported symlink"]}
     if not path.exists():
         return {
             "path": CONFIG_RELATIVE,
@@ -359,7 +369,7 @@ def preview_runtime_config_migration(project_root: Path, migration: object) -> d
         return {"status": "none", "schema_version": None, "add": [], "skipped": []}
     root = project_root.resolve()
     path = config_path(root)
-    if path.is_symlink():
+    if _has_symlink_component(root, CONFIG_RELATIVE):
         raise ValueError("runtime config migration does not follow config.yaml symlinks")
     if not path.exists():
         base = [
@@ -390,7 +400,7 @@ def apply_runtime_config_migration(project_root: Path, migration: object, *, wri
         return {"status": "none", "schema_version": None, "add": [], "skipped": []}
     root = project_root.resolve()
     path = config_path(root)
-    if path.is_symlink():
+    if _has_symlink_component(root, CONFIG_RELATIVE):
         raise ValueError("runtime config migration does not follow config.yaml symlinks")
     if not path.exists():
         ensure_project_config(root, write=write)
@@ -451,7 +461,7 @@ def audit_project_config(project_root: Path) -> dict[str, object]:
     path = config_path(root)
     result = inspect_project_config(root)
     findings = list(result.get("warnings", []))
-    if path.is_file():
+    if not _has_symlink_component(root, CONFIG_RELATIVE) and path.is_file():
         lines = _read_lines(path)
         values = _known_values(lines)
         if values.get("root_path", "").startswith("/") and str(root) != values["root_path"].strip('"\''):

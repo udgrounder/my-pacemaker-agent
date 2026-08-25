@@ -40,7 +40,7 @@ HOOK_SETTINGS_PATH = {
 }
 
 HOOK_DIR_REL = ".mpa/runtime/hooks"
-HOOK_MARKER = "mpa-workspace/hooks"  # 멱등성 판별용 (이미 등록됐는지)
+HOOK_MARKER = ".mpa/runtime/hooks"  # 멱등성 판별용 (이미 등록됐는지)
 
 
 def _hook_cmd(script: str, agent: str) -> str:
