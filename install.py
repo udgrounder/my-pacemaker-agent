@@ -32,6 +32,11 @@ AGENT_CONFIG_MAP = {
     "openagent":    None,   # 실험적·수동 설정 지원 — 자동 진입점 주입 없음
 }
 
+# 신규 설치에서는 세 일반 지원 agent의 진입점 문서를 모두 제공한다. 다만 native
+# 설정 파일과 hook은 사용자가 선택한 agent에만 연결해, 사용하지 않는 agent의
+# 실행 설정을 임의로 활성화하지 않는다.
+DEFAULT_GUIDE_AGENTS = ("claude", "codex", "antigravity")
+
 # hook 자동 와이어링이 확인된 agent와 설정 파일 경로 (프로젝트 루트 기준)
 # antigravity는 hook 지원 확인이 필요하고, openagent는 실험적·수동 설정 지원이다.
 HOOK_SETTINGS_PATH = {
@@ -56,10 +61,17 @@ def _hook_cmd(script: str, agent: str) -> str:
         # Claude Code 공식 지원 변수 (code.claude.com/docs/en/hooks.md)
         return f"python3 ${{CLAUDE_PROJECT_DIR}}/{HOOK_DIR_REL}/{script} --agent {agent}"
     if agent == "codex":
-        # 환경변수 지원 여부가 불확실해 git 저장소 루트를 직접 탐색한다
+        # 환경변수 지원 여부가 불확실해 git 저장소 루트를 직접 탐색한다.
+        # 비-Git 프로젝트에서는 현재 디렉터리부터 상위로 .mpa/runtime를 찾아
+        # 하위 디렉터리에서 시작한 session도 프로젝트 Runtime을 사용하게 한다.
         return (
-            'bash -c \'cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" '
-            f"&& python3 {HOOK_DIR_REL}/{script} --agent {agent}'"
+            "bash -c 'root=$(git rev-parse --show-toplevel 2>/dev/null || true); "
+            'if [ -z "$root" ]; then root=$(pwd -P); '
+            'while [ "$root" != "/" ] && [ ! -d "$root/.mpa/runtime" ]; do '
+            'root=$(dirname "$root"); done; fi; '
+            'if [ ! -d "$root/.mpa/runtime" ]; then '
+            'echo "MPA Runtime root not found" >&2; exit 2; fi; '
+            f'cd "$root" && python3 {HOOK_DIR_REL}/{script} --agent {agent}\''
         )
     # 그 외 agent(hook 자동 배선 미지원) — 기존 방식 유지, 회귀 없음
     return f"python3 {HOOK_DIR_REL}/{script} --agent {agent}"
@@ -299,6 +311,18 @@ def append_agent_config(agent: str, project_path: Path):
         print(f"  [생성] {filename}")
 
 
+def create_missing_agent_guides(project_path: Path):
+    """지원 agent의 guide 문서가 없으면 모두 생성한다.
+
+    선택하지 않은 agent에는 guide 문서만 제공한다. native 설정과 hook은 아래의
+    선택 agent 처리에서만 추가되므로, 다른 agent의 실행 동작은 활성화되지 않는다.
+    """
+    for agent in DEFAULT_GUIDE_AGENTS:
+        filename = AGENT_CONFIG_MAP[agent]
+        if not (project_path / filename).exists():
+            append_agent_config(agent, project_path)
+
+
 def copy_agent_spec_files(agent: str, project_path: Path):
     """agent-specs/{agent}/files/ 의 파일을 프로젝트에 복사한다 (없는 경우만)."""
     files_src = AGENT_SPECS_SRC / agent / "files"
@@ -439,6 +463,8 @@ def run_install(project_path: Path, agents: list, upgrade: bool, runtime_config=
     make_hooks_executable(project_path)
 
     print("\n[마지막] agent 설정 적용")
+    print("\n  ── 공용 agent guide ──")
+    create_missing_agent_guides(project_path)
     for agent in agents:
         print(f"\n  ── {agent} ──")
         append_agent_config(agent, project_path)

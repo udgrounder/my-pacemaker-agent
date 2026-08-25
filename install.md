@@ -224,8 +224,7 @@ python3 release_manager.py rollback \
     └── rules/mpa_pacemaker.md  ← native 폴더에 직접 배치
 ```
 
-> **hook 동작:** `.mpa/runtime/hooks/` 의 스크립트가 세션 시작 시 진행 태스크·라우팅 규칙을 주입하고,
-> `plan.md` 상태가 `구현 중`인 active 태스크 없이 소스코드를 수정하면 차단한다.
+> **hook 동작:** `.mpa/runtime/hooks/` 의 스크립트가 세션 시작 시 진행 태스크·라우팅 규칙을 주입한다. 기본 `MPA_GATE=warn`에서는 `구현 중` 태스크 없는 소스 수정을 경고로 안내한다. 사용자가 `workspace/tasks/CURRENT_TASK`로 선택한 critical 작업의 승인 전·승인해시 불일치는 차단하며, `MPA_GATE=block`은 모든 active 작업에 엄격하게 적용한다.
 > 구현 승인 후에는 `plan_hash.py approve`로 `승인해시`를 갱신하며, 이후 plan.md 본문이 바뀌면 재승인이 필요하다.
 > Codex는 `.codex/hooks.json`의 `PreToolUse` matcher에 `apply_patch|write_file|replace|edit` 등을 포함해 게이트 실효성을 확보한다.
 > 게이트 강도는 환경변수 `MPA_GATE`(block/warn/off)로 조절한다.

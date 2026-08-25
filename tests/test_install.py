@@ -43,6 +43,40 @@ class InstallDryRunTest(unittest.TestCase):
             self.assertIn('name: "' + target.name + '"', config)
             self.assertIn('root_path: "' + str(target.resolve()) + '"', config)
 
+    def test_new_install_creates_all_missing_agent_guides_but_wires_only_selected_agent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            result = subprocess.run(
+                ["python3", "install.py", "--project", str(target), "--agents", "codex"],
+                cwd=ROOT, text=True, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            for filename in ("CLAUDE.md", "AGENTS.md", "GEMINI.md"):
+                content = (target / filename).read_text(encoding="utf-8")
+                self.assertIn("## Agents Workspace", content, filename)
+                self.assertIn(".mpa/runtime/core/agent_rules.md", content, filename)
+
+            self.assertTrue((target / ".codex/hooks.json").is_file())
+            self.assertFalse((target / ".claude/settings.json").exists())
+            self.assertFalse((target / ".gemini/settings.json").exists())
+
+    def test_missing_guides_are_created_without_modifying_existing_unselected_guide(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            original = "# 사용자 Claude 규칙\n변경하지 않는다.\n"
+            (target / "CLAUDE.md").write_text(original, encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", "install.py", "--project", str(target), "--agents", "codex"],
+                cwd=ROOT, text=True, capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((target / "CLAUDE.md").read_text(encoding="utf-8"), original)
+            self.assertTrue((target / "AGENTS.md").exists())
+            self.assertTrue((target / "GEMINI.md").exists())
+
     def test_new_install_applies_runtime_config_defaults_and_project_references(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "runtime-project"
@@ -286,6 +320,23 @@ class InstallDryRunTest(unittest.TestCase):
             result = subprocess.run(["python3", ".mpa/runtime/hooks/" + script, "--help"],
                                     cwd=ROOT, text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_codex_hook_finds_runtime_from_nested_non_git_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "non-git-project"
+            result = subprocess.run(
+                ["python3", "install.py", "--project", str(target), "--agents", "codex"],
+                cwd=ROOT, text=True, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            nested = target / "workspace" / "tasks"
+            command = install.build_hook_block("codex")["SessionStart"][0]["hooks"][0]["command"]
+            result = subprocess.run(
+                command, shell=True, cwd=nested, text=True,
+                input='{"cwd": "' + str(nested) + '"}', capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("[my-pacemaker-agent] 세션 시작 루틴", result.stdout)
 
 
 if __name__ == "__main__":

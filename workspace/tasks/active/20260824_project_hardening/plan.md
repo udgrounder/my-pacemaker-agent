@@ -4,7 +4,7 @@
 타입: major
 실패비용: critical
 상태: 구현 중
-승인해시: reqspec-v1:c40c43beaadff725
+승인해시: reqspec-v1:fb71ee35cdfdbbc5
 승인대상: 요구사항 명세
 ---
 
@@ -53,6 +53,7 @@
 
 - 사용자 불편을 최소화하기 위해 모든 작업을 기본 차단하지 않는다. 일반 작업은 절차 안내·경고를 기본으로 하고, critical 작업·release/deploy와 승인 무결성 위반처럼 실패 비용이 큰 상황에서만 강한 차단을 적용하는 위험도 적응형 gate를 설계한다. 사용자는 필요 시 strict block 모드를 명시적으로 선택할 수 있어야 한다.
 - `critical`의 기본 차단은 사용자가 선택·재개하여 `workspace/tasks/CURRENT_TASK`로 식별한 작업에만 적용한다. 선택되지 않은 기존 active task의 이상은 경고로 남기며, 모든 active task에 대한 전역 차단은 명시적 `MPA_GATE=block`에서만 적용한다. release/deploy/rollback의 사전 차단은 작업 선택과 무관하게 유지한다.
+- 신규 설치에서 누락된 Claude·Codex·Gemini guide 문서는 모두 생성한다. 다만 native 설정·hook은 사용자가 선택한 agent에만 연결하며, 기존의 선택하지 않은 agent guide 문서는 수정하지 않는다.
 - 보완은 다음 3개 하위 작업으로 순차 진행한다: Runtime wiring, adaptive gate·plan integrity, release boundary·CI.
 - 이미 완료된 작업의 plan·이력·artifact는 처리하지 않는다. 진행 중인 기존 작업은 사용자가 해당 작업을 다시 요청할 때에만 현재 보완 내용을 범위에 흡수하고 정상 승인 절차를 밟는다.
 - legacy 문자열 검사는 활성 source·agent 설정·배포 package에만 적용한다. immutable release·receipt·backup·완료 task 이력은 보존하고 검사 실패 대상으로 삼지 않는다.
@@ -216,6 +217,7 @@
 | 독립 검증에서 config 상위 symlink·rollback symlink·ZIP 파일 유형별 거부 테스트가 부족함을 확인 | 구현은 통과했으나 critical 경계의 회귀 증빙을 완결해야 함 | 없음 |
 | 독립 검증에서 발견된 경계 분기를 회귀 테스트로 추가 | config parent·deploy/rollback·archive type 분기까지 차단 증빙을 완결 | 없음 |
 | CURRENT_TASK로 사용자 선택 task를 식별하고 선택된 critical task의 승인 전·승인해시 오류만 기본 차단 | 과거 active critical task의 오류가 관련 없는 일상 수정을 전역 차단하지 않게 하면서 재개한 고위험 작업은 보호 | 사용자 정책 명확화·승인 반영 |
+| 비-Git 프로젝트 하위 폴더에서 Codex hook이 상위 `.mpa/runtime`을 찾도록 보완하고, 신규 설치의 누락 guide 문서를 3개 agent용으로 생성 | 설치 검토에서 hook 경로 실패와 agent 전환 시 guide 문서 누락을 재현 | 사용자 요청 반영 |
 
 ## 명세 변경 이력
 
@@ -233,3 +235,4 @@
 **파생된 작업 항목:**
 - (사용자 결정 후 필요 시 추가)
 | 2026-08-24T11:25:01Z | reqspec-v1:307bd6a456ea0ac6 | reqspec-v1:c40c43beaadff725 | 선택·재개한 critical 작업만 기본 차단하고 전역 strict 차단은 MPA_GATE=block으로 한정 |
+| 2026-08-25T01:55:21Z | reqspec-v1:c40c43beaadff725 | reqspec-v1:fb71ee35cdfdbbc5 | 비-Git 하위 폴더 Codex hook 경로 보완 및 누락된 Claude·Codex·Gemini guide 문서 공통 생성 |
