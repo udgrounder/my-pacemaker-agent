@@ -363,9 +363,12 @@ class ReleaseManagerTest(unittest.TestCase):
             manifest=str(manifest), target=str(target_root), target_ref="test-target", verified_by="test",
             dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
         backup = next((target_root / ".mpa/backups").iterdir())
-        self.assertTrue((backup / "runtime" / ".mpa/runtime" / ".mpa-version").is_file())
-        self.assertFalse((backup / "AGENTS.md").exists())
-        self.assertFalse((backup / "runtime-config" / "config.yaml").exists())
+        self.assertTrue(backup.is_dir())
+        with zipfile.ZipFile(backup / "runtime.zip") as archive:
+            self.assertIn(".mpa/runtime/.mpa-version", archive.namelist())
+            self.assertNotIn("AGENTS.md", archive.namelist())
+        self.assertFalse((backup / "runtime").exists())
+        self.assertFalse((backup / "runtime-config/config.yaml").exists())
         release_manager.rollback(argparse.Namespace(
             target=str(target_root), target_ref="test-target", backup=str(backup.relative_to(target_root)),
             release_id=release_id, verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
@@ -408,7 +411,7 @@ class ReleaseManagerTest(unittest.TestCase):
         manifest_data = json.loads(manifest.read_text(encoding="utf-8"))
         self.assertNotIn(str(target), json.dumps(manifest_data))
         backup = next((target / ".mpa/backups").iterdir())
-        self.assertEqual((backup / "runtime-config" / "config.yaml").read_text(encoding="utf-8"), original)
+        self.assertEqual((backup / "runtime-config/config.yaml").read_text(encoding="utf-8"), original)
         release_manager.rollback(argparse.Namespace(target=str(target), target_ref="target", backup=str(backup.relative_to(target)),
                                                     release_id=release_id, verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
         self.assertEqual(config.read_text(encoding="utf-8"), original)
@@ -437,9 +440,9 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertIn('project_name: "legacy-target"', config.read_text(encoding="utf-8"))
         backup = next((target / ".mpa/backups").iterdir())
         metadata = json.loads((backup / "backup-metadata.json").read_text(encoding="utf-8"))
+        self.assertFalse((backup / "runtime-config/config.yaml").exists())
         self.assertTrue(metadata["config_snapshot"]["included"])
         self.assertFalse(metadata["config_snapshot"]["existed"])
-        self.assertFalse((backup / "runtime-config" / "config.yaml").exists())
 
         release_manager.rollback(argparse.Namespace(
             target=str(target), target_ref="legacy-target", backup=str(backup.relative_to(target)),
@@ -470,15 +473,17 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertFalse((target / "workspace").exists())
         self.assertEqual((target / "docs").read_text(encoding="utf-8"), "user file")
 
-    def test_runtime_backup_retention_keeps_the_newest_three_directories_only(self):
+    def test_runtime_backup_retention_keeps_the_newest_three_runtime_zip_backups_only(self):
         target = self.root / "target"
         backups = target / ".mpa/backups"
         for index in range(4):
             backup = backups / f"backup-{index}"
-            backup.mkdir(parents=True)
+            backup.mkdir(parents=True, exist_ok=True)
             (backup / release_manager.BACKUP_MARKER).write_text(json.dumps({
                 "kind": "runtime_backup", "status": "successful", "release_id": f"release-{index}"
             }), encoding="utf-8")
+            with zipfile.ZipFile(backup / "runtime.zip", "w") as archive:
+                archive.writestr(".mpa/runtime/rule.md", "old")
             timestamp = 1_700_000_000 + index
             os.utime(backup, (timestamp, timestamp))
         note = backups / "operator-note.txt"
@@ -492,6 +497,200 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertEqual(removed, ["backup-0"])
         self.assertEqual(sorted(path.name for path in backups.iterdir()),
                          ["backup-1", "backup-2", "backup-3", "operator-note.txt", "operator-snapshot"])
+
+    def test_history_cleanup_dry_run_lists_all_managed_candidates_without_writing(self):
+        for index in range(11):
+            bundle = release_manager.RELEASES / f"release-{index}"
+            bundle.mkdir(parents=True)
+            os.utime(bundle, (1_700_000_000 + index, 1_700_000_000 + index))
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        release_manager.remember_local_target(target, "target")
+        history = target / ".mpa/runtime/history/releases"
+        receipts = release_manager.DEPLOYMENT_RECEIPTS / "target"
+        backups = target / ".mpa/backups"
+        for index in range(11):
+            entry = history / f"release-{index}.json"
+            entry.parent.mkdir(parents=True, exist_ok=True)
+            entry.write_text("{}", encoding="utf-8")
+            receipt = receipts / f"deploy-{index}.json"
+            receipt.parent.mkdir(parents=True, exist_ok=True)
+            receipt.write_text("{}", encoding="utf-8")
+            timestamp = 1_700_000_000 + index
+            os.utime(entry, (timestamp, timestamp)); os.utime(receipt, (timestamp, timestamp))
+        for index in range(4):
+            backup = backups / f"backup-{index}"
+            backup.mkdir(parents=True)
+            (backup / release_manager.BACKUP_MARKER).write_text(json.dumps({
+                "kind": "runtime_backup", "status": "successful"
+            }), encoding="utf-8")
+            with zipfile.ZipFile(backup / "runtime.zip", "w") as archive:
+                archive.writestr(".mpa/runtime/rule.md", "old")
+            timestamp = 1_700_000_000 + index
+            os.utime(backup, (timestamp, timestamp))
+
+        result = release_manager.history_cleanup_candidates()
+
+        self.assertEqual(result["release_bundles"], ["release-0"])
+        self.assertEqual(result["targets"], [{"target_ref": "target", "deployment_history": ["release-0.json"],
+                                               "deployment_receipts": ["deploy-0.json"],
+                                               "runtime_backups": ["backup-0"]}])
+        self.assertTrue((release_manager.RELEASES / "release-0").exists())
+        self.assertTrue((history / "release-0.json").exists())
+        self.assertTrue((receipts / "deploy-0.json").exists())
+        self.assertTrue((backups / "backup-0").exists())
+
+    def test_history_cleanup_apply_requires_approval_and_removes_only_reviewed_candidates(self):
+        for index in range(2):
+            bundle = release_manager.RELEASES / f"release-{index}"
+            bundle.mkdir(parents=True)
+            os.utime(bundle, (1_700_000_000 + index, 1_700_000_000 + index))
+        with self.assertRaisesRegex(ValueError, "approved-by, approval-ref, and rollback-owner are required"):
+            release_manager.history_cleanup(argparse.Namespace(
+                keep=1, backup_keep=1, apply=True, approved_by="", approval_ref="unit", rollback_owner="test"))
+        release_manager.history_cleanup(argparse.Namespace(
+            keep=1, backup_keep=1, apply=True, approved_by="test", approval_ref="unit", rollback_owner="test"))
+        self.assertFalse((release_manager.RELEASES / "release-0").exists())
+        self.assertTrue((release_manager.RELEASES / "release-1").exists())
+
+    def test_successful_deploy_keeps_only_a_verified_runtime_zip_backup(self):
+        manifest = self.prepare()
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        release_manager.deployment_dry_run(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target"))
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
+
+        with mock.patch.object(release_manager, "prune_runtime_backups") as prune:
+            release_manager.deploy(argparse.Namespace(
+                manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
+                dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+        prune.assert_not_called()
+
+        backups = list((target / ".mpa/backups").iterdir())
+        self.assertEqual(len(backups), 1)
+        self.assertTrue(backups[0].is_dir())
+        self.assertTrue((backups[0] / "runtime.zip").is_file())
+        self.assertFalse((backups[0] / "runtime").exists())
+        release_id = json.loads(manifest.read_text(encoding="utf-8"))["release_id"]
+        self.assertEqual(release_manager._validate_backup(backups[0], release_id)["release_id"], release_id)
+
+    def test_backup_archive_failure_restores_runtime_and_preserves_directory_snapshot(self):
+        manifest = self.prepare()
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        release_manager.deployment_dry_run(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target"))
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
+
+        with mock.patch.object(release_manager, "archive_backup", side_effect=OSError("archive failed")):
+            with self.assertRaisesRegex(OSError, "archive failed"):
+                release_manager.deploy(argparse.Namespace(
+                    manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
+                    dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+
+        self.assertEqual((target / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "old")
+        self.assertTrue(any(path.is_dir() for path in (target / ".mpa/backups").iterdir()))
+        self.assertFalse(any((path / "runtime.zip").exists() for path in (target / ".mpa/backups").iterdir() if path.is_dir()))
+
+    def test_migrate_runtime_backups_replaces_only_legacy_runtime_tree(self):
+        target = self.root / "target"
+        backup = target / ".mpa/backups" / "release-1"
+        self.write_runtime(backup / "runtime/.mpa/runtime", "old")
+        release_manager._write_backup_marker(backup, "release-1", {})
+
+        release_manager.migrate_runtime_backups(argparse.Namespace(
+            target=str(target), approved_by="test", approval_ref="unit", rollback_owner="test"))
+
+        self.assertFalse((backup / "runtime").exists())
+        self.assertTrue((backup / "runtime.zip").is_file())
+        self.assertEqual(release_manager._validate_backup(backup, "release-1")["release_id"], "release-1")
+        metadata = json.loads((backup / release_manager.BACKUP_MARKER).read_text(encoding="utf-8"))
+        self.assertEqual(metadata["archive_migration"]["status"], "completed")
+        self.assertTrue(metadata["archive_migration"]["source_runtime_removed"])
+
+    def test_migrate_runtime_backups_preserves_legacy_runtime_after_archive_failure(self):
+        target = self.root / "target"
+        backup = target / ".mpa/backups" / "release-1"
+        self.write_runtime(backup / "runtime/.mpa/runtime", "old")
+        release_manager._write_backup_marker(backup, "release-1", {})
+
+        with mock.patch.object(release_manager, "archive_backup", side_effect=OSError("archive failed")):
+            with self.assertRaisesRegex(ValueError, "originals were preserved"):
+                release_manager.migrate_runtime_backups(argparse.Namespace(
+                    target=str(target), approved_by="test", approval_ref="unit", rollback_owner="test"))
+
+        self.assertTrue((backup / "runtime/.mpa/runtime/rule.md").is_file())
+        self.assertFalse((backup / "runtime.zip").exists())
+        metadata = json.loads((backup / release_manager.BACKUP_MARKER).read_text(encoding="utf-8"))
+        self.assertEqual(metadata["archive_migration"]["status"], "failed")
+        self.assertTrue(metadata["archive_migration"]["error"])
+
+    def test_deployment_receipt_failure_preserves_published_zip_backup(self):
+        manifest = self.prepare()
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        release_manager.deployment_dry_run(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target"))
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
+        original_write = release_manager.write_safe_receipt
+
+        def fail_deploy_receipt(path, value):
+            if path.parent == release_manager.DEPLOYMENT_RECEIPTS / "target" and value.get("status") == "applied":
+                raise OSError("receipt failed")
+            return original_write(path, value)
+
+        with mock.patch.object(release_manager, "write_safe_receipt", side_effect=fail_deploy_receipt):
+            with self.assertRaisesRegex(OSError, "receipt failed"):
+                release_manager.deploy(argparse.Namespace(
+                    manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
+                    dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+
+        self.assertEqual((target / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "old")
+        self.assertTrue(any((path / "runtime.zip").is_file() for path in (target / ".mpa/backups").iterdir() if path.is_dir()))
+
+    def test_rollback_rejects_legacy_runtime_directory_backup(self):
+        manifest = self.prepare()
+        release_id = json.loads(manifest.read_text(encoding="utf-8"))["release_id"]
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        release_manager.deployment_dry_run(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target"))
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
+        release_manager.deploy(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
+            dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+        backup = next((target / ".mpa/backups").iterdir())
+        with release_manager.materialized_runtime_archive(backup / "runtime.zip") as extracted:
+            shutil.copytree(extracted, backup / "runtime")
+        (backup / "runtime.zip").unlink()
+
+        with self.assertRaisesRegex(ValueError, "asset checksum"):
+            release_manager.rollback(argparse.Namespace(
+                target=str(target), target_ref="target", backup=str(backup.relative_to(target)), release_id=release_id,
+                verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
+
+    def test_rollback_requires_approval_metadata(self):
+        manifest = self.prepare()
+        release_id = json.loads(manifest.read_text(encoding="utf-8"))["release_id"]
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        release_manager.deployment_dry_run(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target"))
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
+        release_manager.deploy(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
+            dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+        backup = next((target / ".mpa/backups").iterdir())
+
+        for field in ("approved_by", "approval_ref", "rollback_owner"):
+            with self.subTest(field=field):
+                values = {"approved_by": "test", "approval_ref": "unit", "rollback_owner": "test"}
+                values[field] = " "
+                with self.assertRaisesRegex(ValueError, "approved-by, approval-ref, and rollback-owner are required"):
+                    release_manager.rollback(argparse.Namespace(
+                        target=str(target), target_ref="target", backup=str(backup.relative_to(target)), release_id=release_id,
+                        verified_by="test", **values))
 
     def test_manual_backup_directory_is_not_pruned_or_accepted_for_rollback(self):
         target = self.root / "target"
@@ -512,11 +711,10 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.deploy(argparse.Namespace(
             manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
             dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
-        backup = next(path for path in (target / ".mpa/backups").iterdir() if path.is_dir())
-        marker = backup / release_manager.BACKUP_MARKER
-        data = json.loads(marker.read_text(encoding="utf-8"))
+        backup = next((target / ".mpa/backups").iterdir())
+        data = json.loads((backup / release_manager.BACKUP_MARKER).read_text(encoding="utf-8"))
         data["asset_checksum"] = "0" * 64
-        marker.write_text(json.dumps(data), encoding="utf-8")
+        (backup / release_manager.BACKUP_MARKER).write_text(json.dumps(data), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "asset checksum"):
             release_manager.rollback(argparse.Namespace(
                 target=str(target), target_ref="target", backup=str(backup.relative_to(target)), release_id=release_id,

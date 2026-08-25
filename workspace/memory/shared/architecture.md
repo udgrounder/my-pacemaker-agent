@@ -20,10 +20,10 @@ release는 `workspace/releases/<release-id>/`의 `package_<release-id>.zip`, `ma
 
 | 자산 | 생성 위치·주체 | 보관하는 것 | 사용하는 시점 | 보존 정책 |
 |---|---|---|---|---|
-| Runtime release | source `workspace/releases/<release-id>/` · `prepare-release` | 배포할 `.mpa/runtime`의 불변 ZIP과 manifest/note/receipt | `release-audit`, deployment dry-run/deploy의 기준본, 릴리즈 이력·감사 | release ID별 immutable archive. 자동 삭제하지 않으며 별도 archive 정책으로 관리 |
-| Runtime deploy backup | 대상 `.mpa/backups/<release-id>-<timestamp>-<attempt-id>/` · `deploy` | `runtime/.mpa/runtime/` 및 migration 대상 `runtime-config/config.yaml` | 같은 Runtime 프로젝트에서 직전 MPA Runtime과 MPA 관리 설정을 함께 rollback | 성공 marker가 있는 백업 최신 3개. 실패 백업·marker 없는 사용자 snapshot은 보존·미사용 |
+| Runtime release | source `workspace/releases/<release-id>/` · `prepare-release` | 배포할 `.mpa/runtime`의 불변 ZIP과 manifest/note/receipt | `release-audit`, deployment dry-run/deploy의 기준본, 릴리즈 이력·감사 | 일반 작업에서 자동 삭제하지 않는다. 사용자 명시 `history-cleanup`의 dry-run·승인 apply에서만 기본 10개 보관 기준으로 정리 |
+| Runtime deploy backup | 대상 `.mpa/backups/<release-id>-<timestamp>-<attempt-id>/runtime.zip` · `deploy` | `runtime/.mpa/runtime/` 및 migration 대상 `runtime-config/config.yaml` | 같은 Runtime 프로젝트에서 직전 MPA Runtime과 MPA 관리 설정을 함께 rollback | 일반 deploy/upgrade에서 자동 삭제하지 않는다. 명시 `history-cleanup` 승인 apply에서 검증된 성공 backup만 기본 3개 보관 기준으로 정리. 실패 backup·marker 없는 사용자 snapshot은 보존·미사용 |
 
-두 자산은 서로 대체하지 않는다. release ZIP은 “무엇을 배포했는가”를 보존하고, Runtime backup은 “대상에 배포하기 직전의 MPA Runtime과 MPA 관리 설정이 무엇이었는가”를 보존한다. Runtime 프로젝트의 사용자 설정 변경과 전체 프로젝트 백업은 Runtime 프로젝트 자체의 버전 관리·백업 절차로 처리한다.
+두 자산은 서로 대체하지 않는다. release ZIP은 “무엇을 배포했는가”를 보존하고, version backup 내부의 `runtime.zip`은 “대상에 배포하기 직전의 MPA Runtime과 MPA 관리 설정이 무엇이었는가”를 보존한다. rollback은 marker와 `runtime.zip`을 안전하게 임시 해제·검증한 뒤 실행하며, legacy `runtime/` tree는 지원하지 않는다. Runtime 프로젝트의 사용자 설정 변경과 전체 프로젝트 백업은 Runtime 프로젝트 자체의 버전 관리·백업 절차로 처리한다.
 
 ### 설치 고유 설정의 additive-only 관리
 

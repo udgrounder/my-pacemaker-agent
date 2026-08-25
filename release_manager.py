@@ -50,6 +50,7 @@ RELEASE_METADATA = ("compatibility", "breaking_change", "migration", "rollback_c
 RELEASE_SCHEMA_VERSION = 4
 VALIDATION_TIMEOUT_SECONDS = 120
 RUNTIME_BACKUP_RETENTION = 3
+HISTORY_RETENTION = 10
 DOCS_INDEX_TEMPLATE = "# 문서 색인\n\n> 이 파일은 agent가 문서 산출물의 위치와 요약을 관리합니다. 일반 문서 내용은 프로젝트 사용자가 소유합니다.\n\n"
 RELEASE_BUNDLE_SCHEMA_VERSION = 1
 BACKUP_MARKER = "backup-metadata.json"
@@ -260,6 +261,21 @@ def _zip_runtime(source: Path, destination: Path) -> None:
             archive.writestr(info, path.read_bytes())
 
 
+def _write_backup_archive(source: Path, destination: Path) -> None:
+    """Write a managed Runtime tree archive without following symlinks."""
+    assert_safe_runtime_tree(source)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        for path in sorted(source.rglob("*")):
+            if path.is_dir():
+                continue
+            relative = path.relative_to(source)
+            info = zipfile.ZipInfo(relative.as_posix(), date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = (path.stat().st_mode & 0o777) << 16
+            archive.writestr(info, path.read_bytes())
+
+
 def _zip_entries(archive_path: Path) -> list[str]:
     try:
         with zipfile.ZipFile(archive_path) as archive:
@@ -323,11 +339,25 @@ def _extract_runtime(archive_path: Path, destination: Path) -> None:
         raise ValueError("release package extraction failed") from error
 
 
+@contextmanager
+def materialized_runtime_archive(path: Path):
+    """Safely extract one runtime.zip archive for validation or rollback."""
+    if not path.is_file():
+        raise ValueError("backup runtime archive is missing or invalid")
+    with tempfile.TemporaryDirectory(prefix="rollback-backup-") as directory:
+        extracted = Path(directory) / "runtime"
+        _extract_runtime(path, extracted)
+        runtime = extracted / ".mpa/runtime"
+        if not runtime.is_dir():
+            raise ValueError("backup Runtime tree is missing")
+        yield extracted
+
+
 def _release_bundle_dirs() -> list[Path]:
     if not RELEASES.is_dir():
         return []
     return sorted(path for path in RELEASES.iterdir()
-                  if path.is_dir() and SAFE_REF.fullmatch(path.name)
+                  if path.is_dir() and not path.is_symlink() and SAFE_REF.fullmatch(path.name)
                   and path.name not in {"legacy", "manifests", "packages"})
 
 
@@ -849,7 +879,7 @@ def ensure_required_project_directories(root: Path) -> list[str]:
 
 
 def prune_runtime_backups(root: Path, keep: int = RUNTIME_BACKUP_RETENTION) -> list[str]:
-    """Retain only marked successful Runtime backups; leave unknown dirs untouched."""
+    """Remove older managed Runtime backups during an explicit history cleanup."""
     backups = root / ".mpa/backups"
     if not backups.is_dir():
         return []
@@ -857,14 +887,12 @@ def prune_runtime_backups(root: Path, keep: int = RUNTIME_BACKUP_RETENTION) -> l
     for path in backups.iterdir():
         if not path.is_dir():
             continue
-        marker = path / BACKUP_MARKER
-        if not marker.is_file():
-            continue
         try:
-            metadata = json.loads(marker.read_text(encoding="utf-8"))
+            metadata = json.loads((path / BACKUP_MARKER).read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        if metadata.get("kind") != "runtime_backup" or metadata.get("status") != "successful":
+        if (metadata.get("kind") != "runtime_backup" or metadata.get("status") != "successful"
+                or not _backup_runtime_archive_path(path).is_file()):
             continue
         candidates.append(path)
     candidates.sort(key=lambda path: path.stat().st_mtime_ns, reverse=True)
@@ -875,9 +903,119 @@ def prune_runtime_backups(root: Path, keep: int = RUNTIME_BACKUP_RETENTION) -> l
     return removed
 
 
+def _retention_candidates(paths: list[Path], keep: int) -> list[Path]:
+    if keep < 0:
+        raise ValueError("retention keep count must be zero or greater")
+    return sorted(paths, key=lambda path: (path.stat().st_mtime_ns, path.name), reverse=True)[keep:]
+
+
+def _managed_runtime_backups(root: Path) -> list[Path]:
+    backups = root / ".mpa/backups"
+    if not backups.is_dir():
+        return []
+    result = []
+    for path in backups.iterdir():
+        if not path.is_dir() or path.is_symlink():
+            continue
+        try:
+            metadata = json.loads((path / BACKUP_MARKER).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if (metadata.get("kind") == "runtime_backup" and metadata.get("status") == "successful"
+                and _backup_runtime_archive_path(path).is_file()):
+            result.append(path)
+    return result
+
+
+def _registered_target_refs() -> list[str]:
+    directory = WORKSPACE / ".local" / "deployment-targets"
+    if not directory.is_dir():
+        return []
+    _reject_symlink_components(WORKSPACE, ".local/deployment-targets", "local deployment target registry")
+    return sorted(path.stem for path in directory.glob("*.json")
+                  if path.is_file() and not path.is_symlink() and SAFE_REF.fullmatch(path.stem))
+
+
+def history_cleanup_candidates(keep: int = HISTORY_RETENTION,
+                               backup_keep: int = RUNTIME_BACKUP_RETENTION) -> dict[str, object]:
+    """List managed history that an explicit cleanup request may remove, without writing."""
+    if keep < 0 or backup_keep < 0:
+        raise ValueError("retention keep count must be zero or greater")
+    releases = _retention_candidates(_release_bundle_dirs(), keep)
+    result: dict[str, object] = {
+        "mode": "dry-run",
+        "retention": {"release_bundles": keep, "deployment_history": keep,
+                      "deployment_receipts": keep, "runtime_backups": backup_keep},
+        "release_bundles": [path.name for path in releases],
+        "targets": [],
+        "warnings": [],
+    }
+    targets: list[dict[str, object]] = []
+    warnings: list[dict[str, str]] = []
+    for target_ref in _registered_target_refs():
+        try:
+            root = local_target(target_ref)
+            _reject_symlink_components(root, ".mpa/backups", "Runtime backup")
+            _reject_symlink_components(root, ".mpa/runtime/history/releases", "deployment history")
+            _reject_symlink_components(WORKSPACE, ".local/receipts/deployments", "deployment receipt")
+        except ValueError as error:
+            warnings.append({"target_ref": target_ref, "warning": str(error)})
+            continue
+        history_folder = root / ".mpa/runtime/history/releases"
+        receipt_folder = DEPLOYMENT_RECEIPTS / target_ref
+        history = _retention_candidates(
+            [path for path in history_folder.glob("*.json") if path.is_file() and not path.is_symlink()]
+            if history_folder.is_dir() else [], keep)
+        receipts = _retention_candidates(
+            [path for path in receipt_folder.glob("*.json") if path.is_file() and not path.is_symlink()]
+            if receipt_folder.is_dir() else [], keep)
+        backups = _retention_candidates(_managed_runtime_backups(root), backup_keep)
+        targets.append({"target_ref": target_ref,
+                        "deployment_history": [path.name for path in history],
+                        "deployment_receipts": [path.name for path in receipts],
+                        "runtime_backups": [path.name for path in backups]})
+    result["targets"] = targets
+    result["warnings"] = warnings
+    return result
+
+
+def history_cleanup(args: argparse.Namespace) -> None:
+    """Apply only a reviewed, explicit history cleanup request."""
+    keep = int(getattr(args, "keep", HISTORY_RETENTION))
+    backup_keep = int(getattr(args, "backup_keep", RUNTIME_BACKUP_RETENTION))
+    result = history_cleanup_candidates(keep, backup_keep)
+    if not getattr(args, "apply", False):
+        print(json.dumps(result, ensure_ascii=False))
+        return
+    if not all(str(getattr(args, field, "")).strip()
+               for field in ("approved_by", "approval_ref", "rollback_owner")):
+        raise ValueError("approved-by, approval-ref, and rollback-owner are required with --apply")
+    for path in [RELEASES / name for name in result["release_bundles"]]:
+        shutil.rmtree(path)
+    for target in result["targets"]:
+        target_ref = str(target["target_ref"])
+        root = local_target(target_ref)
+        with target_lock(root):
+            for name in target["deployment_history"]:
+                (root / ".mpa/runtime/history/releases" / str(name)).unlink()
+            for name in target["deployment_receipts"]:
+                (DEPLOYMENT_RECEIPTS / target_ref / str(name)).unlink()
+            for name in target["runtime_backups"]:
+                shutil.rmtree(root / ".mpa/backups" / str(name))
+    result["mode"] = "applied"
+    result["approved_by"] = redact_sensitive_text(str(args.approved_by))
+    result["approval_ref"] = redact_sensitive_text(str(args.approval_ref))
+    result["rollback_owner"] = redact_sensitive_text(str(args.rollback_owner))
+    print(json.dumps(result, ensure_ascii=False))
+
+
 def _backup_runtime_path(path: Path) -> Path:
     """Resolve the Runtime tree in a current managed backup."""
     return path / RUNTIME_BACKUP_ROOT / ".mpa/runtime"
+
+
+def _backup_runtime_archive_path(path: Path) -> Path:
+    return path / f"{RUNTIME_BACKUP_ROOT}.zip"
 
 
 def _backup_config_path(path: Path) -> Path:
@@ -940,20 +1078,41 @@ def _restore_config_from_backup(root: Path, backup: Path, metadata: dict[str, ob
         path.unlink()
 
 
-def _write_backup_marker(path: Path, release_id: str, assets: dict[str, str], config_snapshot: dict[str, object] | None = None) -> None:
+def _write_backup_marker(path: Path, release_id: str, assets: dict[str, str], config_snapshot: dict[str, object] | None = None,
+                         release_asset_checksum: str | None = None, archive_migration: dict[str, object] | None = None) -> None:
     backup_assets = asset_map(path)
     backup_assets.pop(BACKUP_MARKER, None)
     write_json(path / BACKUP_MARKER, {
-        "schema_version": 2,
+        "schema_version": 3,
         "kind": "runtime_backup",
         "status": "successful",
         "release_id": release_id,
         "asset_checksum": hashlib.sha256(json.dumps(backup_assets, sort_keys=True).encode()).hexdigest(),
-        "release_asset_checksum": hashlib.sha256(json.dumps(assets, sort_keys=True).encode()).hexdigest(),
-        "runtime_backup": "runtime/.mpa/runtime",
+        "release_asset_checksum": release_asset_checksum or hashlib.sha256(json.dumps(assets, sort_keys=True).encode()).hexdigest(),
+        "runtime_backup": "runtime.zip",
         "config_snapshot": config_snapshot or {"included": False, "existed": False, "checksum": None},
+        "archive_migration": archive_migration or {
+            "status": "completed", "completed_at": now(), "archive": "runtime.zip", "source_runtime_removed": True,
+        },
         "created_at": now(),
     })
+
+
+def _record_backup_migration(path: Path, metadata: dict[str, object], *, status: str, error: str | None = None) -> None:
+    """Record archive migration state without deleting or replacing any backup asset."""
+    updated = dict(metadata)
+    state: dict[str, object] = {
+        "status": status,
+        "archive": "runtime.zip",
+        "source_runtime_removed": not (path / RUNTIME_BACKUP_ROOT).exists(),
+    }
+    if status == "completed":
+        state["completed_at"] = now()
+    else:
+        state["failed_at"] = now()
+        state["error"] = error or "unknown archive migration failure"
+    updated["archive_migration"] = state
+    write_json(path / BACKUP_MARKER, updated)
 
 
 def _validate_backup(path: Path, release_id: str) -> dict:
@@ -971,12 +1130,76 @@ def _validate_backup(path: Path, release_id: str) -> dict:
     checksum = hashlib.sha256(json.dumps(assets, sort_keys=True).encode()).hexdigest()
     if metadata.get("asset_checksum") != checksum:
         raise ValueError("backup asset checksum does not match metadata")
-    runtime_path = _backup_runtime_path(path)
-    if not runtime_path.is_dir():
-        raise ValueError("backup Runtime tree is missing")
-    if metadata.get("schema_version", 1) >= 2 and metadata.get("runtime_backup") != "runtime/.mpa/runtime":
+    if metadata.get("schema_version", 1) >= 3 and metadata.get("runtime_backup") != "runtime.zip":
         raise ValueError("backup Runtime path metadata is invalid")
+    with materialized_runtime_archive(_backup_runtime_archive_path(path)):
+        pass
     return metadata
+
+
+def archive_backup(path: Path) -> Path:
+    """Publish a verified runtime.zip, then delete only its source runtime/ tree."""
+    source = path / RUNTIME_BACKUP_ROOT
+    archive = _backup_runtime_archive_path(path)
+    if not source.is_dir():
+        raise ValueError("backup Runtime tree is missing")
+    temporary = archive.with_name(f".{archive.name}.new-{uuid.uuid4().hex[:8]}")
+    try:
+        _write_backup_archive(source, temporary)
+        with temporary.open("rb") as stream:
+            os.fsync(stream.fileno())
+        with materialized_runtime_archive(temporary):
+            pass
+        temporary.replace(archive)
+        shutil.rmtree(source)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return archive
+
+
+def migrate_runtime_backups(args: argparse.Namespace) -> None:
+    """Convert managed legacy runtime/ trees in one target, preserving failures."""
+    root = Path(args.target).expanduser().resolve()
+    _reject_symlink_components(root, ".mpa/backups", "Runtime backup")
+    if not all(str(getattr(args, field, "")).strip() for field in ("approved_by", "approval_ref", "rollback_owner")):
+        raise ValueError("approved-by, approval-ref, and rollback-owner are required")
+    backups = root / ".mpa/backups"
+    if not backups.is_dir():
+        raise ValueError("target .mpa/backups is missing")
+    converted: list[str] = []
+    failures: list[dict[str, str]] = []
+    with target_lock(root):
+        for backup in sorted(path for path in backups.iterdir() if path.is_dir()):
+            runtime = backup / RUNTIME_BACKUP_ROOT
+            marker: dict[str, object] = {}
+            try:
+                marker = json.loads((backup / BACKUP_MARKER).read_text(encoding="utf-8"))
+                release_id = require_safe_ref(str(marker.get("release_id", "")), "backup release-id")
+                if not runtime.exists():
+                    if _backup_runtime_archive_path(backup).is_file():
+                        _validate_backup(backup, release_id)
+                        _record_backup_migration(backup, marker, status="completed")
+                    continue
+                archive_backup(backup)
+                _write_backup_marker(backup, release_id, {}, marker.get("config_snapshot"), marker.get("release_asset_checksum"), {
+                    "status": "completed", "completed_at": now(), "archive": "runtime.zip", "source_runtime_removed": True,
+                })
+                _validate_backup(backup, release_id)
+                converted.append(backup.name)
+            except Exception as error:
+                try:
+                    if marker:
+                        _record_backup_migration(backup, marker, status="failed", error=str(error))
+                except OSError:
+                    pass
+                failures.append({"backup": backup.name, "error": str(error),
+                                 "recovery": "runtime directory preserved" if runtime.exists() else "manual recovery required"})
+    result = {"converted": converted, "failures": failures,
+              "approved_by": args.approved_by, "approval_ref": args.approval_ref,
+              "rollback_owner": args.rollback_owner}
+    print(json.dumps(result, ensure_ascii=False))
+    if failures:
+        raise ValueError("one or more runtime backup migrations failed; originals were preserved")
 
 
 def update_issue_inventory(root: Path) -> list[dict[str, str]]:
@@ -1201,7 +1424,8 @@ def deploy(args: argparse.Namespace) -> None:
         if target_history(target).get(manifest["release_id"], {}).get("status") == "applied":
             raise ValueError("target history already contains this release ID")
         from_release = current_release(target)
-        backup = root / ".mpa/backups" / f"{manifest['release_id']}-{receipt_suffix()}"
+        backup_directory = root / ".mpa/backups" / f"{manifest['release_id']}-{receipt_suffix()}"
+        backup = backup_directory
         replacement = None
         previous = None
         created_paths: list[str] = []
@@ -1214,7 +1438,7 @@ def deploy(args: argparse.Namespace) -> None:
             try:
                 created_paths = ensure_required_project_directories(root)
                 backup.parent.mkdir(parents=True, exist_ok=True)
-                config_snapshot = _backup_runtime(root, target, backup, runtime_config is not None)
+                config_snapshot = _backup_runtime(root, target, backup_directory, runtime_config is not None)
                 replacement = destination.parent / f".runtime.new-{uuid.uuid4().hex[:8]}"
                 previous = target.with_name(f"{target.name}.previous-{uuid.uuid4().hex[:8]}")
                 _extract_runtime(package, extracted)
@@ -1239,6 +1463,9 @@ def deploy(args: argparse.Namespace) -> None:
                     config_migration = project_config.apply_runtime_config_migration(root, runtime_config)
                 collected, moved_issues = collect_update_issues_transaction(
                     root, target_ref, dry_run_data["issue_inventory"])
+                archive_backup(backup_directory)
+                _write_backup_marker(backup_directory, manifest["release_id"], manifest["assets"], config_snapshot)
+                _validate_backup(backup_directory, manifest["release_id"])
                 receipt = {
                     "status": "applied", "release_id": manifest["release_id"],
                     "from_release": from_release, "to_release": manifest["release_id"],
@@ -1256,15 +1483,8 @@ def deploy(args: argparse.Namespace) -> None:
                 history_path = target / "history" / "releases" / f"{manifest['release_id']}.json"
                 write_safe_receipt(deployment_receipt, receipt)
                 write_safe_receipt(history_path, receipt)
-                _write_backup_marker(backup, manifest["release_id"], manifest["assets"], config_snapshot)
                 if previous and previous.exists():
                     shutil.rmtree(previous)
-                try:
-                    removed_backups = prune_runtime_backups(root)
-                    if removed_backups:
-                        print(f"pruned runtime backups: {', '.join(removed_backups)}", file=sys.stderr)
-                except OSError as error:
-                    print(f"warning: runtime backup retention deferred: {error}", file=sys.stderr)
             except Exception as error:
                 _rollback_issue_moves(moved_issues)
                 if previous and previous.exists():
@@ -1343,27 +1563,29 @@ def rollback(args: argparse.Namespace) -> None:
             release_id = require_safe_ref(args.release_id, "release-id")
             if release_id not in target_history(target):
                 raise ValueError("target history does not contain the release to roll back")
-            _validate_backup(backup, release_id)
+            if not all(str(getattr(args, field, "")).strip() for field in ("approved_by", "approval_ref", "rollback_owner")):
+                raise ValueError("approved-by, approval-ref, and rollback-owner are required")
             from_release = current_release(target)
             created_paths = ensure_required_project_directories(root)
             config_before = _capture_config(root)
             replacement = target.parent / f".runtime.rollback-{uuid.uuid4().hex[:8]}"
             previous = target.parent / f".runtime.rollback-previous-{uuid.uuid4().hex[:8]}"
-            try:
-                shutil.copytree(_backup_runtime_path(backup), replacement)
-                target.replace(previous)
+            metadata = _validate_backup(backup, release_id)
+            with materialized_runtime_archive(_backup_runtime_archive_path(backup)) as backup_contents:
                 try:
-                    replacement.replace(target)
-                    metadata = json.loads((backup / BACKUP_MARKER).read_text(encoding="utf-8"))
-                    _restore_config_from_backup(root, backup, metadata)
-                except Exception:
-                    if previous.exists() and not target.exists():
-                        previous.replace(target)
-                    _restore_config_state(root, config_before)
-                    raise
-            finally:
-                if replacement.exists():
-                    shutil.rmtree(replacement)
+                    shutil.copytree(backup_contents / ".mpa/runtime", replacement)
+                    target.replace(previous)
+                    try:
+                        replacement.replace(target)
+                        _restore_config_from_backup(root, backup, metadata)
+                    except Exception:
+                        if previous.exists() and not target.exists():
+                            previous.replace(target)
+                        _restore_config_state(root, config_before)
+                        raise
+                finally:
+                    if replacement.exists():
+                        shutil.rmtree(replacement)
             receipt = {"status": "rolled_back", "release_id": release_id,
                        "from_release": from_release, "to_release": current_release(root / ".mpa/runtime"),
                        "target_ref": target_ref, "target_fingerprint": project_fingerprint(root),
@@ -1581,6 +1803,16 @@ def main() -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("sync-runtime").set_defaults(func=sync_runtime)
     commands.add_parser("release-audit").set_defaults(func=audit_releases)
+    cleanup = commands.add_parser("history-cleanup")
+    cleanup.add_argument("--keep", type=int, default=HISTORY_RETENTION,
+                         help="number of release, history, and receipt records to retain per group")
+    cleanup.add_argument("--backup-keep", type=int, default=RUNTIME_BACKUP_RETENTION,
+                         help="number of successful managed Runtime backups to retain per target")
+    cleanup.add_argument("--apply", action="store_true", help="delete the dry-run candidates after approval")
+    cleanup.add_argument("--approved-by")
+    cleanup.add_argument("--approval-ref")
+    cleanup.add_argument("--rollback-owner")
+    cleanup.set_defaults(func=history_cleanup)
     release = commands.add_parser("prepare-release")
     release.add_argument("--verified-by", required=True)
     release.add_argument("--compatibility", required=True); release.add_argument("--breaking-change", required=True)
@@ -1604,6 +1836,10 @@ def main() -> int:
     roll.add_argument("--target", help="optional when target-ref is registered in the local deployment target registry"); roll.add_argument("--backup", required=True); roll.add_argument("--target-ref", required=True); roll.add_argument("--release-id", required=True)
     roll.add_argument("--verified-by", required=True); roll.add_argument("--approved-by", required=True); roll.add_argument("--approval-ref", required=True); roll.add_argument("--rollback-owner", required=True)
     roll.set_defaults(func=rollback)
+    migrate_backups = commands.add_parser("migrate-runtime-backups")
+    migrate_backups.add_argument("--target", required=True)
+    migrate_backups.add_argument("--approved-by", required=True); migrate_backups.add_argument("--approval-ref", required=True); migrate_backups.add_argument("--rollback-owner", required=True)
+    migrate_backups.set_defaults(func=migrate_runtime_backups)
     create = commands.add_parser("issue-create"); create.add_argument("--project", required=True); create.add_argument("--title", required=True); create.add_argument("--summary", required=True); create.add_argument("--kind", default="observation"); create.add_argument("--key"); create.add_argument("--occurrence", default="first_observed"); create.add_argument("--area", default="unspecified"); create.add_argument("--observed-release", default="unknown"); create.add_argument("--collection-purpose", default="review"); create.set_defaults(func=create_issue)
     collect = commands.add_parser("issue-collect"); collect.add_argument("--project", required=True); collect.add_argument("--project-ref", required=True); collect.add_argument("--issue", required=True); collect.set_defaults(func=collect_issue)
     archive = commands.add_parser("issue-archive"); archive.add_argument("--issue", required=True)

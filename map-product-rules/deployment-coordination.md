@@ -10,11 +10,11 @@ manifest, target, target-ref, recorded dry-run, 승인자·승인 기록·rollba
 
 ## Allowed Actions
 
-dry-run, release ZIP의 안전한 임시 해제, 배포 전 `.mpa/runtime`와 예정된 MPA `runtime.*` 설정 snapshot backup, Runtime 교체·검증·설정 additive migration, target history와 deployment/rollback receipt 기록. 성공한 deploy 뒤에는 대상 `.mpa/backups/`의 성공 marker가 있는 Runtime backup 디렉터리만 최신 3개 유지한다. marker 없는 사용자 snapshot은 건드리지 않는다.
+dry-run, release ZIP의 안전한 임시 해제, 배포 전 `.mpa/runtime`와 예정된 MPA `runtime.*` 설정 snapshot backup, Runtime 교체·검증·설정 additive migration, target history와 deployment/rollback receipt 기록. 성공한 deploy 뒤에는 version backup 내부의 `runtime/`만 `runtime.zip`으로 압축·검증한 뒤 원본을 삭제한다. 일반 deploy/rollback은 과거 release·history·receipt·backup을 정리하지 않으며, marker 없는 사용자 snapshot은 언제나 건드리지 않는다.
 
 ## Backup Purpose
 
-Runtime release의 ZIP은 배포 기준이자 릴리즈 이력·감사용 불변 원본이다. deploy가 만드는 `.mpa/backups/<release-id>-<timestamp>-<attempt-id>/` 디렉터리는 `runtime/.mpa/runtime/`와 `runtime-config/config.yaml`(migration이 있을 때)을 보존하는 운영 snapshot이며 release archive를 대신하지 않는다. config snapshot은 rollback 원문 복원을 위한 local copy일 뿐 MPA가 사용자 값을 해석·수정한다는 뜻이 아니다. Runtime 프로젝트의 사용자 설정 변경과 전체 프로젝트 백업은 Runtime 프로젝트 자체의 버전 관리·백업 절차로 처리한다.
+Runtime release의 ZIP은 배포 기준이자 릴리즈 이력·감사용 불변 원본이다. deploy는 `.mpa/backups/<release-id>-<timestamp>-<attempt-id>/` 디렉터리에 `runtime/.mpa/runtime/`와 `runtime-config/config.yaml`(migration이 있을 때)을 먼저 보존해 배포 실패를 복구하고, 성공 검증 뒤 같은 version 디렉터리의 `runtime.zip`만 남긴다. `backup-metadata.json`의 `archive_migration`은 archive 경로·성공 또는 실패 시각·원본 `runtime/` 삭제 여부·실패 원인을 해당 backup의 전환 receipt로 기록한다. config snapshot은 rollback 원문 복원을 위한 local copy일 뿐 MPA가 사용자 값을 해석·수정한다는 뜻이 아니다. rollback은 version backup의 marker와 `runtime.zip`을 검증·안전 해제한 뒤에만 Runtime 교체를 시작한다. Runtime 프로젝트의 사용자 설정 변경과 전체 프로젝트 백업은 Runtime 프로젝트 자체의 버전 관리·백업 절차로 처리한다.
 
 ## Checks
 
@@ -22,7 +22,7 @@ dry-run의 release·target fingerprint·target-ref와 실제 apply 입력, packa
 
 ## Gates
 
-dry-run·승인·rollback 책임자 없이는 apply하지 않는다. rollback 원본은 대상 `.mpa/backups/` 아래만 허용한다. retention은 성공 receipt/history가 기록된 후에만 수행하며, 실패한 deploy에서는 기존 backup을 정리하지 않는다.
+dry-run·승인·rollback 책임자 없이는 apply하지 않는다. 이 정보가 아직 없으면 agent는 apply/rollback 명령을 호출해 오류를 내는 대신 dry-run 또는 rollback 후보·영향을 제시하고 사용자에게 승인을 요청한다. 승인 뒤에만 승인 기록과 책임자를 입력해 실행한다. rollback 원본은 대상 `.mpa/backups/` 아래만 허용한다. 이력 정리는 사용자 명시 요청의 `history-cleanup`에서만 수행한다. 이 명령은 먼저 전체 후보를 읽기 전용으로 제시하고, 승인 정보와 `--apply` 뒤에만 release·대상 history/receipt 및 검증된 성공 ZIP backup을 삭제한다. 실패 backup·marker 없는 사용자 snapshot·등록부 불일치 대상은 보존한다.
 
 ## Output
 
