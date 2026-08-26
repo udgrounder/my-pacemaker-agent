@@ -1196,6 +1196,51 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertTrue(issue.exists())
         self.assertFalse((release_manager.ISSUES / "inbox" / "target" / issue.name).exists())
 
+    def test_deploy_collects_legacy_issue_then_adds_inbox_metadata(self):
+        manifest = self.prepare()
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        issue = target / "workspace" / "issues" / "legacy.md"
+        issue.parent.mkdir(parents=True)
+        original = "# Legacy observation\n\nNeeds review.\n"
+        issue.write_text(original, encoding="utf-8")
+        release_manager.deployment_dry_run(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target"))
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
+        original_write_issue = release_manager.write_issue
+
+        def assert_collected_before_metadata(destination, metadata, body):
+            self.assertTrue(destination.is_file())
+            self.assertFalse(issue.exists())
+            self.assertEqual(destination.read_text(encoding="utf-8"), original)
+            original_write_issue(destination, metadata, body)
+
+        with mock.patch.object(release_manager, "write_issue", side_effect=assert_collected_before_metadata):
+            release_manager.deploy(argparse.Namespace(
+                manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
+                dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+        destination = release_manager.ISSUES / "inbox" / "target" / issue.name
+        metadata, body = release_manager.read_issue(destination)
+        self.assertEqual(metadata["kind"], "legacy_issue")
+        self.assertEqual(body, original)
+        self.assertFalse(issue.exists())
+
+    def test_collect_issue_accepts_legacy_markdown_and_adds_metadata_after_move(self):
+        project = self.root / "project"
+        source = project / "workspace" / "issues" / "legacy.md"
+        source.parent.mkdir(parents=True)
+        original = "# Legacy observation\n\nNeeds review.\n"
+        source.write_text(original, encoding="utf-8")
+
+        release_manager.collect_issue(argparse.Namespace(
+            project=str(project), project_ref="project", issue=source.name))
+
+        destination = release_manager.ISSUES / "inbox" / "project" / source.name
+        metadata, body = release_manager.read_issue(destination)
+        self.assertEqual(metadata["kind"], "legacy_issue")
+        self.assertEqual(body, original)
+        self.assertFalse(source.exists())
+
     def test_duplicate_archive_blocks_collection_and_preserves_project_issue(self):
         project = self.root / "project"
         source = project / "workspace" / "issues" / "issue.md"

@@ -1255,13 +1255,46 @@ def deployment_target_root(args: argparse.Namespace, target_ref: str) -> Path:
     return Path(str(value)).resolve() if value not in (None, "") else local_target(target_ref)
 
 
-def _issue_identity(path: Path) -> dict[str, str]:
+def legacy_issue_metadata(path: Path, text: str) -> dict[str, str]:
+    """Create stable inbox metadata for an issue collected in the legacy Markdown format."""
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+    return {
+        "type": "issue",
+        "status": "open",
+        "kind": "legacy_issue",
+        "canonical_key": f"legacy-{digest}",
+        "canonical_issue_key": f"legacy-{digest}",
+        "occurrence": "legacy_import",
+        "area": "unspecified",
+        "observed_release": "unknown",
+        "collection_purpose": "review",
+        "source_issue_id": f"legacy-source-{digest}",
+        "workspace_issue_id": f"legacy-workspace-{digest}",
+        "created_at": now(),
+        "legacy_source_filename": path.name,
+    }
+
+
+def issue_metadata_for_collection(path: Path, text: str) -> tuple[dict, str | None]:
+    """Return issue metadata and the original text when legacy metadata must be added after collection."""
+    if not text.startswith("---\n"):
+        return legacy_issue_metadata(path, text), text
     metadata, _ = read_issue(path)
+    return metadata, None
+
+
+def _metadata_identity(metadata: dict) -> dict[str, str]:
     return {
         key: str(metadata[key])
         for key in ("source_issue_id", "workspace_issue_id", "canonical_issue_key")
         if metadata.get(key)
     }
+
+
+def _issue_identity(path: Path) -> dict[str, str]:
+    text = path.read_text(encoding="utf-8")
+    metadata, _ = issue_metadata_for_collection(path, text)
+    return _metadata_identity(metadata)
 
 
 def _existing_issue_identity_matches(identity: dict[str, str]) -> list[str]:
@@ -1283,9 +1316,11 @@ def _existing_issue_identity_matches(identity: dict[str, str]) -> list[str]:
     return matches
 
 
-def _rollback_issue_moves(moved: list[tuple[Path, Path]]) -> None:
-    for source, destination in reversed(moved):
+def _rollback_issue_moves(moved: list[tuple[Path, Path, str | None]]) -> None:
+    for source, destination, legacy_source_text in reversed(moved):
         if destination.exists() and not source.exists():
+            if legacy_source_text is not None:
+                destination.write_text(legacy_source_text, encoding="utf-8")
             move_issue_atomically(destination, source)
 
 
@@ -1330,33 +1365,35 @@ def transfer_issue_after_verification(source: Path, destination: Path) -> None:
 
 
 def collect_update_issues_transaction(root: Path, project_ref: str,
-                                      expected: list[dict[str, str]]) -> tuple[list[str], list[tuple[Path, Path]]]:
+                                      expected: list[dict[str, str]]) -> tuple[list[str], list[tuple[Path, Path, str | None]]]:
     """Collect a verified update batch and return rollback handles for the caller."""
     if update_issue_inventory(root) != expected:
         raise ValueError("project issues changed after dry-run")
     project_issues = root / "workspace" / "issues"
-    destinations: list[tuple[Path, Path]] = []
+    destinations: list[tuple[Path, Path, dict, str | None]] = []
     for item in expected:
         source = project_issues / item["path"]
         text = source.read_text(encoding="utf-8")
         check_issue_text(text)
-        read_issue(source)
+        metadata, legacy_source_text = issue_metadata_for_collection(source, text)
         destination = ISSUES / "inbox" / project_ref / source.name
         archived = list((ISSUES / "archived").rglob(source.name)) if (ISSUES / "archived").exists() else []
-        identity_matches = _existing_issue_identity_matches(_issue_identity(source))
+        identity_matches = _existing_issue_identity_matches(_metadata_identity(metadata))
         if destination.exists() or archived or identity_matches:
             raise ValueError("update issue already exists in inbox or archive")
-        destinations.append((source, destination))
-    moved: list[tuple[Path, Path]] = []
+        destinations.append((source, destination, metadata, legacy_source_text))
+    moved: list[tuple[Path, Path, str | None]] = []
     try:
-        for source, destination in destinations:
+        for source, destination, metadata, legacy_source_text in destinations:
             destination.parent.mkdir(parents=True, exist_ok=True)
             transfer_issue_after_verification(source, destination)
-            moved.append((source, destination))
+            moved.append((source, destination, legacy_source_text))
+            if legacy_source_text is not None:
+                write_issue(destination, metadata, legacy_source_text)
     except Exception:
         _rollback_issue_moves(moved)
         raise
-    return [str(destination.relative_to(ROOT)) for _, destination in moved], moved
+    return [str(destination.relative_to(ROOT)) for _, destination, _ in moved], moved
 
 
 def collect_update_issues(root: Path, project_ref: str, expected: list[dict[str, str]]) -> list[str]:
@@ -1673,17 +1710,19 @@ def collect_issue(args: argparse.Namespace) -> None:
         raise ValueError("specified issue does not exist")
     text = source.read_text(encoding="utf-8")
     check_issue_text(text)
-    read_issue(source)
+    metadata, legacy_source_text = issue_metadata_for_collection(source, text)
     destination = ISSUES / "inbox" / project_ref / source.name
     archived = list((ISSUES / "archived").rglob(source.name)) if (ISSUES / "archived").exists() else []
-    identity_matches = _existing_issue_identity_matches(_issue_identity(source))
+    identity_matches = _existing_issue_identity_matches(_metadata_identity(metadata))
     if destination.exists() or archived or identity_matches:
         raise ValueError("issue already exists in inbox or archive")
     destination.parent.mkdir(parents=True, exist_ok=True)
     try:
         transfer_issue_after_verification(source, destination)
+        if legacy_source_text is not None:
+            write_issue(destination, metadata, legacy_source_text)
     except Exception:
-        _rollback_issue_moves([(source, destination)])
+        _rollback_issue_moves([(source, destination, legacy_source_text)])
         raise
     similar = [str(path.relative_to(ROOT)) for path in (ISSUES / "archived").rglob(f"*{source.stem}*")]
     print(json.dumps({"issue": str(destination.relative_to(ROOT)), "similar_archives": similar}, ensure_ascii=False))
