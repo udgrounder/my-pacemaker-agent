@@ -29,7 +29,7 @@
             └── 단일 세션만 명시적으로 시작할 때 → inject/ 직접 사용
                 ├── 기능 설계 / 계획 수립                       → @inject/layer1_design.md
                 ├── 계획 독립 비평 (서브에이전트로 실행)         → @inject/layer1_critique.md
-                ├── 설계 완료된 작업 항목 구현                  → @inject/layer1_implement.md
+                ├── 설계 완료된 작업 항목 계획 검토·구현 승인 요청 → plan.md 검토
                 ├── 에이전트 검증 (`검증 중` 단계, 서브에이전트)     → @inject/layer1_review.md
                 ├── 결과물을 보고 수정·추가 사항이 생겼을 때    → @inject/layer1_discovery.md
                 └── 정합성 점검                                 → @inject/layer2_checkpoint.md
@@ -71,7 +71,7 @@
 ```
 plan.md 상태 확인
     ├── "구현 중" → changelog.md 읽기 → 첫 미완료 단계부터 재개
-    └── "설계 완료" → @inject/layer1_implement.md 로 구현 세션 시작
+    └── "설계 완료" → plan.md 검토 → 구현 승인 요청
 ```
 
 ---

@@ -194,6 +194,18 @@ class PlanHashTest(unittest.TestCase):
             self.assertIn("| 승인 시각 | 이전 체크섬 | 새 체크섬 | 변경 요약 |", text)
             self.assertIn(f"승인해시: {new_hash}", text)
 
+    def test_renew_spec_keeps_following_subsection_outside_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            initial = self.new_plan_hash()
+            content = NEW_PLAN.replace("oldhash", initial).replace("결과를 만든다.", "변경된 결과")
+            content += "### 구현 후 발견\n\n- 기존 기록\n"
+            path.write_text(content, encoding="utf-8")
+            plan_hash.renew_spec(str(path), "명세 승인")
+            text = path.read_text(encoding="utf-8")
+            self.assertLess(text.index("명세 승인"), text.index("### 구현 후 발견"))
+            self.assertIn("### 구현 후 발견\n\n- 기존 기록", text)
+
     def test_spec_format_rejects_missing_specification_heading(self):
         front = "\n".join([
             "태스크: example", "생성일: 2026-08-19", "타입: major", "실패비용: major",
@@ -340,7 +352,7 @@ class PlanHashTest(unittest.TestCase):
             code, output, error = self.run_gate_main(root, "warn")
             self.assertEqual(code, 2)
             self.assertEqual(output, "")
-            self.assertIn("계획 승인 기록 복구 필요", error)
+            self.assertIn("구현 승인 기록 복구 필요", error)
 
     def test_warn_mode_does_not_block_unselected_critical_task_with_hash_issue(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -352,7 +364,7 @@ class PlanHashTest(unittest.TestCase):
             self.write_active_plan(root, critical)
             code, output, error = self.run_gate(root, "warn")
             self.assertEqual(code, 0)
-            self.assertIn("계획 승인 기록 복구 필요", output)
+            self.assertIn("구현 승인 기록 복구 필요", output)
             self.assertEqual(error, "")
 
     def test_warn_mode_blocks_selected_critical_task_before_approval(self):

@@ -215,8 +215,8 @@ def renew_spec(plan_path, summary):
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     row = f"| {timestamp} | {old_hash} | {new_hash} | {summary.strip()} |"
     start = history_match.end()
-    next_heading = body.find("\n## ", start)
-    end = len(body) if next_heading < 0 else next_heading
+    next_heading_match = re.search(r"(?m)^#{1,6}\s+", body[start:])
+    end = len(body) if next_heading_match is None else start + next_heading_match.start()
     history = body[start:end]
     header = "| 승인 시각 | 이전 체크섬 | 새 체크섬 | 변경 요약 |\n|---|---|---|---|"
     if header not in history:
@@ -366,7 +366,7 @@ def main():
         # 상태를 '구현 중'으로 전환하고 해시를 원자적으로 기록
         set_field(plan_path, "상태", "구현 중")
         set_field(plan_path, "승인해시", h)
-        print(f"계획 승인됨: 상태 → 구현 중 / 승인해시: {h}")
+        print(f"구현 승인됨: 상태 → 구현 중 / 승인해시: {h}")
     elif cmd == "renew-spec":
         args = sys.argv[3:]
         summary = ""

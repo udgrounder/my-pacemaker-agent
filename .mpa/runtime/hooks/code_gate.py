@@ -180,7 +180,7 @@ def current_task_plan(cwd):
 
 def _approval_recovery_message(name, status, issue):
     return (
-        f"⛔ 계획 승인 기록 복구 필요: '{name}' plan.md 상태는 '{status}'이며 승인해시가 유효하지 않습니다.\n"
+        f"⛔ 구현 승인 기록 복구 필요: '{name}' plan.md 상태는 '{status}'이며 승인해시가 유효하지 않습니다.\n"
         f"  사유: {issue}\n"
         "승인해시를 직접 입력하거나 날짜·승인 문구로 바꾸지 마세요. 아래 중 하나로 명시적으로 복구하세요:\n"
         "  1. 사용자 승인 이력이 불명확함 → 상태를 '설계 완료'로 되돌리고 plan.md 검토 후 재승인\n"
@@ -203,7 +203,7 @@ def check_selected_critical_integrity(cwd):
     if status not in HASH_REQUIRED_STATUSES:
         return (
             f"⛔ critical 작업 시작 전 승인 필요: '{name}'의 현재 상태는 '{status or '미상'}'입니다.\n"
-            "사용자에게 계획 승인을 받은 뒤 plan_hash.py approve로 '구현 중' 상태와 승인해시를 기록하세요."
+            "사용자에게 계획서 검토 후 구현 승인을 받은 뒤 plan_hash.py approve로 '구현 중' 상태와 승인해시를 기록하세요."
         )
     front_matter = "\n".join(f"{k}: {v}" for k, v in fields.items())
     issue = approval_hash_issue(front_matter, body)
