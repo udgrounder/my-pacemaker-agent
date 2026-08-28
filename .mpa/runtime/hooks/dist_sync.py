@@ -43,7 +43,7 @@ def main():
     dist_path = os.path.normpath(os.path.join(cwd, "dist", rel))
 
     if not os.path.exists(file_path):
-        sys.exit(0)  # 삭제는 release_manager.py sync-runtime이 명시적으로 처리한다
+        sys.exit(0)  # 삭제는 source의 명시적 Runtime 동기화 절차에서 처리한다
 
     dist_dir = os.path.normpath(os.path.join(cwd, "dist"))
     if not os.path.isdir(dist_dir):

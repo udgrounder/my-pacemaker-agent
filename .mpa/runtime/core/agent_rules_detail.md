@@ -217,6 +217,20 @@ code_gate.py가 "구현 승인 기록 복구 필요" 또는 "구현 재승인 �
 
 ## issue 기록
 
+### 설치 프로젝트에서의 MPA 개선 issue 판정·기록
+
+다음 중 하나에 해당하는 문제점 또는 개선점은 `methodology_improvement` issue로 판단한다. 실제 장애·오류가 없어도 MPA 운영 방식을 더 낫게 만들 수 있는 개선 제안이면 기록 대상이다.
+
+- 에이전트의 작업 절차·행동 방식이 의도와 다르거나 반복적으로 문제를 일으킨 경우
+- Runtime 규칙, inject, persona, hook 지침의 누락·모순·개선점이 발견된 경우
+- 여러 설치 프로젝트에 일반화할 수 있는 MPA 운영 방식의 개선 제안인 경우
+
+제품 기능·도메인 로직 자체의 버그는 이 기준만으로 시스템 개선 issue로 분류하지 않는다. 이슈 검토·수집 요청도 이슈 생성 요청과 구분한다.
+
+설치 프로젝트에서는 위 관찰을 즉시 해당 프로젝트의 `workspace/issues/<filename>.md`에 원본으로 기록한다. 파일에는 아래 `methodology_improvement` 템플릿의 정확한 `**타입**: 방법론 개선` 표기를 포함한다. 이 표기는 source가 수집 시 canonical `methodology_improvement` kind로 정규화하는 기준이다.
+
+설치 Runtime은 source 전용 운영 명령을 실행하거나 중앙 `inbox/`로 직접 이동하지 않는다. 수집은 사용자가 요청한 뒤 source 운영자가 수행하며, 수집 전 원본 이슈는 설치 프로젝트의 `workspace/issues/`에 보존한다.
+
 **`methodology_improvement` — 방법론 개선** (agent 운영 방식, inject 파일, 규칙 등)
 ```markdown
 # [개선 내용 제목]
@@ -266,9 +280,9 @@ code_gate.py가 "구현 승인 기록 복구 필요" 또는 "구현 재승인 �
 | 페르소나 | task_designer | **`personas/mpa_system_designer.md`** |
 | 수정 후 동기화 | 불필요 | `dist/`와 설치본 양쪽 동기화 필수 |
 
-**처리 흐름:** `mpa_system_designer.md` 읽기 → plan.md 작성 및 승인 → 수정 → 일관성 점검·source 테스트 → **사용자의 명시 릴리즈 요청 또는 배포 요청 시에만** 최신 release 필요 여부 판정 → 필요한 경우 `prepare-release`로 Runtime 동기화·검증·단일 release ID 생성
+**처리 흐름:** `mpa_system_designer.md` 읽기 → plan.md 작성 및 승인 → 수정 → 일관성 점검·source 테스트 → **사용자의 명시 릴리즈 요청 또는 배포 요청 시에만** source 운영자가 최신 release 필요 여부를 판정하고 Runtime 동기화·검증·단일 release ID 생성을 수행한다.
 
-> **release ID 생성:** 방법론(`.mpa/runtime/`)을 의미 있게 수정한 태스크를 release할 때 `release_manager.py prepare-release`가 `.mpa-version`의 `current_release`를 UTC `YYYYMMDDHHMMSS-uuid8`으로 갱신하고 `dist/.mpa/runtime/`에 동기화한다. 이 값 하나가 package·manifest·receipt·대상 history·backup의 표시 ID다. checksum은 내부 무결성 증빙이며 **dist를 직접 편집하지 않는다**.
+> **release ID 생성:** 방법론(`.mpa/runtime/`)을 의미 있게 수정한 태스크를 release할 때 source 운영 절차가 `.mpa-version`의 `current_release`를 UTC `YYYYMMDDHHMMSS-uuid8`으로 갱신하고 Runtime 배포본을 동기화한다. 이 값 하나가 package·manifest·receipt·대상 history·backup의 표시 ID다. checksum은 내부 무결성 증빙이며 설치 프로젝트는 배포본을 직접 편집하지 않는다.
 
 > **릴리즈 생성 시점:** Runtime 변경·테스트 통과만으로는 release를 만들지 않는다. 사용자가 “릴리즈 만들어줘”처럼 명시 요청했거나 “배포해줘” 요청에서 현재 source Runtime을 담은 최신 release가 없을 때만 생성한다. 이미 만든 immutable release는 삭제·재작성하지 않는다.
 

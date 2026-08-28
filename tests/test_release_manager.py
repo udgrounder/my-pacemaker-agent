@@ -1241,6 +1241,28 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertEqual(body, original)
         self.assertFalse(source.exists())
 
+    def test_collect_issue_preserves_methodology_improvement_kind_from_runtime_template(self):
+        project = self.root / "project"
+        source = project / "workspace" / "issues" / "runtime-rule.md"
+        source.parent.mkdir(parents=True)
+        original = (
+            "# Runtime issue recording can be clearer\n\n"
+            "**타입**: 방법론 개선\n"
+            "**발견 상황**: 설치 프로젝트의 검토 단계\n\n"
+            "## 현재 방식\n\n규칙이 이슈를 작업 항목으로 오분류할 수 있다.\n\n"
+            "## 개선 방안\n\nMPA 개선 관찰을 로컬 issue로 기록한다.\n"
+        )
+        source.write_text(original, encoding="utf-8")
+
+        release_manager.collect_issue(argparse.Namespace(
+            project=str(project), project_ref="project", issue=source.name))
+
+        destination = release_manager.ISSUES / "inbox" / "project" / source.name
+        metadata, body = release_manager.read_issue(destination)
+        self.assertEqual(metadata["kind"], "methodology_improvement")
+        self.assertEqual(body, original)
+        self.assertFalse(source.exists())
+
     def test_duplicate_archive_blocks_collection_and_preserves_project_issue(self):
         project = self.root / "project"
         source = project / "workspace" / "issues" / "issue.md"

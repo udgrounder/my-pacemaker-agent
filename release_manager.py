@@ -1258,10 +1258,11 @@ def deployment_target_root(args: argparse.Namespace, target_ref: str) -> Path:
 def legacy_issue_metadata(path: Path, text: str) -> dict[str, str]:
     """Create stable inbox metadata for an issue collected in the legacy Markdown format."""
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+    kind = "methodology_improvement" if "**타입**: 방법론 개선" in text else "legacy_issue"
     return {
         "type": "issue",
         "status": "open",
-        "kind": "legacy_issue",
+        "kind": kind,
         "canonical_key": f"legacy-{digest}",
         "canonical_issue_key": f"legacy-{digest}",
         "occurrence": "legacy_import",
