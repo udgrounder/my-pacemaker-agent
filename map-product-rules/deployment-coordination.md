@@ -6,7 +6,7 @@
 
 ## Input
 
-manifest, target, target-ref, recorded dry-run, 승인자·승인 기록·rollback 책임자.
+manifest, target, target-ref, recorded dry-run, 실행자·검증자·승인자·승인 기록.
 
 ## Allowed Actions
 
@@ -22,7 +22,7 @@ dry-run의 release·target fingerprint·target-ref와 실제 apply 입력, packa
 
 ## Gates
 
-dry-run·승인·rollback 책임자 없이는 apply하지 않는다. 이 정보가 아직 없으면 agent는 apply/rollback 명령을 호출해 오류를 내는 대신 dry-run 또는 rollback 후보·영향을 제시하고 사용자에게 승인을 요청한다. 승인 뒤에만 승인 기록과 책임자를 입력해 실행한다. rollback 원본은 대상 `.mpa/backups/` 아래만 허용한다. 이력 정리는 사용자 명시 요청의 `history-cleanup`에서만 수행한다. 이 명령은 먼저 전체 후보를 읽기 전용으로 제시하고, 승인 정보와 `--apply` 뒤에만 release·대상 history/receipt 및 검증된 성공 ZIP backup을 삭제한다. 실패 backup·marker 없는 사용자 snapshot·등록부 불일치 대상은 보존한다.
+dry-run·실행자·승인 없이는 deploy를 apply하지 않는다. 실행자가 복구 책임 주체이며, 검증자는 실행자와 달라도 된다. 이 정보가 아직 없으면 agent는 apply/rollback 명령을 호출해 오류를 내는 대신 dry-run 또는 rollback 후보·영향을 제시하고 사용자에게 승인을 요청한다. 승인 뒤에만 승인 기록과 실행자를 입력해 실행한다. rollback 원본은 대상 `.mpa/backups/` 아래만 허용한다. 이력 정리는 사용자 명시 요청의 `history-cleanup`에서만 수행한다. 이 명령은 먼저 전체 후보를 읽기 전용으로 제시하고, 실행자·승인 정보와 `--apply` 뒤에만 release·대상 history/receipt 및 검증된 성공 ZIP backup을 삭제한다. 실패 backup·marker 없는 사용자 snapshot·등록부 불일치 대상은 보존한다.
 
 ## Output
 

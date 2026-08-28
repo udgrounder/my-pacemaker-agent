@@ -1151,10 +1151,10 @@ python3 install.py --project <경로> --agents <agent>
 
 # Runtime 업데이트 (source 저장소에서 실행)
 python3 release_manager.py deployment-dry-run --manifest workspace/releases/<release-id>/manifest_<release-id>.json --target <경로> --target-ref <대상-식별자>
-python3 release_manager.py deploy --manifest workspace/releases/<release-id>/manifest_<release-id>.json --target <경로> --target-ref <대상-식별자> --verified-by <검증자> --dry-run <dry-run-receipt> --approved-by <승인자> --approval-ref <승인기록> --rollback-owner <책임자>
+python3 release_manager.py deploy --manifest workspace/releases/<release-id>/manifest_<release-id>.json --target <경로> --target-ref <대상-식별자> --verified-by <검증자> --operator <실행자> --dry-run <dry-run-receipt> --approved-by <승인자> --approval-ref <승인기록>
 ```
 
-`--project`와 `--agents`는 신규 설치에만 **둘 다 필수**다. `install.py --dry-run`으로 template·agent spec·변경 범위를 먼저 확인할 수 있다. 기존 `.mpa/runtime/`가 있으면 `install.py`는 중단하며, Runtime update는 validation을 통과한 immutable release manifest와 recorded dry-run, 승인, rollback 책임자로만 수행한다.
+`--project`와 `--agents`는 신규 설치에만 **둘 다 필수**다. `install.py --dry-run`으로 template·agent spec·변경 범위를 먼저 확인할 수 있다. 기존 `.mpa/runtime/`가 있으면 `install.py`는 중단하며, Runtime update는 validation을 통과한 immutable release manifest와 recorded dry-run, 승인, 실행자 기록으로만 수행한다. 실행자가 복구 책임 주체다.
 
 기존 설치의 agent wiring·agent spec·고유 설정은 Runtime 프로젝트가 자체 관리한다. `install.py`는 기존 `.mpa/runtime/`가 있는 대상을 변경하지 않으며, Runtime update도 사용자 설정·workspace·docs·일반 소스를 보존한다. 단, release manifest가 명시한 `runtime.*` additive migration은 `${project.name}`·`${project.root_path}` 등의 참조를 대상 config 값으로 해석해 deploy transaction 안에서 누락값만 추가한다. 이 경우 배포 전 `.mpa/runtime`와 config snapshot을 함께 백업하고 rollback 때 함께 복원한다.
 

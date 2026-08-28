@@ -988,8 +988,8 @@ def history_cleanup(args: argparse.Namespace) -> None:
         print(json.dumps(result, ensure_ascii=False))
         return
     if not all(str(getattr(args, field, "")).strip()
-               for field in ("approved_by", "approval_ref", "rollback_owner")):
-        raise ValueError("approved-by, approval-ref, and rollback-owner are required with --apply")
+               for field in ("operator", "approved_by", "approval_ref")):
+        raise ValueError("operator, approved-by, and approval-ref are required with --apply")
     for path in [RELEASES / name for name in result["release_bundles"]]:
         shutil.rmtree(path)
     for target in result["targets"]:
@@ -1005,9 +1005,9 @@ def history_cleanup(args: argparse.Namespace) -> None:
             for name in target["runtime_backups"]:
                 shutil.rmtree(root / ".mpa/backups" / str(name))
     result["mode"] = "applied"
+    result["operator"] = redact_sensitive_text(str(args.operator))
     result["approved_by"] = redact_sensitive_text(str(args.approved_by))
     result["approval_ref"] = redact_sensitive_text(str(args.approval_ref))
-    result["rollback_owner"] = redact_sensitive_text(str(args.rollback_owner))
     print(json.dumps(result, ensure_ascii=False))
 
 
@@ -1163,8 +1163,8 @@ def migrate_runtime_backups(args: argparse.Namespace) -> None:
     """Convert managed legacy runtime/ trees in one target, preserving failures."""
     root = Path(args.target).expanduser().resolve()
     _reject_symlink_components(root, ".mpa/backups", "Runtime backup")
-    if not all(str(getattr(args, field, "")).strip() for field in ("approved_by", "approval_ref", "rollback_owner")):
-        raise ValueError("approved-by, approval-ref, and rollback-owner are required")
+    if not all(str(getattr(args, field, "")).strip() for field in ("operator", "approved_by", "approval_ref")):
+        raise ValueError("operator, approved-by, and approval-ref are required")
     backups = root / ".mpa/backups"
     if not backups.is_dir():
         raise ValueError("target .mpa/backups is missing")
@@ -1196,9 +1196,8 @@ def migrate_runtime_backups(args: argparse.Namespace) -> None:
                     pass
                 failures.append({"backup": backup.name, "error": str(error),
                                  "recovery": "runtime directory preserved" if runtime.exists() else "manual recovery required"})
-    result = {"converted": converted, "failures": failures,
-              "approved_by": args.approved_by, "approval_ref": args.approval_ref,
-              "rollback_owner": args.rollback_owner}
+    result = {"converted": converted, "failures": failures, "operator": args.operator,
+              "approved_by": args.approved_by, "approval_ref": args.approval_ref}
     print(json.dumps(result, ensure_ascii=False))
     if failures:
         raise ValueError("one or more runtime backup migrations failed; originals were preserved")
@@ -1459,8 +1458,8 @@ def deploy(args: argparse.Namespace) -> None:
             raise ValueError("Runtime project config changed after dry-run")
         if runtime_config is not None:
             _runtime_config_migration(runtime_config)
-        if not all(str(getattr(args, field, "")).strip() for field in ("approved_by", "approval_ref", "rollback_owner")):
-            raise ValueError("approved-by, approval-ref, and rollback-owner are required")
+        if not all(str(getattr(args, field, "")).strip() for field in ("operator", "approved_by", "approval_ref")):
+            raise ValueError("operator, approved-by, and approval-ref are required")
         if target_history(target).get(manifest["release_id"], {}).get("status") == "applied":
             raise ValueError("target history already contains this release ID")
         from_release = current_release(target)
@@ -1511,9 +1510,10 @@ def deploy(args: argparse.Namespace) -> None:
                     "from_release": from_release, "to_release": manifest["release_id"],
                     "manifest": relative_to_root(manifest_path),
                     "target_ref": target_ref, "target_fingerprint": project_fingerprint(root),
-                    "backup": str(backup.relative_to(root)), "applied_at": now(), "verified_by": args.verified_by,
+                    "backup": str(backup.relative_to(root)), "applied_at": now(), "operator": args.operator,
+                    "verified_by": args.verified_by,
                     "approved_by": args.approved_by, "approval_ref": args.approval_ref,
-                    "rollback_owner": args.rollback_owner, "dry_run": relative_to_root(dry_run),
+                    "dry_run": relative_to_root(dry_run),
                     "assets": manifest["assets"], "verification": {"asset_map": "matched", "verified_at": now()},
                     "runtime_config": {"migration": config_migration, "config_backup": config_snapshot},
                     "collected_issues": collected,
@@ -1546,7 +1546,8 @@ def deploy(args: argparse.Namespace) -> None:
                            "to_release": manifest["release_id"], "manifest": relative_to_root(manifest_path),
                            "target_ref": target_ref, "target_fingerprint": project_fingerprint(root),
                            "backup": str(backup.relative_to(root)) if backup.exists() else None,
-                           "failed_at": now(), "error": str(error), "dry_run": relative_to_root(dry_run),
+                           "failed_at": now(), "error": str(error), "operator": args.operator,
+                           "dry_run": relative_to_root(dry_run),
                            "recovery": {"runtime_restored": not previous or target.is_dir(), "issues_restored": not moved_issues}}
                 try:
                     write_safe_receipt(DEPLOYMENT_RECEIPTS / target_ref / f"deploy-failed-{manifest['release_id']}-{receipt_suffix()}.json", failure)
@@ -1603,8 +1604,8 @@ def rollback(args: argparse.Namespace) -> None:
             release_id = require_safe_ref(args.release_id, "release-id")
             if release_id not in target_history(target):
                 raise ValueError("target history does not contain the release to roll back")
-            if not all(str(getattr(args, field, "")).strip() for field in ("approved_by", "approval_ref", "rollback_owner")):
-                raise ValueError("approved-by, approval-ref, and rollback-owner are required")
+            if not all(str(getattr(args, field, "")).strip() for field in ("operator", "approved_by", "approval_ref")):
+                raise ValueError("operator, approved-by, and approval-ref are required")
             from_release = current_release(target)
             created_paths = ensure_required_project_directories(root)
             config_before = _capture_config(root)
@@ -1629,9 +1630,9 @@ def rollback(args: argparse.Namespace) -> None:
             receipt = {"status": "rolled_back", "release_id": release_id,
                        "from_release": from_release, "to_release": current_release(root / ".mpa/runtime"),
                        "target_ref": target_ref, "target_fingerprint": project_fingerprint(root),
-                       "backup": str(backup.relative_to(root)), "rolled_back_at": now(),
+                       "backup": str(backup.relative_to(root)), "rolled_back_at": now(), "operator": args.operator,
                        "approved_by": args.approved_by, "approval_ref": args.approval_ref,
-                       "rollback_owner": args.rollback_owner, "verified_by": args.verified_by,
+                       "verified_by": args.verified_by,
                        "verification": {"asset_map": asset_map(root / ".mpa/runtime"), "verified_at": now()}}
             receipt_path = DEPLOYMENT_RECEIPTS / target_ref / f"rollback-{receipt_suffix()}.json"
             history_path = root / ".mpa/runtime" / "history" / "releases" / f"{release_id}.json"
@@ -1655,7 +1656,7 @@ def rollback(args: argparse.Namespace) -> None:
                 write_safe_receipt(DEPLOYMENT_RECEIPTS / target_ref / f"rollback-failed-{receipt_suffix()}.json",
                                    {"status": "failed", "release_id": release_id, "target_ref": target_ref,
                                     "target_fingerprint": project_fingerprint(root), "backup": args.backup,
-                                    "failed_at": now(), "error": str(error),
+                                    "failed_at": now(), "error": str(error), "operator": getattr(args, "operator", None),
                                     "recovery": {"runtime_restored": not previous or target.is_dir()}})
             except OSError:
                 pass
@@ -1853,7 +1854,7 @@ def main() -> int:
     cleanup.add_argument("--apply", action="store_true", help="delete the dry-run candidates after approval")
     cleanup.add_argument("--approved-by")
     cleanup.add_argument("--approval-ref")
-    cleanup.add_argument("--rollback-owner")
+    cleanup.add_argument("--operator")
     cleanup.set_defaults(func=history_cleanup)
     release = commands.add_parser("prepare-release")
     release.add_argument("--verified-by", required=True)
@@ -1869,18 +1870,18 @@ def main() -> int:
     deploy_parser.add_argument("--manifest", required=True); deploy_parser.add_argument("--target", required=True)
     deploy_parser.add_argument("--target-ref", required=True); deploy_parser.add_argument("--verified-by", required=True)
     deploy_parser.add_argument("--dry-run", required=True); deploy_parser.add_argument("--approved-by", required=True)
-    deploy_parser.add_argument("--approval-ref", required=True); deploy_parser.add_argument("--rollback-owner", required=True)
+    deploy_parser.add_argument("--approval-ref", required=True); deploy_parser.add_argument("--operator", required=True)
     deploy_parser.set_defaults(func=deploy)
     dry_run = commands.add_parser("deployment-dry-run")
     dry_run.add_argument("--manifest", required=True); dry_run.add_argument("--target", required=True); dry_run.add_argument("--target-ref", required=True)
     dry_run.set_defaults(func=deployment_dry_run)
     roll = commands.add_parser("rollback")
     roll.add_argument("--target", help="optional when target-ref is registered in the local deployment target registry"); roll.add_argument("--backup", required=True); roll.add_argument("--target-ref", required=True); roll.add_argument("--release-id", required=True)
-    roll.add_argument("--verified-by", required=True); roll.add_argument("--approved-by", required=True); roll.add_argument("--approval-ref", required=True); roll.add_argument("--rollback-owner", required=True)
+    roll.add_argument("--verified-by", required=True); roll.add_argument("--approved-by", required=True); roll.add_argument("--approval-ref", required=True); roll.add_argument("--operator", required=True)
     roll.set_defaults(func=rollback)
     migrate_backups = commands.add_parser("migrate-runtime-backups")
     migrate_backups.add_argument("--target", required=True)
-    migrate_backups.add_argument("--approved-by", required=True); migrate_backups.add_argument("--approval-ref", required=True); migrate_backups.add_argument("--rollback-owner", required=True)
+    migrate_backups.add_argument("--approved-by", required=True); migrate_backups.add_argument("--approval-ref", required=True); migrate_backups.add_argument("--operator", required=True)
     migrate_backups.set_defaults(func=migrate_runtime_backups)
     create = commands.add_parser("issue-create"); create.add_argument("--project", required=True); create.add_argument("--title", required=True); create.add_argument("--summary", required=True); create.add_argument("--kind", default="observation"); create.add_argument("--key"); create.add_argument("--occurrence", default="first_observed"); create.add_argument("--area", default="unspecified"); create.add_argument("--observed-release", default="unknown"); create.add_argument("--collection-purpose", default="review"); create.set_defaults(func=create_issue)
     collect = commands.add_parser("issue-collect"); collect.add_argument("--project", required=True); collect.add_argument("--project-ref", required=True); collect.add_argument("--issue", required=True); collect.set_defaults(func=collect_issue)

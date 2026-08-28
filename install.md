@@ -148,7 +148,9 @@ python3 install.py --project <경로> --agents <agent ...> \
 # Runtime 업데이트 (source 저장소에서 실행)
 python3 release_manager.py deploy \
   --manifest workspace/releases/<release-id>/manifest_<release-id>.json \
-  --target <경로> --target-ref <대상-식별자> --verified-by <검증자>
+  --target <경로> --target-ref <대상-식별자> --verified-by <검증자> --operator <실행자> \
+  --dry-run workspace/.local/receipts/deployments/<대상>/dry-run-<release-id>-<id>.json \
+  --approved-by <승인자> --approval-ref <승인-기록>
 ```
 
 ### Runtime release 준비·배포·롤백
@@ -182,19 +184,18 @@ python3 release_manager.py deployment-dry-run \
   --manifest workspace/releases/<release-id>/manifest_<release-id>.json \
   --target <프로젝트-경로> --target-ref <소문자-식별자>
 
-# 4. dry-run, 명시 승인, rollback 책임자를 연결해 Runtime만 배포
+# 4. dry-run, 명시 승인, 실행자를 연결해 Runtime만 배포
 python3 release_manager.py deploy \
   --manifest workspace/releases/<release-id>/manifest_<release-id>.json \
-  --target <프로젝트-경로> --target-ref <소문자-식별자> --verified-by <검증자> \
+  --target <프로젝트-경로> --target-ref <소문자-식별자> --verified-by <검증자> --operator <실행자> \
   --dry-run workspace/.local/receipts/deployments/<대상>/dry-run-<release-id>-<id>.json \
-  --approved-by <승인자> --approval-ref <승인-기록> --rollback-owner <책임자>
+  --approved-by <승인자> --approval-ref <승인-기록>
 
 # 5. 문제가 있을 때, deploy 출력의 .mpa/backups/... 값을 그대로 사용해 rollback
 python3 release_manager.py rollback \
   --target-ref <소문자-식별자> \
   --backup .mpa/backups/<release-id>-<timestamp>-<id> --release-id <release-id> \
-  --verified-by <검증자> --approved-by <승인자> --approval-ref <승인-기록> \
-  --rollback-owner <책임자>
+  --verified-by <검증자> --operator <실행자> --approved-by <승인자> --approval-ref <승인-기록>
 
 # --target은 선택 사항이다. 직전 deployment-dry-run이 이 source workspace의
 # Git 비추적 workspace/.local/deployment-targets/<target-ref>.json에 저장한

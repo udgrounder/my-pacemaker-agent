@@ -93,7 +93,7 @@ class ReleaseManagerTest(unittest.TestCase):
 
         release_manager.deploy(argparse.Namespace(
             manifest=str(manifest), target=str(target_root), target_ref="test-target", verified_by="test",
-            dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test",
+            dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test",
         ))
 
         self.assertEqual((target_root / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "v1")
@@ -116,12 +116,25 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.deploy(argparse.Namespace(
             manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
             dry_run=str(dry_run), approved_by="test", approval_ref=f"operator request: {target}",
-            rollback_owner="test",
+            operator="test",
         ))
         receipt = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("deploy-*.json"))
+        receipt_data = json.loads(receipt.read_text(encoding="utf-8"))
         receipt_text = receipt.read_text(encoding="utf-8")
         self.assertNotIn(str(target), receipt_text)
         self.assertIn("<redacted-path>", receipt_text)
+        self.assertEqual(receipt_data["operator"], "test")
+        self.assertNotIn("rollback_owner", receipt_data)
+
+    def test_management_cli_uses_operator_and_no_rollback_owner_argument(self):
+        for command in ("deploy", "rollback", "history-cleanup", "migrate-runtime-backups"):
+            with self.subTest(command=command):
+                result = subprocess.run(
+                    [sys.executable, str(MODULE_PATH), command, "--help"],
+                    check=True, capture_output=True, text=True,
+                )
+                self.assertIn("--operator", result.stdout)
+                self.assertNotIn("--rollback-owner", result.stdout)
 
     def test_rollback_uses_local_target_registry_when_target_is_omitted(self):
         manifest = self.prepare()
@@ -134,13 +147,13 @@ class ReleaseManagerTest(unittest.TestCase):
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         release_manager.deploy(argparse.Namespace(
             manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-            dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test",
+            dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test",
         ))
         backup = next((target / ".mpa/backups").iterdir())
 
         release_manager.rollback(argparse.Namespace(
             target_ref="target", backup=str(backup.relative_to(target)), release_id=release_id,
-            verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test",
+            verified_by="test", approved_by="test", approval_ref="unit", operator="test",
         ))
 
         self.assertEqual((target / ".mpa/runtime/rule.md").read_text(encoding="utf-8"), "old")
@@ -162,7 +175,7 @@ class ReleaseManagerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "local deployment target registry no longer matches"):
             release_manager.rollback(argparse.Namespace(
                 target_ref="target", backup=".mpa/backups/missing", release_id="release",
-                verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test",
+                verified_by="test", approved_by="test", approval_ref="unit", operator="test",
             ))
 
     def test_deployment_dry_run_requires_current_runtime_layout(self):
@@ -200,7 +213,7 @@ class ReleaseManagerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Runtime backup path contains an unsupported symlink"):
             release_manager.deploy(argparse.Namespace(
                 manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+                dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         self.assertFalse(any(external.iterdir()))
 
     def test_deployment_dry_run_rejects_config_parent_symlink_for_migration(self):
@@ -227,7 +240,7 @@ class ReleaseManagerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Runtime path contains an unsupported symlink"):
             release_manager.rollback(argparse.Namespace(
                 target=str(target), target_ref="target", backup=".mpa/backups/backup",
-                release_id="release", verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
+                release_id="release", verified_by="test", approved_by="test", approval_ref="unit", operator="test"))
 
         (target / ".mpa/runtime").unlink()
         self.write_runtime(target / ".mpa/runtime", "old")
@@ -238,7 +251,7 @@ class ReleaseManagerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Runtime backup path contains an unsupported symlink"):
             release_manager.rollback(argparse.Namespace(
                 target=str(target), target_ref="target", backup=".mpa/backups/backup",
-                release_id="release", verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
+                release_id="release", verified_by="test", approved_by="test", approval_ref="unit", operator="test"))
 
     def test_required_directories_reject_symlink(self):
         target = self.root / "target"
@@ -361,7 +374,7 @@ class ReleaseManagerTest(unittest.TestCase):
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "test-target").glob("dry-run-*.json"))
         release_manager.deploy(argparse.Namespace(
             manifest=str(manifest), target=str(target_root), target_ref="test-target", verified_by="test",
-            dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+            dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         backup = next((target_root / ".mpa/backups").iterdir())
         self.assertTrue(backup.is_dir())
         with zipfile.ZipFile(backup / "runtime.zip") as archive:
@@ -371,7 +384,7 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertFalse((backup / "runtime-config/config.yaml").exists())
         release_manager.rollback(argparse.Namespace(
             target=str(target_root), target_ref="test-target", backup=str(backup.relative_to(target_root)),
-            release_id=release_id, verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
+            release_id=release_id, verified_by="test", approved_by="test", approval_ref="unit", operator="test"))
         self.assertEqual((target_root / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "old")
         self.assertEqual((target_root / "workspace" / "user.txt").read_text(encoding="utf-8"), "workspace")
         self.assertEqual((target_root / "docs" / "user.md").read_text(encoding="utf-8"), "docs")
@@ -402,7 +415,7 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         release_manager.deploy(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+                                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         updated = config.read_text(encoding="utf-8")
         self.assertIn('project_name: "user-value"', updated)
         self.assertIn(f'root_path: "{target}"', updated)
@@ -413,7 +426,7 @@ class ReleaseManagerTest(unittest.TestCase):
         backup = next((target / ".mpa/backups").iterdir())
         self.assertEqual((backup / "runtime-config/config.yaml").read_text(encoding="utf-8"), original)
         release_manager.rollback(argparse.Namespace(target=str(target), target_ref="target", backup=str(backup.relative_to(target)),
-                                                    release_id=release_id, verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
+                                                    release_id=release_id, verified_by="test", approved_by="test", approval_ref="unit", operator="test"))
         self.assertEqual(config.read_text(encoding="utf-8"), original)
         self.assertEqual((target / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "old")
 
@@ -434,7 +447,7 @@ class ReleaseManagerTest(unittest.TestCase):
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "legacy-target").glob("dry-run-*.json"))
         release_manager.deploy(argparse.Namespace(
             manifest=str(manifest), target=str(target), target_ref="legacy-target", verified_by="test",
-            dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+            dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
 
         self.assertTrue(config.is_file())
         self.assertIn('project_name: "legacy-target"', config.read_text(encoding="utf-8"))
@@ -447,7 +460,7 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.rollback(argparse.Namespace(
             target=str(target), target_ref="legacy-target", backup=str(backup.relative_to(target)),
             release_id=release_id, verified_by="test", approved_by="test", approval_ref="unit",
-            rollback_owner="test"))
+            operator="test"))
         self.assertFalse(config.exists())
         self.assertEqual((target / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "legacy")
 
@@ -458,7 +471,7 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         release_manager.deploy(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+                                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         self.assertTrue((target / "workspace").is_dir())
         self.assertTrue((target / "workspace" / "issues").is_dir())
         self.assertTrue((target / "docs").is_dir())
@@ -548,12 +561,12 @@ class ReleaseManagerTest(unittest.TestCase):
         target = self.root / "target"
         self.write_runtime(target / ".mpa/runtime", "old")
         release_manager.remember_local_target(target, "target")
-        with self.assertRaisesRegex(ValueError, "approved-by, approval-ref, and rollback-owner are required"):
+        with self.assertRaisesRegex(ValueError, "operator, approved-by, and approval-ref are required"):
             release_manager.history_cleanup(argparse.Namespace(
-                keep=1, backup_keep=1, apply=True, approved_by="", approval_ref="unit", rollback_owner="test"))
+                keep=1, backup_keep=1, apply=True, approved_by="", approval_ref="unit", operator="test"))
         with mock.patch.object(release_manager, "target_lock") as target_lock:
             release_manager.history_cleanup(argparse.Namespace(
-                keep=1, backup_keep=1, apply=True, approved_by="test", approval_ref="unit", rollback_owner="test"))
+                keep=1, backup_keep=1, apply=True, approved_by="test", approval_ref="unit", operator="test"))
         target_lock.assert_not_called()
         self.assertFalse((release_manager.RELEASES / "release-0").exists())
         self.assertTrue((release_manager.RELEASES / "release-1").exists())
@@ -569,7 +582,7 @@ class ReleaseManagerTest(unittest.TestCase):
         with mock.patch.object(release_manager, "prune_runtime_backups") as prune:
             release_manager.deploy(argparse.Namespace(
                 manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+                dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         prune.assert_not_called()
 
         backups = list((target / ".mpa/backups").iterdir())
@@ -592,7 +605,7 @@ class ReleaseManagerTest(unittest.TestCase):
             with self.assertRaisesRegex(OSError, "archive failed"):
                 release_manager.deploy(argparse.Namespace(
                     manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                    dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+                    dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
 
         self.assertEqual((target / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "old")
         self.assertTrue(any(path.is_dir() for path in (target / ".mpa/backups").iterdir()))
@@ -605,7 +618,7 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager._write_backup_marker(backup, "release-1", {})
 
         release_manager.migrate_runtime_backups(argparse.Namespace(
-            target=str(target), approved_by="test", approval_ref="unit", rollback_owner="test"))
+            target=str(target), approved_by="test", approval_ref="unit", operator="test"))
 
         self.assertFalse((backup / "runtime").exists())
         self.assertTrue((backup / "runtime.zip").is_file())
@@ -623,7 +636,7 @@ class ReleaseManagerTest(unittest.TestCase):
         with mock.patch.object(release_manager, "archive_backup", side_effect=OSError("archive failed")):
             with self.assertRaisesRegex(ValueError, "originals were preserved"):
                 release_manager.migrate_runtime_backups(argparse.Namespace(
-                    target=str(target), approved_by="test", approval_ref="unit", rollback_owner="test"))
+                    target=str(target), approved_by="test", approval_ref="unit", operator="test"))
 
         self.assertTrue((backup / "runtime/.mpa/runtime/rule.md").is_file())
         self.assertFalse((backup / "runtime.zip").exists())
@@ -649,7 +662,7 @@ class ReleaseManagerTest(unittest.TestCase):
             with self.assertRaisesRegex(OSError, "receipt failed"):
                 release_manager.deploy(argparse.Namespace(
                     manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                    dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+                    dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
 
         self.assertEqual((target / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "old")
         self.assertTrue(any((path / "runtime.zip").is_file() for path in (target / ".mpa/backups").iterdir() if path.is_dir()))
@@ -664,7 +677,7 @@ class ReleaseManagerTest(unittest.TestCase):
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         release_manager.deploy(argparse.Namespace(
             manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-            dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+            dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         backup = next((target / ".mpa/backups").iterdir())
         with release_manager.materialized_runtime_archive(backup / "runtime.zip") as extracted:
             shutil.copytree(extracted, backup / "runtime")
@@ -673,7 +686,7 @@ class ReleaseManagerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "asset checksum"):
             release_manager.rollback(argparse.Namespace(
                 target=str(target), target_ref="target", backup=str(backup.relative_to(target)), release_id=release_id,
-                verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
+                verified_by="test", approved_by="test", approval_ref="unit", operator="test"))
 
     def test_rollback_requires_approval_metadata(self):
         manifest = self.prepare()
@@ -685,14 +698,14 @@ class ReleaseManagerTest(unittest.TestCase):
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         release_manager.deploy(argparse.Namespace(
             manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-            dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+            dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         backup = next((target / ".mpa/backups").iterdir())
 
-        for field in ("approved_by", "approval_ref", "rollback_owner"):
+        for field in ("operator", "approved_by", "approval_ref"):
             with self.subTest(field=field):
-                values = {"approved_by": "test", "approval_ref": "unit", "rollback_owner": "test"}
+                values = {"operator": "test", "approved_by": "test", "approval_ref": "unit"}
                 values[field] = " "
-                with self.assertRaisesRegex(ValueError, "approved-by, approval-ref, and rollback-owner are required"):
+                with self.assertRaisesRegex(ValueError, "operator, approved-by, and approval-ref are required"):
                     release_manager.rollback(argparse.Namespace(
                         target=str(target), target_ref="target", backup=str(backup.relative_to(target)), release_id=release_id,
                         verified_by="test", **values))
@@ -715,7 +728,7 @@ class ReleaseManagerTest(unittest.TestCase):
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         release_manager.deploy(argparse.Namespace(
             manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-            dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+            dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         backup = next((target / ".mpa/backups").iterdir())
         data = json.loads((backup / release_manager.BACKUP_MARKER).read_text(encoding="utf-8"))
         data["asset_checksum"] = "0" * 64
@@ -723,7 +736,7 @@ class ReleaseManagerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "asset checksum"):
             release_manager.rollback(argparse.Namespace(
                 target=str(target), target_ref="target", backup=str(backup.relative_to(target)), release_id=release_id,
-                verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
+                verified_by="test", approved_by="test", approval_ref="unit", operator="test"))
 
     def test_rollback_receipt_failure_restores_applied_runtime(self):
         manifest = self.prepare()
@@ -733,7 +746,7 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         release_manager.deploy(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+                                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         backup = next((target / ".mpa/backups").iterdir())
         original_write = release_manager.write_json
         def fail_rollback_receipt(path, value):
@@ -743,7 +756,7 @@ class ReleaseManagerTest(unittest.TestCase):
         with mock.patch.object(release_manager, "write_json", side_effect=fail_rollback_receipt):
             with self.assertRaisesRegex(OSError, "receipt failed"):
                 release_manager.rollback(argparse.Namespace(target=str(target), target_ref="target", backup=str(backup.relative_to(target)),
-                                                          release_id=release_id, verified_by="test", approved_by="test", approval_ref="unit", rollback_owner="test"))
+                                                          release_id=release_id, verified_by="test", approved_by="test", approval_ref="unit", operator="test"))
         self.assertEqual((target / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "v1")
 
     def test_deploy_rejects_repeated_release_history(self):
@@ -753,7 +766,7 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target_root), target_ref="test-target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "test-target").glob("dry-run-*.json"))
         args = argparse.Namespace(manifest=str(manifest), target=str(target_root), target_ref="test-target", verified_by="test",
-                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test")
+                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test")
         release_manager.deploy(args)
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target_root), target_ref="test-target"))
         args.dry_run = str(max((release_manager.DEPLOYMENT_RECEIPTS / "test-target").glob("dry-run-*.json"), key=lambda path: path.stat().st_mtime_ns))
@@ -767,7 +780,7 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target"))
         first = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         args = argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                                  dry_run=str(first), approved_by="test", approval_ref="unit", rollback_owner="test")
+                                  dry_run=str(first), approved_by="test", approval_ref="unit", operator="test")
         with mock.patch.object(release_manager, "verify_target", side_effect=[None, ValueError("verification failed")]):
             with self.assertRaisesRegex(ValueError, "verification failed"):
                 release_manager.deploy(args)
@@ -787,7 +800,7 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target_root), target_ref="test-target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "test-target").glob("dry-run-*.json"))
         args = argparse.Namespace(manifest=str(manifest), target=str(target_root), target_ref="test-target", verified_by="test",
-                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test")
+                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test")
         with mock.patch.object(release_manager, "verify_target", side_effect=[None, ValueError("verification failed")]):
             with self.assertRaisesRegex(ValueError, "verification failed"):
                 release_manager.deploy(args)
@@ -803,10 +816,10 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         args = argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                                  dry_run=str(dry_run), approved_by="", approval_ref="", rollback_owner="")
+                                  dry_run=str(dry_run), approved_by="", approval_ref="", operator="")
         with self.assertRaisesRegex(ValueError, "approved-by"):
             release_manager.deploy(args)
-        args.approved_by = args.approval_ref = args.rollback_owner = "test"
+        args.approved_by = args.approval_ref = args.operator = "test"
         data = json.loads(dry_run.read_text(encoding="utf-8"))
         data["release_receipt"] = "workspace/receipts/releases/not-the-release.json"
         dry_run.write_text(json.dumps(data), encoding="utf-8")
@@ -840,7 +853,7 @@ class ReleaseManagerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "target-ref"):
             release_manager.deploy(argparse.Namespace(
                 manifest=str(manifest), target=str(target_root), target_ref="../escape", verified_by="test",
-                dry_run="unused", approved_by="test", approval_ref="unit", rollback_owner="test",
+                dry_run="unused", approved_by="test", approval_ref="unit", operator="test",
             ))
         with self.assertRaisesRegex(ValueError, "backup must be inside"):
             release_manager.rollback(argparse.Namespace(
@@ -895,7 +908,7 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         release_manager.deploy(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+                                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         self.assertFalse(issue.exists())
         self.assertTrue((release_manager.ISSUES / "inbox" / "target" / "issue.md").is_file())
         self.assertFalse((release_manager.WORKSPACE / "receipts" / "issues").exists())
@@ -912,7 +925,7 @@ class ReleaseManagerTest(unittest.TestCase):
         issue.write_text(release_manager.issue_text("changed", "summary", "methodology_improvement"), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "issues changed"):
             release_manager.deploy(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                                                      dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+                                                      dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         self.assertTrue(issue.exists())
 
     def test_release_allows_scoped_dirty_or_no_git_source(self):
@@ -974,7 +987,7 @@ class ReleaseManagerTest(unittest.TestCase):
         dry_data = json.loads(dry_run.read_text(encoding="utf-8"))
         self.assertEqual(dry_data["from_release"], "legacy-2026-08-12-12-06-00")
         release_manager.deploy(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="legacy-target", verified_by="test",
-                                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+                                                  dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         self.assertEqual(release_manager.current_release(target_runtime), json.loads(manifest.read_text(encoding="utf-8"))["release_id"])
 
     def test_empty_metadata_creates_nothing_and_audit_rejects_missing_package(self):
@@ -1191,7 +1204,7 @@ class ReleaseManagerTest(unittest.TestCase):
             with self.assertRaisesRegex(OSError, "deployment receipt failed"):
                 release_manager.deploy(argparse.Namespace(
                     manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                    dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+                    dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         self.assertEqual((target / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "old")
         self.assertTrue(issue.exists())
         self.assertFalse((release_manager.ISSUES / "inbox" / "target" / issue.name).exists())
@@ -1218,7 +1231,7 @@ class ReleaseManagerTest(unittest.TestCase):
         with mock.patch.object(release_manager, "write_issue", side_effect=assert_collected_before_metadata):
             release_manager.deploy(argparse.Namespace(
                 manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                dry_run=str(dry_run), approved_by="test", approval_ref="unit", rollback_owner="test"))
+                dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         destination = release_manager.ISSUES / "inbox" / "target" / issue.name
         metadata, body = release_manager.read_issue(destination)
         self.assertEqual(metadata["kind"], "legacy_issue")
