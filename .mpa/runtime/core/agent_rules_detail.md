@@ -137,9 +137,9 @@ code_gate.py가 "구현 승인 기록 복구 필요" 또는 "구현 재승인 �
 
 ## 기술/도메인 지식 기록 기준
 
-> **단방향 흐름 원칙:** 발견 시점에는 경계를 판단하지 않는다. 항상 단일 위치(`domains/`)에 기록하고, 정기적으로 승격 후보를 평가한다.
+> **프로젝트 자산 우선 원칙:** 발견한 기술·도메인 지식은 issue로 우회하지 않고 해당 프로젝트의 지속 자산으로 즉시 기록한다.
 
-### 1단계 — 발견 시: 항상 domains/에 기록
+### 발견 시: domains/에 즉시 기록
 
 지식을 발견했을 때는 "이 프로젝트만의 것인가, 보편적인가"를 판단하지 않는다.  
 일단 `workspace/memory/domains/[관련 도메인]/rules.md` 에 기록한다.
@@ -153,31 +153,27 @@ code_gate.py가 "구현 승인 기록 복구 필요" 또는 "구현 재승인 �
 - 일반적인 Best Practice, 공식 문서에 있는 내용 (훈련 데이터를 신뢰한다)
 - 일회성 결정
 
-> 새 도메인 파일을 만들었으면 `workspace/memory/INDEX.md`의 `domains/` 표에 한 행 등록한다 (도메인 · 다루는 내용 · 파일 · 업데이트).
+새 도메인 파일을 만들었으면 같은 작업 단위에서 다음 세 자산을 모두 갱신한다.
 
-### 2단계 — Layer 2 체크포인트 시: 승격 후보 평가
+1. `workspace/memory/domains/[도메인]/rules.md` 생성
+2. `workspace/memory/INDEX.md`의 `domains/` 표에 도메인·다루는 내용·파일·업데이트 등록
+3. `workspace/memory/shared/project_identity.md`의 `가용 도메인` 목록에 도메인 등록. 해당 섹션이 없으면 `## 가용 도메인`을 만든다
 
-전체 정합성 점검(`layer2_checkpoint.md`)을 진행할 때, `domains/`에 기록된 지식 중 다음 질문에 답한다:
+기존 도메인 지식을 수정한 경우에도 INDEX의 업데이트 정보를 함께 갱신한다. Layer 2는 세 자산의 누락·충돌·stale 항목을 정합성 문제로 점검하고 직접 보완하지만, 도메인 지식을 issue로 만들지 않는다.
 
-> **"이 지식이 다른 프로젝트의 의사결정도 바꾸는가?"**
+### 공용 knowledge 경계
 
-답이 Yes인 항목은 local `workspace/issues/`에 `knowledge_promotion` issue로 기록한다.
-
-### 3단계 — issue 검토 후: knowledge/로 승격
-
-사용자가 수집·검토한 `knowledge_promotion` issue를 승인하면 `.mpa/runtime/knowledge/[도메인명].md`로 이동한다.
-승격된 지식은 **실제로 다른 프로젝트에서 import해 사용 가능한 검증된 지식**이다.
+`.mpa/runtime/knowledge/[도메인].md`는 여러 설치 프로젝트에 배포되는 검증된 공용 사실이다. project memory에서 자동 승격하거나 issue lifecycle로 생성·갱신·폐기하지 않는다. 공용 knowledge 변경이 필요하면 사용자가 범위와 목적을 승인한 별도 MPA 시스템 변경 작업 항목으로 처리한다.
 
 ### 위치 요약
 
 | 위치 | 단계 | 신뢰도 |
 |------|------|--------|
 | `workspace/memory/domains/[도메인]/rules.md` | 발견 즉시 기록 | 이 프로젝트 한정 |
-| `workspace/issues/` | Layer 2 시 기록한 승격 issue | 평가 중 |
-| `.mpa/runtime/knowledge/[도메인].md` | 사용자 승인 후 승격 | 검증된 범용 지식 |
+| `workspace/memory/INDEX.md`, `workspace/memory/shared/project_identity.md` | 새 도메인 생성·기존 도메인 갱신과 같은 작업 단위에 동기화 | 로딩·선별용 색인 |
+| `.mpa/runtime/knowledge/[도메인].md` | 명시적 MPA 변경 작업으로만 관리 | 검증된 범용 지식 |
 
-> 기록 시점에 경계를 판단하지 않으므로 인지 부담이 분산된다.
-> knowledge/는 진짜 검증된 지식만 모이는 곳이 되어 신뢰도가 보장된다.
+> 프로젝트에서 검증된 지식이라는 이유만으로 공용 knowledge 후보나 중앙 issue가 되지는 않는다.
 
 ---
 
@@ -227,7 +223,19 @@ code_gate.py가 "구현 승인 기록 복구 필요" 또는 "구현 재승인 �
 
 제품 기능·도메인 로직 자체의 버그는 이 기준만으로 시스템 개선 issue로 분류하지 않는다. 이슈 검토·수집 요청도 이슈 생성 요청과 구분한다.
 
+프로젝트 기능 보완은 `tasks/`·`docs/`, 아키텍처·계약·역할 함정·도메인 지식은 성격에 맞는 `workspace/memory/`에 직접 기록한다. 특히 도메인 지식은 위 "기술/도메인 지식 기록 기준"에 따라 rules·INDEX·project identity를 같은 작업 단위로 갱신한다. 이 항목들은 local issue로 생성하지 않는다.
+
 설치 프로젝트에서는 위 관찰을 즉시 해당 프로젝트의 `workspace/issues/<filename>.md`에 원본으로 기록한다. 파일에는 아래 `methodology_improvement` 템플릿의 정확한 `**타입**: 방법론 개선` 표기를 포함한다. 이 표기는 source가 수집 시 canonical `methodology_improvement` kind로 정규화하는 기준이다.
+
+작성 전 다음 순서로 라우팅·안전성을 확인한다.
+
+1. MPA Runtime 규칙·hook·agent 행동·source 운영 방식의 개선인가? → `methodology_improvement` issue
+2. 프로젝트 기능 보완인가? → `workspace/tasks/` 또는 `docs/`
+3. 아키텍처·계약·역할 함정·기술/도메인 지식인가? → 해당 `workspace/memory/` 자산
+
+issue에는 credential-like 값이나 그 일부를 기록하지 않는다. 재현에 필요한 프로젝트 내부 절대 경로는 `<project-root>/상대/경로`로, 프로젝트 밖 머신 경로는 `<redacted-path>/안전한-하위-경로`로 작성한다. 실제 credential이 이미 포함됐다면 자동 치환해 수집 가능한 것으로 취급하지 말고 producer가 원본에서 제거한 뒤 다시 검토한다.
+
+잘못된 유형으로 issue를 만들었다면 collector에게 자산 수정을 맡기지 않는다. producer가 원본을 보존한 채 올바른 `tasks/`·`docs/`·`memory/` 자산에 내용을 반영하고, issue가 더 이상 필요 없음을 사용자에게 확인받은 뒤 원본을 정리한다. collector는 `not_candidate` 사유와 필요한 경우 안전한 producer handoff 경로만 고지한다.
 
 설치 Runtime은 source 전용 운영 명령을 실행하거나 중앙 `inbox/`로 직접 이동하지 않는다. 수집은 사용자가 요청한 뒤 source 운영자가 수행하며, 수집 전 원본 이슈는 설치 프로젝트의 `workspace/issues/`에 보존한다.
 
@@ -245,24 +253,10 @@ code_gate.py가 "구현 승인 기록 복구 필요" 또는 "구현 재승인 �
 [더 나은 방법]
 
 ## 적용 대상 파일
-- `.mpa/runtime/[파일명]`
+- `.mpa/runtime/[파일명]` 또는 `<project-root>/상대/경로`
 ```
 
-**`knowledge_promotion` — 도메인 지식** (다른 프로젝트에도 유효한 도메인·업종 지식)
-```markdown
-# [도메인명]: [지식 제목]
-**타입**: 도메인 지식
-**도메인**: [결제 / 인증 / 알림 / ...]
-**발견 상황**: [어떤 태스크 중 발견했는지]
-
-## 내용
-[기록할 지식]
-
-## 적용 대상 파일
-- `.mpa/runtime/knowledge/[도메인명].md`
-```
-
-> local issue는 프로젝트 `workspace/issues/`에 기록한다. map-product source 저장소로의 수집·review·triage·archive는 사용자가 지정한 요청 또는 승인된 Runtime update의 dry-run에서 후보·원본 정리 계획을 고지한 경우에만 수행한다. 검증·receipt 기록이 실패하면 대상 원본을 보존한다.
+> local `workspace/issues/`에는 `methodology_improvement`만 기록한다. map-product source 저장소로의 수집·review·triage·archive는 사용자가 지정한 요청 또는 승인된 Runtime update의 dry-run에서 후보·원본 정리 계획을 고지한 경우에만 수행한다. 검증·receipt 기록이 실패하면 대상 원본을 보존한다.
 
 ---
 

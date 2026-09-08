@@ -31,6 +31,6 @@
 사용자가 수집 issue의 검토 결과를 결정하면:
 
 1. `workspace/issues/inbox/`의 지정 issue와 현재 MPA 규칙을 대조한 검토 내용을 사용자에게 제시한다
-2. 사용자가 채택하면 `methodology_improvement`는 MPA 시스템 파일 수정 태스크로, `knowledge_promotion`은 `.mpa/runtime/knowledge/[도메인].md` 반영 태스크로 등록하고 plan.md를 만든다
+2. 사용자가 `methodology_improvement`를 채택하면 MPA 시스템 파일 수정 태스크로 등록하고 plan.md를 만든다. 도메인 지식은 이 수집 lifecycle에서 처리하지 않고 해당 프로젝트 memory에 직접 자산화한다
 3. 채택 이슈에는 새 task plan 경로와 판단 근거를 기록한 뒤 바로 archive한다. 사용자가 기각하면 판단 근거를 기록한 뒤 바로 archive한다
 4. 채택된 Runtime 변경은 구현·검증 뒤 `release_manager.py sync-runtime`으로 `dist/.mpa/runtime/`에 동기화한다

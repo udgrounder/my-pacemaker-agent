@@ -41,8 +41,21 @@ RELEASE_RECEIPTS = RELEASES
 DEPLOYMENT_RECEIPTS = WORKSPACE / ".local" / "receipts" / "deployments"
 ISSUES = WORKSPACE / "issues"
 SAFE_REF = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+SAFE_ISSUE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.md$")
 SECRET = re.compile(r"(?i)(api[_-]?key|secret|password|token)\s*[:=]\s*\S+")
 ABSOLUTE_PATH = re.compile(r"(?<![\w.-])/(?:Users|home|var|private|tmp|etc)/")
+MACHINE_ABSOLUTE_PATH = re.compile(
+    r"(?<![\w.-])/(?:Users|home|var|private|tmp|etc)(?:/[^\s`'\"<>{}\[\]()]*)+"
+)
+ISSUE_TYPE_MARKER = re.compile(r"^\*\*타입\*\*:\s*(.+?)\s*$", re.MULTILINE)
+ISSUE_POLICY_VERSION = "issue-preflight-v1"
+ISSUE_NORMALIZATION_VERSION = "machine-path-v2"
+METHODOLOGY_KIND = "methodology_improvement"
+METHODOLOGY_TYPE_MARKER = "방법론 개선"
+NORMALIZED_MACHINE_PATH = re.compile(
+    r"<(?:project-root|redacted-path)>(?:/[^\s`'\"<>{}\[\](),;:!?]*)*"
+)
+ISSUE_IDENTITY_PATH_ANCHORS = (".mpa", "workspace", "docs")
 RETIRED_RUNTIME_REFERENCE = ".mpa-workspace"
 TEXT_RUNTIME_SUFFIXES = {".json", ".md", ".py", ".toml"}
 IGNORED_RUNTIME_NAMES = {"__pycache__", ".DS_Store", "history"}
@@ -1203,13 +1216,6 @@ def migrate_runtime_backups(args: argparse.Namespace) -> None:
         raise ValueError("one or more runtime backup migrations failed; originals were preserved")
 
 
-def update_issue_inventory(root: Path) -> list[dict[str, str]]:
-    folder = root / "workspace" / "issues"
-    if not folder.is_dir():
-        return []
-    return [{"path": path.name, "checksum": sha(path)} for path in sorted(folder.glob("*.md"))]
-
-
 def project_fingerprint(root: Path) -> str:
     return sha_bytes(str(root.resolve()).encode("utf-8"))[:16]
 
@@ -1283,6 +1289,250 @@ def issue_metadata_for_collection(path: Path, text: str) -> tuple[dict, str | No
     return metadata, None
 
 
+def _parse_issue_candidate(text: str) -> tuple[str | None, dict | None, str]:
+    """Classify raw issue metadata without normalizing or rewriting its body."""
+    marker_values = {value.strip() for value in ISSUE_TYPE_MARKER.findall(text)}
+    if len(marker_values) > 1:
+        raise ValueError("issue type markers conflict")
+    marker = next(iter(marker_values), None)
+
+    if not text.startswith("---\n"):
+        if marker == METHODOLOGY_TYPE_MARKER:
+            return METHODOLOGY_KIND, None, text
+        if marker is None:
+            return None, None, text
+        return "project_asset", None, text
+
+    try:
+        raw_metadata, body = text[4:].split("\n---\n", 1)
+        metadata = json.loads(raw_metadata)
+    except (ValueError, json.JSONDecodeError) as error:
+        raise ValueError("issue metadata is invalid") from error
+    if not isinstance(metadata, dict) or metadata.get("type") != "issue":
+        raise ValueError("issue metadata is invalid")
+    kind = metadata.get("kind")
+    if kind is not None and (not isinstance(kind, str) or not kind.strip()):
+        raise ValueError("issue kind is invalid")
+    kind = kind.strip() if isinstance(kind, str) else None
+    if marker is not None:
+        marker_is_methodology = marker == METHODOLOGY_TYPE_MARKER
+        if marker_is_methodology != (kind == METHODOLOGY_KIND):
+            raise ValueError("issue metadata and type marker conflict")
+    return kind, metadata, body
+
+
+def _candidate_metadata_is_complete(metadata: dict | None) -> bool:
+    if metadata is None:
+        return True
+    required = (
+        "status", "canonical_key", "canonical_issue_key", "occurrence", "area",
+        "observed_release", "collection_purpose", "source_issue_id", "workspace_issue_id",
+    )
+    return metadata.get("status") == "open" and all(
+        isinstance(metadata.get(field), str) and metadata[field].strip()
+        for field in required
+    )
+
+
+def _require_regular_issue(path: Path) -> None:
+    try:
+        mode = path.lstat().st_mode
+    except OSError as error:
+        raise ValueError("issue candidate is not a readable regular file") from error
+    if not stat.S_ISREG(mode):
+        raise ValueError("issue candidate must be a regular file, not a symlink or special file")
+
+
+def normalize_issue_machine_paths(text: str, project_root: Path) -> str:
+    """Replace machine paths while preserving project-relative reproduction detail."""
+    project_roots = {
+        project_root.absolute().as_posix().rstrip("/"),
+        project_root.resolve().as_posix().rstrip("/"),
+    }
+    # macOS exposes the same temporary tree through both /var and /private/var.
+    # Accept either spelling so normalization does not depend on how a caller
+    # obtained the project path.
+    for root in tuple(project_roots):
+        if root.startswith("/private/var/"):
+            project_roots.add(root.removeprefix("/private"))
+        elif root.startswith("/var/"):
+            project_roots.add(f"/private{root}")
+
+    def replace(match: re.Match[str]) -> str:
+        token = match.group(0)
+        suffix = ""
+        while token and token[-1] in ".,;:!?":
+            suffix = token[-1] + suffix
+            token = token[:-1]
+        matching_root = next(
+            (root for root in sorted(project_roots, key=len, reverse=True)
+             if token == root or token.startswith(f"{root}/")),
+            None,
+        )
+        if matching_root is not None:
+            return f"<project-root>{token[len(matching_root):]}{suffix}"
+        parts = [part for part in token.split("/") if part]
+        safe_tail = parts[-2:] if len(parts) > 1 else parts
+        replacement = "<redacted-path>"
+        if safe_tail:
+            replacement += "/" + "/".join(safe_tail)
+        return replacement + suffix
+
+    return MACHINE_ABSOLUTE_PATH.sub(replace, text)
+
+
+def normalize_issue_identity_paths(text: str) -> str:
+    """Remove machine roots while retaining stable path detail for identity."""
+    def stable_path(parts: list[str]) -> str:
+        anchor = next(
+            (index for index, part in enumerate(parts) if part in ISSUE_IDENTITY_PATH_ANCHORS),
+            None,
+        )
+        safe_parts = parts[anchor:] if anchor is not None else parts[-2:]
+        return "<machine-path>" + ("/" + "/".join(safe_parts) if safe_parts else "")
+
+    def replace_absolute(match: re.Match[str]) -> str:
+        token = match.group(0)
+        suffix = ""
+        while token and token[-1] in ".,;:!?":
+            suffix = token[-1] + suffix
+            token = token[:-1]
+        return stable_path([part for part in token.split("/") if part]) + suffix
+
+    def replace_placeholder(match: re.Match[str]) -> str:
+        token = match.group(0)
+        prefix_end = token.find(">") + 1
+        parts = [part for part in token[prefix_end:].split("/") if part]
+        return stable_path(parts)
+
+    return NORMALIZED_MACHINE_PATH.sub(
+        replace_placeholder, MACHINE_ABSOLUTE_PATH.sub(replace_absolute, text))
+
+
+def _normalized_issue_values(text: str, project_root: Path) -> tuple[str, str, str]:
+    kind, _, body = _parse_issue_candidate(text)
+    if kind != METHODOLOGY_KIND:
+        raise ValueError("not a methodology issue")
+    normalized_text = normalize_issue_machine_paths(text, project_root)
+    identity_body = normalize_issue_identity_paths(body)
+    normalized_checksum = sha_bytes(normalized_text.encode("utf-8"))
+    normalized_identity = sha_bytes(f"{METHODOLOGY_KIND}\0{identity_body}".encode("utf-8"))
+    return normalized_text, normalized_checksum, normalized_identity
+
+
+def _central_issue_records(project_root: Path) -> list[tuple[Path, str | None, str]]:
+    _reject_symlink_components(WORKSPACE, "issues/inbox", "central issue")
+    _reject_symlink_components(WORKSPACE, "issues/archived", "central issue")
+    records: list[tuple[Path, str | None, str]] = []
+    for folder in (ISSUES / "inbox", ISSUES / "archived"):
+        for path in sorted(folder.rglob("*.md")) if folder.is_dir() else []:
+            content = path.read_bytes()
+            try:
+                text = content.decode("utf-8")
+                _, _, identity = _normalized_issue_values(text, project_root)
+            except (ValueError, UnicodeDecodeError):
+                identity = None
+            records.append((path, identity, sha_bytes(content)))
+    return records
+
+
+def preflight_issue(source: Path, project_root: Path, project_ref: str) -> dict[str, object]:
+    """Return a safe, read-only collection decision for one top-level project issue."""
+    project_ref = require_safe_ref(project_ref, "project-ref")
+    _reject_symlink_components(project_root, "workspace/issues", "project issue")
+    project_issues = (project_root.resolve() / "workspace" / "issues").resolve()
+    _require_regular_issue(source)
+    source = source.resolve()
+    if source.parent != project_issues or source.suffix != ".md" or not source.is_file():
+        raise ValueError("issue preflight requires a top-level project markdown issue")
+    content = source.read_bytes()
+    safe_name = bool(SAFE_ISSUE_NAME.fullmatch(source.name))
+    issue_name = source.name if safe_name else f"unsafe-{sha_bytes(source.name.encode('utf-8'))[:16]}.md"
+    result: dict[str, object] = {
+        "policy_version": ISSUE_POLICY_VERSION,
+        "issue_id": f"workspace/issues/{issue_name}",
+        "raw_checksum": sha_bytes(content),
+        "normalization_version": ISSUE_NORMALIZATION_VERSION,
+        "normalized_checksum": None,
+        "normalized_identity": None,
+        "classification": "unknown",
+        "status": "blocked",
+        "reason_code": "metadata_invalid",
+        "expected_destination": {"state": "absent"},
+    }
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return result
+    if SECRET.search(text):
+        result["reason_code"] = "credential_detected"
+        return result
+    if not safe_name:
+        result["reason_code"] = "unsafe_issue_id"
+        return result
+    try:
+        kind, metadata, _ = _parse_issue_candidate(text)
+    except ValueError:
+        return result
+    if kind is None:
+        result.update(classification="unknown", status="not_candidate", reason_code="kind_missing")
+        return result
+    if kind != METHODOLOGY_KIND:
+        result.update(classification="project_asset", status="not_candidate", reason_code="project_asset")
+        return result
+    result["classification"] = METHODOLOGY_KIND
+    if not _candidate_metadata_is_complete(metadata):
+        result["reason_code"] = "candidate_invalid"
+        return result
+
+    _, normalized_checksum, normalized_identity = _normalized_issue_values(text, project_root)
+    result["normalized_checksum"] = normalized_checksum
+    result["normalized_identity"] = normalized_identity
+    _reject_symlink_components(
+        WORKSPACE, f"issues/inbox/{project_ref}", "central issue destination")
+    destination = ISSUES / "inbox" / project_ref / source.name
+    records = _central_issue_records(project_root)
+    same_name = [
+        record for record in records
+        if record[0] == destination
+        or (record[0].name == source.name and record[0].parent.name == project_ref
+            and (ISSUES / "archived").resolve() in record[0].resolve().parents)
+    ]
+    identical = [record for record in records if record[1] == normalized_identity]
+    conflicts = [record for record in same_name if record[1] != normalized_identity]
+    if conflicts:
+        result.update(reason_code="destination_conflict",
+                      expected_destination={"state": "fingerprint", "checksum": conflicts[0][2]})
+        return result
+    if identical:
+        result.update(status="not_candidate", reason_code="already_collected",
+                      expected_destination={"state": "fingerprint", "checksum": identical[0][2]})
+        return result
+    result.update(status="collectable", reason_code="ready")
+    return result
+
+
+def update_issue_inventory(root: Path, project_ref: str) -> list[dict[str, object]]:
+    """Return the safe preflight snapshot for top-level project issues."""
+    _reject_symlink_components(root, "workspace/issues", "project issue")
+    folder = root / "workspace" / "issues"
+    if not folder.is_dir():
+        return []
+    return [preflight_issue(path, root, project_ref) for path in sorted(folder.glob("*.md"))]
+
+
+def render_collected_issue(source: Path, text: str, project_root: Path) -> str:
+    """Render the normalized central form without changing the project source."""
+    kind, metadata, _ = _parse_issue_candidate(text)
+    if kind != METHODOLOGY_KIND:
+        raise ValueError("only methodology improvement issues can be collected")
+    normalized = normalize_issue_machine_paths(text, project_root)
+    if metadata is not None:
+        return normalized
+    collected_metadata = legacy_issue_metadata(source, normalized)
+    return "---\n" + json.dumps(collected_metadata, ensure_ascii=False, indent=2) + "\n---\n" + normalized
+
+
 def _metadata_identity(metadata: dict) -> dict[str, str]:
     return {
         key: str(metadata[key])
@@ -1316,12 +1566,22 @@ def _existing_issue_identity_matches(identity: dict[str, str]) -> list[str]:
     return matches
 
 
-def _rollback_issue_moves(moved: list[tuple[Path, Path, str | None]]) -> None:
-    for source, destination, legacy_source_text in reversed(moved):
-        if destination.exists() and not source.exists():
-            if legacy_source_text is not None:
-                destination.write_text(legacy_source_text, encoding="utf-8")
-            move_issue_atomically(destination, source)
+def _rollback_issue_moves(moved: list[tuple[Path, Path, bytes]]) -> None:
+    failures = 0
+    for source, destination, raw_source in reversed(moved):
+        try:
+            if destination.exists() and not source.exists():
+                with source.open("xb") as output_file:
+                    output_file.write(raw_source)
+                    output_file.flush()
+                    os.fsync(output_file.fileno())
+                if sha_bytes(source.read_bytes()) != sha_bytes(raw_source):
+                    raise OSError("issue rollback source verification failed")
+                destination.unlink()
+        except Exception:
+            failures += 1
+    if failures:
+        raise OSError(f"issue rollback failed for {failures} item(s)")
 
 
 def confirm_issue_move(source: Path, destination: Path) -> None:
@@ -1333,18 +1593,43 @@ def confirm_issue_move(source: Path, destination: Path) -> None:
     raise OSError("issue move verification failed")
 
 
-def delete_issue_source(source: Path) -> None:
-    source.unlink()
+def delete_issue_source(source: Path, expected_checksum: str | None = None) -> None:
+    if expected_checksum is None:
+        source.unlink()
+        return
+    quarantine = source.with_name(f".{source.name}.collecting-{uuid.uuid4().hex[:8]}")
+    source.replace(quarantine)
+    try:
+        _require_regular_issue(quarantine)
+        matches = sha(quarantine) == expected_checksum
+    except (OSError, ValueError):
+        matches = False
+    if not matches:
+        if not source.exists():
+            quarantine.replace(source)
+        raise OSError("issue source changed before deletion")
+    try:
+        quarantine.unlink()
+    except Exception:
+        if not source.exists() and quarantine.exists():
+            quarantine.replace(source)
+        raise
 
 
-def transfer_issue_after_verification(source: Path, destination: Path) -> None:
+def transfer_issue_after_verification(source: Path, destination: Path,
+                                      destination_content: bytes | None = None,
+                                      source_checksum: str | None = None) -> None:
     """Create and confirm the destination before deleting the collection source."""
     temporary = destination.with_name(f".{destination.name}.new-{uuid.uuid4().hex[:8]}")
     destination_created = False
     source_deleted = False
     try:
-        with source.open("rb") as input_file, temporary.open("xb") as output_file:
-            shutil.copyfileobj(input_file, output_file)
+        with temporary.open("xb") as output_file:
+            if destination_content is None:
+                with source.open("rb") as input_file:
+                    shutil.copyfileobj(input_file, output_file)
+            else:
+                output_file.write(destination_content)
             output_file.flush()
             os.fsync(output_file.fileno())
         os.link(temporary, destination)
@@ -1352,7 +1637,10 @@ def transfer_issue_after_verification(source: Path, destination: Path) -> None:
         temporary.unlink()
         if not destination.is_file():
             raise OSError("issue destination verification failed")
-        delete_issue_source(source)
+        expected_checksum = sha_bytes(destination_content) if destination_content is not None else sha(source)
+        if sha(destination) != expected_checksum:
+            raise OSError("issue destination checksum verification failed")
+        delete_issue_source(source, source_checksum)
         source_deleted = True
         confirm_issue_move(source, destination)
     except Exception:
@@ -1365,38 +1653,37 @@ def transfer_issue_after_verification(source: Path, destination: Path) -> None:
 
 
 def collect_update_issues_transaction(root: Path, project_ref: str,
-                                      expected: list[dict[str, str]]) -> tuple[list[str], list[tuple[Path, Path, str | None]]]:
+                                      expected: list[dict[str, object]]) -> tuple[list[str], list[tuple[Path, Path, bytes]]]:
     """Collect a verified update batch and return rollback handles for the caller."""
-    if update_issue_inventory(root) != expected:
+    if update_issue_inventory(root, project_ref) != expected:
         raise ValueError("project issues changed after dry-run")
     project_issues = root / "workspace" / "issues"
-    destinations: list[tuple[Path, Path, dict, str | None]] = []
-    for item in expected:
-        source = project_issues / item["path"]
-        text = source.read_text(encoding="utf-8")
-        check_issue_text(text)
-        metadata, legacy_source_text = issue_metadata_for_collection(source, text)
+    destinations: list[tuple[Path, Path, bytes, bytes, str]] = []
+    for item in (candidate for candidate in expected if candidate.get("status") == "collectable"):
+        issue_id = str(item["issue_id"])
+        source = project_issues / Path(issue_id).name
+        _require_regular_issue(source)
+        raw_source = source.read_bytes()
+        if sha_bytes(raw_source) != item.get("raw_checksum"):
+            raise ValueError("project issue changed after dry-run")
+        text = raw_source.decode("utf-8")
+        rendered = render_collected_issue(source, text, root).encode("utf-8")
         destination = ISSUES / "inbox" / project_ref / source.name
-        archived = list((ISSUES / "archived").rglob(source.name)) if (ISSUES / "archived").exists() else []
-        identity_matches = _existing_issue_identity_matches(_metadata_identity(metadata))
-        if destination.exists() or archived or identity_matches:
-            raise ValueError("update issue already exists in inbox or archive")
-        destinations.append((source, destination, metadata, legacy_source_text))
-    moved: list[tuple[Path, Path, str | None]] = []
+        destinations.append((source, destination, raw_source, rendered, str(item["raw_checksum"])))
+    moved: list[tuple[Path, Path, bytes]] = []
     try:
-        for source, destination, metadata, legacy_source_text in destinations:
+        for source, destination, raw_source, rendered, raw_checksum in destinations:
             destination.parent.mkdir(parents=True, exist_ok=True)
-            transfer_issue_after_verification(source, destination)
-            moved.append((source, destination, legacy_source_text))
-            if legacy_source_text is not None:
-                write_issue(destination, metadata, legacy_source_text)
+            transfer_issue_after_verification(
+                source, destination, rendered, raw_checksum)
+            moved.append((source, destination, raw_source))
     except Exception:
         _rollback_issue_moves(moved)
         raise
     return [str(destination.relative_to(ROOT)) for _, destination, _ in moved], moved
 
 
-def collect_update_issues(root: Path, project_ref: str, expected: list[dict[str, str]]) -> list[str]:
+def collect_update_issues(root: Path, project_ref: str, expected: list[dict[str, object]]) -> list[str]:
     collected, _ = collect_update_issues_transaction(root, project_ref, expected)
     return collected
 
@@ -1408,11 +1695,19 @@ def deployment_dry_run(args: argparse.Namespace) -> None:
     root = deployment_target_root(args, target_ref)
     target = resolve_runtime(root)
     created_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
+    issue_inventory = update_issue_inventory(root, target_ref)
+    blocked = [item for item in issue_inventory if item["status"] == "blocked"]
     result = {"release_id": manifest["release_id"],
               "from_release": current_release(target), "to_release": manifest["release_id"], "manifest": relative_to_root(manifest_path),
               "release_receipt": manifest["release_receipt"],
               "target_ref": target_ref, "target_fingerprint": project_fingerprint(root), "current_assets": asset_map(target),
-              "release_assets": manifest["assets"], "history": target_history(target), "issue_inventory": update_issue_inventory(root),
+              "release_assets": manifest["assets"], "history": target_history(target), "issue_inventory": issue_inventory,
+              "issue_collection": {
+                  "status": "blocked" if blocked else "ready",
+                  "collectable": sum(item["status"] == "collectable" for item in issue_inventory),
+                  "not_candidate": sum(item["status"] == "not_candidate" for item in issue_inventory),
+                  "blocked": len(blocked),
+              },
               "runtime_config": _runtime_config_summary(root, manifest.get("runtime_config")),
               "created_at": created_at.isoformat(),
               "expires_at": (created_at + dt.timedelta(minutes=30)).isoformat()}
@@ -1420,6 +1715,8 @@ def deployment_dry_run(args: argparse.Namespace) -> None:
     write_safe_receipt(path, result)
     remember_local_target(root, target_ref)
     print(relative_to_root(path))
+    if blocked:
+        raise ValueError("deployment dry-run blocked by project issue preflight")
 
 
 def deploy(args: argparse.Namespace) -> None:
@@ -1450,8 +1747,10 @@ def deploy(args: argparse.Namespace) -> None:
         if (dry_run_data.get("current_assets") != asset_map(target) or dry_run_data.get("history") != target_history(target) or
                 dry_run_data.get("from_release") != current_release(target)):
             raise ValueError("target changed after dry-run")
-        if dry_run_data.get("issue_inventory") != update_issue_inventory(root):
+        if dry_run_data.get("issue_inventory") != update_issue_inventory(root, target_ref):
             raise ValueError("project issues changed after dry-run")
+        if any(item.get("status") == "blocked" for item in dry_run_data.get("issue_inventory", [])):
+            raise ValueError("deploy cannot use a dry-run with blocked project issues")
         runtime_config = manifest.get("runtime_config")
         dry_runtime_config = dry_run_data.get("runtime_config", {})
         if runtime_config is not None and dry_runtime_config.get("config_checksum") != _runtime_config_checksum(root):
@@ -1468,7 +1767,7 @@ def deploy(args: argparse.Namespace) -> None:
         replacement = None
         previous = None
         created_paths: list[str] = []
-        moved_issues: list[tuple[Path, Path]] = []
+        moved_issues: list[tuple[Path, Path, bytes]] = []
         deployment_receipt: Path | None = None
         history_path: Path | None = None
         config_snapshot: dict[str, object] = {"included": False, "existed": False, "checksum": None}
@@ -1526,29 +1825,53 @@ def deploy(args: argparse.Namespace) -> None:
                 if previous and previous.exists():
                     shutil.rmtree(previous)
             except Exception as error:
-                _rollback_issue_moves(moved_issues)
-                if previous and previous.exists():
-                    if target.exists():
-                        shutil.rmtree(target)
-                    previous.replace(original_target)
+                recovery_errors: list[str] = []
+                try:
+                    _rollback_issue_moves(moved_issues)
+                except Exception:
+                    recovery_errors.append("issues")
+                try:
+                    if previous and previous.exists():
+                        if target.exists():
+                            shutil.rmtree(target)
+                        previous.replace(original_target)
+                except Exception:
+                    recovery_errors.append("runtime")
                 try:
                     _restore_config_from_backup(root, backup, {"config_snapshot": config_snapshot})
                 except Exception:
-                    pass
-                if replacement and replacement.exists():
-                    shutil.rmtree(replacement)
-                if deployment_receipt and deployment_receipt.exists():
-                    deployment_receipt.unlink()
-                if history_path and history_path.exists():
-                    history_path.unlink()
-                _remove_created_project_paths(root, created_paths)
+                    recovery_errors.append("config")
+                try:
+                    if replacement and replacement.exists():
+                        shutil.rmtree(replacement)
+                except Exception:
+                    recovery_errors.append("replacement")
+                try:
+                    if deployment_receipt and deployment_receipt.exists():
+                        deployment_receipt.unlink()
+                except Exception:
+                    recovery_errors.append("deployment_receipt")
+                try:
+                    if history_path and history_path.exists():
+                        history_path.unlink()
+                except Exception:
+                    recovery_errors.append("history")
+                try:
+                    _remove_created_project_paths(root, created_paths)
+                except Exception:
+                    recovery_errors.append("created_paths")
                 failure = {"status": "failed", "release_id": manifest["release_id"], "from_release": from_release,
                            "to_release": manifest["release_id"], "manifest": relative_to_root(manifest_path),
                            "target_ref": target_ref, "target_fingerprint": project_fingerprint(root),
                            "backup": str(backup.relative_to(root)) if backup.exists() else None,
                            "failed_at": now(), "error": str(error), "operator": args.operator,
                            "dry_run": relative_to_root(dry_run),
-                           "recovery": {"runtime_restored": not previous or target.is_dir(), "issues_restored": not moved_issues}}
+                           "recovery": {
+                               "runtime_restored": not previous or target.is_dir(),
+                               "issues_restored": all(source.exists() and not destination.exists()
+                                                      for source, destination, _ in moved_issues),
+                               "errors": recovery_errors,
+                           }}
                 try:
                     write_safe_receipt(DEPLOYMENT_RECEIPTS / target_ref / f"deploy-failed-{manifest['release_id']}-{receipt_suffix()}.json", failure)
                 except OSError:
@@ -1558,6 +1881,11 @@ def deploy(args: argparse.Namespace) -> None:
                         write_safe_receipt(target / "history" / "releases" / f"{manifest['release_id']}.json", failure)
                     except OSError:
                         pass
+                if recovery_errors:
+                    raise OSError(
+                        "deployment failed and recovery was incomplete: "
+                        + ", ".join(recovery_errors)
+                    ) from error
                 raise
         print(json.dumps({"backup": str(backup.relative_to(root)), "issue_collection": receipt["issue_collection"]}, ensure_ascii=False))
 
@@ -1687,7 +2015,10 @@ def check_issue_text(text: str) -> None:
 
 
 def create_issue(args: argparse.Namespace) -> None:
+    if args.kind != METHODOLOGY_KIND:
+        raise ValueError("issue-create accepts only methodology_improvement; route project work to tasks/docs/memory")
     project = Path(args.project).resolve()
+    _reject_symlink_components(project, "workspace/issues", "project issue")
     folder = project / "workspace" / "issues"
     folder.mkdir(parents=True, exist_ok=True)
     ident = f"issue-{dt.datetime.now().strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}.md"
@@ -1706,25 +2037,38 @@ def create_issue(args: argparse.Namespace) -> None:
 
 def collect_issue(args: argparse.Namespace) -> None:
     project_ref = require_safe_ref(args.project_ref, "project-ref")
-    project_issues = (Path(args.project).resolve() / "workspace" / "issues").resolve()
-    source = (project_issues / args.issue).resolve()
+    if Path(args.issue).name != args.issue:
+        raise ValueError("specified issue must be a top-level basename")
+    project_root = Path(args.project).resolve()
+    _reject_symlink_components(project_root, "workspace/issues", "project issue")
+    project_issues = (project_root / "workspace" / "issues").resolve()
+    source = project_issues / args.issue
     if project_issues not in source.parents or source.suffix != ".md" or not source.is_file():
         raise ValueError("specified issue does not exist")
-    text = source.read_text(encoding="utf-8")
-    check_issue_text(text)
-    metadata, legacy_source_text = issue_metadata_for_collection(source, text)
+    decision = preflight_issue(source, project_root, project_ref)
+    if decision["status"] != "collectable":
+        routing_hint = {
+            "project_asset": "producer:tasks/docs/memory",
+            "kind_missing": "producer:reclassify-then-route",
+            "already_collected": "central:existing-issue",
+        }.get(str(decision["reason_code"]), "producer:repair-source")
+        raise ValueError(
+            f"issue collection {decision['status']}: {decision['reason_code']}; "
+            f"source preserved; handoff={routing_hint}"
+        )
+    _require_regular_issue(source)
+    raw_source = source.read_bytes()
+    if sha_bytes(raw_source) != decision["raw_checksum"]:
+        raise ValueError("issue changed after preflight; source preserved")
+    text = raw_source.decode("utf-8")
+    rendered = render_collected_issue(source, text, project_root).encode("utf-8")
     destination = ISSUES / "inbox" / project_ref / source.name
-    archived = list((ISSUES / "archived").rglob(source.name)) if (ISSUES / "archived").exists() else []
-    identity_matches = _existing_issue_identity_matches(_metadata_identity(metadata))
-    if destination.exists() or archived or identity_matches:
-        raise ValueError("issue already exists in inbox or archive")
     destination.parent.mkdir(parents=True, exist_ok=True)
     try:
-        transfer_issue_after_verification(source, destination)
-        if legacy_source_text is not None:
-            write_issue(destination, metadata, legacy_source_text)
+        transfer_issue_after_verification(
+            source, destination, rendered, str(decision["raw_checksum"]))
     except Exception:
-        _rollback_issue_moves([(source, destination, legacy_source_text)])
+        _rollback_issue_moves([(source, destination, raw_source)])
         raise
     similar = [str(path.relative_to(ROOT)) for path in (ISSUES / "archived").rglob(f"*{source.stem}*")]
     print(json.dumps({"issue": str(destination.relative_to(ROOT)), "similar_archives": similar}, ensure_ascii=False))
@@ -1883,7 +2227,7 @@ def main() -> int:
     migrate_backups.add_argument("--target", required=True)
     migrate_backups.add_argument("--approved-by", required=True); migrate_backups.add_argument("--approval-ref", required=True); migrate_backups.add_argument("--operator", required=True)
     migrate_backups.set_defaults(func=migrate_runtime_backups)
-    create = commands.add_parser("issue-create"); create.add_argument("--project", required=True); create.add_argument("--title", required=True); create.add_argument("--summary", required=True); create.add_argument("--kind", default="observation"); create.add_argument("--key"); create.add_argument("--occurrence", default="first_observed"); create.add_argument("--area", default="unspecified"); create.add_argument("--observed-release", default="unknown"); create.add_argument("--collection-purpose", default="review"); create.set_defaults(func=create_issue)
+    create = commands.add_parser("issue-create"); create.add_argument("--project", required=True); create.add_argument("--title", required=True); create.add_argument("--summary", required=True); create.add_argument("--kind", choices=(METHODOLOGY_KIND,), default=METHODOLOGY_KIND); create.add_argument("--key"); create.add_argument("--occurrence", default="first_observed"); create.add_argument("--area", default="unspecified"); create.add_argument("--observed-release", default="unknown"); create.add_argument("--collection-purpose", default="review"); create.set_defaults(func=create_issue)
     collect = commands.add_parser("issue-collect"); collect.add_argument("--project", required=True); collect.add_argument("--project-ref", required=True); collect.add_argument("--issue", required=True); collect.set_defaults(func=collect_issue)
     archive = commands.add_parser("issue-archive"); archive.add_argument("--issue", required=True)
     archive.add_argument("--decision", choices=("accepted", "rejected"), required=True)

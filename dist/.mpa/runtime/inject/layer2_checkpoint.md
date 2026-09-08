@@ -119,17 +119,18 @@ methodology issue 누적: [N]개
 
 ---
 
-### 9. 지식 승격 후보 평가
+### 9. project domain memory 정합성 점검
 
-`workspace/memory/domains/*/rules.md`에 누적된 지식 중 다음 질문을 통과하는 항목을 식별한다:
+`workspace/memory/domains/*/rules.md`, `workspace/memory/INDEX.md`, `workspace/memory/shared/project_identity.md`를 대조한다.
 
-> **"이 지식이 다른 프로젝트의 의사결정도 바꾸는가?"**
+- 각 domain `rules.md`가 memory INDEX의 `domains/` 표에 등록되어 있는가?
+- INDEX의 domain 행이 실제 파일과 일치하고 업데이트 정보가 stale하지 않은가?
+- 각 domain이 `project_identity.md`의 `가용 도메인` 목록에 등록되어 있는가?
+- domain rules 사이 또는 shared architecture·contracts와 충돌하는 현재 규칙이 있는가?
 
-통과 항목은 local `workspace/issues/`에 `knowledge_promotion` issue로 기록한다.
-형식: `core/agent_rules_detail.md` "issue 기록" 섹션 참조.
+누락·stale 색인은 현재 project memory의 정답인 domain 파일을 기준으로 직접 보완한다. 규칙 충돌은 즉시/다음 스프린트 항목으로 분류하고 사용자 결정이 필요한 경우 보고한다.
 
-> 매 태스크마다 경계를 판단하지 않는다. Layer 2에서 한꺼번에 평가하는 것이 단방향 흐름 원칙이다.
-> map-product review가 승인하면 `.mpa/runtime/knowledge/[도메인].md`로 승격된다.
+> Layer 2는 도메인 지식을 `workspace/issues/`에 기록하거나 `.mpa/runtime/knowledge/`로 승격하지 않는다. 공용 knowledge 변경은 별도의 명시적 MPA 시스템 변경 작업에서만 수행한다.
 
 ---
 
@@ -142,7 +143,7 @@ methodology issue 누적: [N]개
 - [ ] 요청/문서 동기화 점검 완료
 - [ ] INDEX vs 태스크 폴더 동기화 확인 (누락·불일치 없음)
 - [ ] 사용자 회고 제시 완료 (methodology issue 요약 + 가정 오류 사례)
-- [ ] 지식 승격 후보 평가 완료 (`domains/` → `workspace/issues/`)
+- [ ] project domain memory·INDEX·가용 도메인 정합성 확인
 - [ ] 발견 사항이 즉시 / 다음 스프린트 / 기록으로 분류됨
 
 ---
@@ -163,6 +164,8 @@ methodology issue 누적: [N]개
 - `shared/contracts.md` 업데이트: [내용]
 - `shared/direction.md` 업데이트: [추가/수정/삭제할 방향 원칙]
 - 안티패턴 추가: [패턴] / 이유: [내용]
+- `memory/INDEX.md` 업데이트: [추가/수정/삭제한 domain·role 행]
+- `shared/project_identity.md` 가용 도메인 업데이트: [추가/삭제한 도메인]
 - `domains/[도메인명]/registry.md` 업데이트: [내용]
 - `tasks/` 미처리 항목: [내용]
 - `docs/` 미반영 항목: [내용]

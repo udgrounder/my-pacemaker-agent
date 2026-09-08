@@ -10,7 +10,7 @@
 | Runtime | `.mpa/runtime/` | `sync-runtime`으로만 `dist/.mpa/runtime/`에 동기화하고 release asset으로 포함 |
 | 신규 설치 골격 | `dist/workspace/` | 최초 설치에만 복사, Runtime release에는 제외 |
 | 설치 고유 설정 | 대상 `.mpa/config/config.yaml` | 최초 install에서 없을 때 생성, 기존 파일은 누락 필드만 additive 보강. release의 `runtime.*` migration만 deploy transaction에서 추가하며 release ZIP에는 포함하지 않음 |
-| 대상 사용자 데이터 | 대상 `workspace/`, 루트 `docs/`, agent 설정, 일반 소스 | install/deploy/rollback이 보존하며 release에 포함하지 않음 |
+| 대상 사용자 데이터 | 대상 `workspace/`, 루트 `docs/`, agent 설정, 일반 소스 | install/deploy/rollback이 보존하며 release에 포함하지 않음. 단, 별도 승인된 issue collection은 최상위 `workspace/issues/*.md`를 안전하게 읽고 승인 snapshot의 `collectable` 원본만 제거할 수 있음 |
 
 release는 `workspace/releases/<release-id>/`의 `package_<release-id>.zip`, `manifest_<release-id>.json`, `note_<release-id>.md`, `release-receipt_<release-id>.json` 단일 immutable bundle로 고정한다. `prepare-release`는 source 동기화 뒤 전체 단위 테스트·source/runtime-dist parity·기존 bundle audit을 표준 preflight로 강제하고, 사용자가 제공한 추가 validation도 성공해야 새 bundle을 만든다. 직전 유효 bundle과 `.mpa-version` 외 Runtime asset map이 같으면 source-only 변경을 배포 변경으로 오인하지 않도록 기본 거부하며, 의도적인 재발행은 `--allow-version-only`를 명시해야 한다. 거부·검증 실패 뒤에는 source와 dist의 Runtime version을 함께 원복한다. 새 source/package는 retired 실행 참조, credential·machine absolute path, 모든 Python hook 문법을 검사한다. immutable 과거 bundle은 재작성하거나 최신 content policy를 소급 적용하지 않고 구조·checksum·hook 문법 audit으로 보존한다. deployment는 ZIP을 안전하게 해제한 뒤 dry-run·실행자·검증자·승인을 검증해 대상 `.mpa/runtime`를 교체하고, 실행자를 복구 책임 주체로 receipt/history에 기록한다. manifest에 있는 `runtime.*` migration만 config에 additive 적용하며 대상 history와 Git 비추적 `workspace/.local/receipts/deployments/` receipt를 남긴다. Git은 scoped source 식별 보조 정보일 뿐 dirty worktree 차단 Gate가 아니다. Runtime 변경·검증만으로 release를 자동 생성하지 않으며, 사용자 명시 릴리즈 요청 또는 배포 요청 시 현재 source Runtime을 담은 최신 유효 release가 없을 때만 `prepare-release`를 실행한다.
 
@@ -152,13 +152,24 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 | 저장소 | 내용 | 성격 |
 |--|--|--|
 | `.mpa/runtime/skills/<도메인>/` | 도메인 **방법·패턴**(어떻게 쓰나) | MPA 배포, 재사용 |
-| `.mpa/runtime/knowledge/[도메인].md` | 승격된 **검증 사실**(크로스 프로젝트) | upgrade-candidates 승인 후 승격 |
+| `.mpa/runtime/knowledge/[도메인].md` | **검증된 공용 사실**(크로스 프로젝트) | 명시적 MPA 변경 작업으로 생성·갱신·폐기 |
 | `workspace/memory/domains/<도메인>/` | 이 프로젝트의 **규칙·레지스트리**(=기억) | 프로젝트 데이터, 보존 |
 
 - skills=방법 / knowledge=검증 사실 / memory/domains=프로젝트 기억. 역할이 다르다.
 - **개념적 소유**(역할 종속성 — *언제 활성화*)와 **물리적 저장**(응집·DRY·이식성)은 별개다. 섞지 않는다.
 - 프로젝트 고유 주제 도메인이 생기면 `.mpa/runtime/skills/`(재사용)와 분리해 둔다.
 - **가용 도메인 집합 선언:** 이 프로젝트가 쓰는 주제 도메인 목록은 `workspace/memory/shared/project_identity.md`에 선언한다(사실이므로 코드 작업 시 로드됨). inject는 이 목록을 보고 활성 부분집합을 당긴다. 이 프로젝트(방법론)는 주제 도메인이 사실상 없어 **비워둔다** — 다른 프로젝트 도입 시 채운다.
+
+### 이슈·프로젝트 자산·공용 knowledge 소유 경계
+
+- `workspace/issues/`에 새로 작성하는 중앙 수집 후보는 MPA의 Runtime 규칙·hook·agent 행동·source 운영 도구를 개선하는 `methodology_improvement`로 한정한다.
+- producer/router는 중앙 issue를 만들기 전에 분류한다. 프로젝트 기능 보완은 `tasks/`·`docs/`, 아키텍처·계약·역할 함정·도메인 지식은 성격에 맞는 `workspace/memory/`에 기록한다. 도메인 지식은 발견 즉시 같은 작업 단위에서 `memory/domains/<domain>/rules.md`, memory INDEX, `project_identity.md`의 가용 도메인 집합을 함께 갱신한다.
+- Layer 2는 project memory의 현재 상태·충돌·색인 정합성을 점검하지만 도메인 지식을 `knowledge_promotion` issue로 생성하지 않는다. `.mpa/runtime/knowledge/`는 중앙 issue lifecycle이 아닌 명시적 MPA 변경 작업으로만 관리한다.
+- source collector는 대상 프로젝트의 `tasks/`·`docs/`·`memory/`를 자동 수정하지 않는다. 이미 잘못 issue화된 project asset은 원본을 보존하고 올바른 자산 경로와 producer handoff 사유를 안내한다.
+- 이슈 preflight의 단일 순서는 raw credential 검사 → raw metadata/type kind 분류 → machine path 정규화 → normalized checksum/identity·충돌 검사다. raw credential과 metadata·candidate 무결성·destination/snapshot 충돌은 `blocked`, 명시적 비방법론·kind 없음·동일 identity의 기존 수집본은 `not_candidate`, 안전하고 충돌 없는 방법론 이슈만 `collectable`이다.
+- 저장 본문은 프로젝트 내부 경로의 상대 구조를 보존하지만 identity는 머신 루트를 제거한다. `.mpa`·`workspace`·`docs` anchor 이후 경로를 우선 보존하고 그 밖의 절대 경로는 마지막 두 segment를 보존해, 머신만 다른 중복과 서로 다른 대상 파일을 구분한다.
+- manual collection과 update collection은 같은 순수 preflight를 쓰되 권한과 commit은 분리한다. update dry-run receipt에는 policy/normalization version, target fingerprint, safe project-relative issue ID, raw content checksum, normalized checksum/identity, classification/status/reason code, expected destination state만 기록하며 원문·절대 경로·credential 조각을 넣지 않는다. deploy는 전체 필드와 issue 집합의 추가·삭제를 재검증한다.
+- deploy issue collection은 대상 사용자 데이터 보존 규칙의 좁은 예외다. dry-run은 최상위 `workspace/issues/*.md`만 읽고, Runtime 교체·검증과 config migration 뒤 승인 snapshot의 `collectable` 원본만 commit한다. collection 또는 이후 backup·receipt 기록 실패 시 issue 이동과 Runtime·MPA config를 함께 rollback한다.
 
 ### "스킬" 정의 — how-to ≠ what-is (성격 명시)
 
@@ -208,7 +219,7 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 | `personas/*.md` | **역할** | 역할 정의. 평가 역할은 분석 도메인을 구성적으로 요구 |
 | `skills/analysis/*.md` | **스킬 (방법 도메인)** | 분석 방법. 페르소나가 요구·합성 |
 | `skills/programming/*.md` | **스킬 (주제 도메인)** | 기술 방법·패턴. 전 역할이 합성, 역할-면 구조 |
-| `knowledge/[도메인].md` | 스킬 (검증 사실) | 승격된 크로스 프로젝트 도메인 지식 |
+| `knowledge/[도메인].md` | 스킬 (검증 사실) | 명시적 MPA 변경 작업으로 큐레이션한 크로스 프로젝트 도메인 지식 |
 | `templates/*.md` | (도구) | 파일 생성 시 복사해 쓰는 골격 |
 
 > **주입(inject)은 위 표의 "층위"가 아니라 직교 메커니즘** — `inject/` 폴더가 담은 것은 단계 워크플로우(내용)이고, '주입'은 그 내용을 쓰레드에 싣는 행위다.

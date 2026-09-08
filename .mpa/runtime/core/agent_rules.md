@@ -331,7 +331,7 @@ root README는 사람이 처음 읽는 **설명 레이어**다. 사용자에게 
 3. `workspace/tasks/active/yyyymmdd_[태스크명]/` → `workspace/tasks/done/yyyymmdd_[태스크명]/` 이동
 4. `plan.md`의 "완료 시 문서 업데이트 대상" 확인 후 `docs/` 반영
 5. **전체 정합성 점검 제안** — 여러 변경의 상호작용을 확인할 필요가 있으면 사용자에게 전체 정합성 점검을 제안하고, 현재 소스·Runtime 규칙·최신 문서를 직접 대조한다. 과거 결정의 근거가 현재 기준만으로 불명확할 때만 done 이력을 선택적으로 참조한다.
-6. **methodology issue 확인** — local `workspace/issues/`에 방법론 개선 issue가 있으면 필요 시 수집을 제안한다. 수집·review·triage는 map-product source에서만 실행한다.
+6. **project memory·methodology issue 확인** — 발견한 기술·도메인 지식은 `workspace/memory/domains/`와 INDEX·project identity에 직접 반영됐는지 확인한다. local `workspace/issues/`에는 방법론 개선만 남기고 필요 시 수집을 제안한다. 수집·review·triage는 map-product source에서만 실행한다.
 
 > INDEX.md가 손상된 경우 점검 상태는 재확인이 필요하다 — plan.md로 복구할 수 없다.
 

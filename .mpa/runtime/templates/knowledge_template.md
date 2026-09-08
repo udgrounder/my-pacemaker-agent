@@ -1,8 +1,9 @@
 # [도메인명] 지식
 
 > **사용법 — 작성 완료 후 이 블록을 삭제한다**
-> - 이 파일은 MPA 시스템 관리자가 `dist/.mpa/runtime/knowledge/`에 추가한다
-> - 프로젝트에서 직접 작성하지 않는다 → `knowledge_promotion` issue review를 거쳐 작성
+> - 이 파일은 사용자가 범위와 목적을 승인한 명시적 MPA 시스템 변경 작업에서 `.mpa/runtime/knowledge/`에 추가·갱신한다
+> - project memory에서 자동 승격하거나 issue lifecycle로 생성하지 않는다
+> - 변경 후 Runtime source 검증과 `dist/.mpa/runtime/` 동기화를 수행한다
 > - 출처 프로젝트명을 반드시 명시한다
 
 **도메인:** [결제 / 인증 / 알림 / ...]

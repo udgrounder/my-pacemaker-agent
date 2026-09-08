@@ -488,7 +488,7 @@ AI를 잘 쓰는 사람과 못 쓰는 사람의 차이는 프롬프트 실력이
 │   ├── plan_interview.md    ← 계획 인터뷰 절차 (오케스트레이터; 구 skills/analysis에서 이동)
 │   └── discussion_mode.md   ← 토론 작업 도메인
 ├── hooks/                   ← agent 강제 메커니즘 (세션 시작 주입·소스 수정 게이트·종료 리마인드)
-├── knowledge/               ← 크로스 프로젝트 도메인 지식 (승격된 검증 사실)
+├── knowledge/               ← 명시적 MPA 변경 작업으로 큐레이션한 공용 검증 사실
 ├── templates/               ← 파일 생성 시 복사해 쓰는 템플릿
 └── (프로젝트 issue는 `workspace/issues/`에 기록)
 ```
@@ -1191,17 +1191,17 @@ release preparation에서 `dist/.mpa/runtime/` 해시와 불변 package를 고�
 
 #### 9.2 설치가 "지식 전달의 트리거"인 이유
 
-설치와 업데이트 단계가 프로젝트의 발견을 체계로 올리는 **공식 경로**다.
+설치와 업데이트 단계가 프로젝트에서 발견한 **MPA 방법론 개선**을 체계로 올리는 공식 경로다. 프로젝트 기능·결정·도메인 지식은 이 경로를 거치지 않고 해당 프로젝트의 task·docs·memory에 즉시 남긴다.
 
 ```
-프로젝트 A에서 검증된 패턴
-    ↓ workspace/issues/ 수집·검토 → 체계 반영
+프로젝트 A에서 발견한 MPA 방법론 개선
+    ↓ methodology_improvement issue 수집·검토 → 체계 반영
 프로젝트 B의 Layer 0에서 활용
 ```
 
 이 경로가 없으면, 각 프로젝트에서 발견한 것들이 체계에 반영되지 않고 사라진다.
 
-issue는 고지 없이 자동 수집·자동 삭제하지 않는다. 사용자가 지정한 프로젝트·파일 또는 승인된 Runtime update의 dry-run에서 고지된 후보만 source inbox로 원자 수집하고, receipt 확정 뒤 원본을 정리한다. 이후 검토·release 근거를 연결한 뒤 archive한다.
+issue는 고지 없이 자동 수집·자동 삭제하지 않는다. 사용자가 지정한 프로젝트·파일 또는 승인된 Runtime update의 dry-run에서 고지된 `collectable` 후보만 source inbox로 원자 수집한다. update batch는 receipt에 결박된 snapshot만 처리한다. credential·무결성·목적지 충돌은 `blocked`, 프로젝트 자산은 `not_candidate`로 원본을 보존한다. 수집 뒤에도 사용자가 채택·기각하기 전에는 archive하지 않는다.
 
 ---
 
@@ -1400,24 +1400,26 @@ N개 작업마다 팀 체크포인트 — 개인 작업들이 전체 아키텍�
 
 #### 13.1 방법론 개선 issue 기록 방법
 
-운영 중 발견한 체계 개선 후보를 기록하는 위치: `workspace/issues/` (`kind: methodology_improvement`)
+운영 중 발견한 MPA 체계 개선 후보를 기록하는 위치: `workspace/issues/` (`kind: methodology_improvement`). 프로젝트 기능 보완은 `tasks/`·`docs/`, 아키텍처·계약·역할 함정·도메인 지식은 `workspace/memory/`에 직접 기록한다. 새 도메인 지식은 domain rules와 memory INDEX, `project_identity.md`의 가용 도메인 집합을 같은 작업 단위에서 갱신한다.
 
 기록 전 판단 기준:
-> "이 발견이 다른 프로젝트에도 적용될 가치가 있는가?"
+> "이 발견이 MPA의 Runtime 규칙·hook·agent 행동·source 운영 도구를 개선하는가?"
 
-- 이 프로젝트에만 해당하는 특수 케이스 → workspace/memory/에 기록
-- 다른 프로젝트에도 일반적으로 적용될 패턴 → `methodology_improvement` issue로 기록
+- MPA 작업 방식의 일반 개선 → `methodology_improvement` issue로 기록
+- 프로젝트 기능 보완 → task 또는 docs에 기록
+- 프로젝트 사실·결정·역할 함정·도메인 지식 → 성격에 맞는 project memory에 즉시 기록
+- 공용 Runtime knowledge 후보 → 자동 승격하거나 issue화하지 않고 별도의 명시적 MPA 변경 작업으로 큐레이션
 
 #### 13.2 프로젝트 → 체계 이전 흐름
 
 ```
-운영 중 발견
+운영 중 MPA 작업 방식 개선 발견
     ↓
-workspace/issues/ 기록
+`methodology_improvement` 판정 → workspace/issues/ 기록
     ↓
 (사용자 명시 수집·검토 시점)
     ↓
-전체 후보 목록 검토
+preflight 전체 결과(`collectable`/`blocked`/`not_candidate`) 검토
     ↓
 하나씩 확인 후 반영
     ↓
@@ -1429,7 +1431,7 @@ workspace/issues/ 기록
 체계를 업데이트하는 것은 모든 프로젝트에 전파되는 일이다. 신중하게 진행해야 한다.
 
 - **사용자가 명시적으로 요청했을 때만 시작**
-- 전체 후보 목록을 먼저 제시한다
+- 전체 preflight 결과와 수집 가능한 후보를 먼저 제시한다
 - **후보 하나씩, 사용자 확인 후 진행** — 일괄 자동 적용 금지
 - 에이전트는 체계 변경을 사용자 없이 주도할 수 없다
 
@@ -1759,7 +1761,7 @@ plan_critic이 설계 과정 없이 plan.md만 보고 독립 비평을 수행한
 
 **스킬(Skill)**: 규칙 기반 *how-to*(기법·절차) — "어떻게 하는가"(인간 "인터뷰 스킬" + Claude Code의 로드 가능한 skill의 핵심). "무엇인가"에 답하는 **지식(reference 사실)** 과 성격이 다르다(`skills/analysis`=기법, `skills/programming`=도메인 지식). **단 기능상 분리 불가** — 기법은 지식이 채워져야 작동, 지식은 기법이 있어야 활용된다(저장은 분리, 기능은 합성). 그래서 별도 저장소로 쪼개지 않고 `skills/`(도메인 자원) 우산으로 둔다. 진짜 "역량" = 역할 ⊗ 기법 ⊗ 지식의 합성 결과.
 
-**도메인(Domain)**: 역할 무관 지식·방법. 두 종류 — **방법 도메인**(analysis: 어떻게 따지나) / **주제 도메인**(programming·finance: 무엇에 관한 지식인가). 세 저장소로 갈린다: `.mpa/runtime/skills/`(방법·패턴) / `.mpa/runtime/knowledge/`(승격된 검증 사실) / `workspace/memory/domains/`(이 프로젝트의 규칙·기억). 평가 역할은 방법 도메인을 *구성적으로 요구*한다.
+**도메인(Domain)**: 역할 무관 지식·방법. 두 종류 — **방법 도메인**(analysis: 어떻게 따지나) / **주제 도메인**(programming·finance: 무엇에 관한 지식인가). 세 저장소로 갈린다: `.mpa/runtime/skills/`(방법·패턴) / `.mpa/runtime/knowledge/`(명시적 MPA 변경으로 큐레이션한 공용 검증 사실) / `workspace/memory/domains/`(발견 즉시 기록하는 이 프로젝트의 규칙·기억). 평가 역할은 방법 도메인을 *구성적으로 요구*한다.
 
 **주입(Injection) — 메커니즘**: 구성 층위(워크플로우·역할·스킬)는 *내용*이고, 주입은 그 내용을 워크플로우 단계에 따라 (새) 쓰레드에 *싣는 행위*다. `inject/` 폴더는 "주입 레이어"가 아니라 단계 워크플로우(내용)이며, '주입'은 그 내용에 가하는 동작 이름일 뿐이다.
 

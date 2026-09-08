@@ -55,10 +55,12 @@
 | 저장소 | 내용 |
 |--|--|
 | `.mpa/runtime/skills/<도메인>/` | 도메인 **방법·패턴**(MPA 배포, 재사용) |
-| `.mpa/runtime/knowledge/[도메인].md` | 승격된 **검증 사실**(크로스 프로젝트) |
+| `.mpa/runtime/knowledge/[도메인].md` | 명시적 MPA 변경으로 큐레이션한 **검증 사실**(크로스 프로젝트) |
 | `workspace/memory/domains/<도메인>/` | 이 프로젝트의 **규칙·레지스트리**(=기억) |
 
 skills=방법 / knowledge=검증 사실 / memory/domains=프로젝트 기억. 프로젝트 고유 주제 도메인이 생기면 `.mpa/runtime/skills/`(재사용)와 분리. 가용 도메인 목록은 `project_identity.md`에 선언.
+
+프로젝트에서 발견한 도메인 지식은 중앙 issue로 승격을 예약하지 않는다. 발견한 작업 단위에서 `workspace/memory/domains/<도메인>/rules.md`와 memory INDEX, `project_identity.md`의 가용 도메인 집합을 함께 갱신한다. `.mpa/runtime/knowledge/`의 신규·갱신·폐기는 자동 승격이나 issue collection이 아니라 별도로 명시된 MPA 변경 작업에서만 수행한다. 중앙 `workspace/issues/` 수집 후보는 MPA 작업 방식 자체를 개선하는 `methodology_improvement`로 제한한다.
 
 **원칙 9 — 역할-면(role-facet), 기본은 단일 면.** 스킬은 역할 무관이라 전 역할이 합성한다. 기본은 단일 면(공통 사실). 같은 사실을 *쓰는 방식*이 역할별로 갈릴 때만 `[설계자/구현자/리뷰어 면]`으로 표시. (예: springboot.md "모르면 물어볼 것"이 이미 암묵적 설계/구현 면.) (R12~14)
 

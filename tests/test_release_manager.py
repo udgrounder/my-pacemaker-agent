@@ -913,6 +913,23 @@ class ReleaseManagerTest(unittest.TestCase):
         self.assertTrue((release_manager.ISSUES / "inbox" / "target" / "issue.md").is_file())
         self.assertFalse((release_manager.WORKSPACE / "receipts" / "issues").exists())
 
+    def test_update_collection_uses_each_issue_snapshot_checksum(self):
+        target = self.root / "target"
+        folder = target / "workspace" / "issues"
+        folder.mkdir(parents=True)
+        for name, title in (("first.md", "first"), ("second.md", "second")):
+            (folder / name).write_text(
+                release_manager.issue_text(title, "summary", "methodology_improvement"),
+                encoding="utf-8",
+            )
+        expected = release_manager.update_issue_inventory(target, "target")
+
+        collected, _ = release_manager.collect_update_issues_transaction(
+            target, "target", expected)
+
+        self.assertEqual(len(collected), 2)
+        self.assertFalse(list(folder.glob("*.md")))
+
     def test_update_issue_change_after_dry_run_preserves_source(self):
         manifest = self.prepare()
         target = self.root / "target"
@@ -926,6 +943,96 @@ class ReleaseManagerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "issues changed"):
             release_manager.deploy(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
                                                       dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
+        self.assertTrue(issue.exists())
+
+    def test_deployment_dry_run_records_only_safe_issue_snapshot_fields(self):
+        manifest = self.prepare()
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        issue = target / "workspace" / "issues" / "method.md"
+        issue.parent.mkdir(parents=True)
+        issue.write_text(
+            "# Runtime path\n**타입**: 방법론 개선\n\n"
+            f"Run {target}/.mpa/runtime/hooks/code_gate.py.\n",
+            encoding="utf-8",
+        )
+
+        release_manager.deployment_dry_run(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target"))
+
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
+        data = json.loads(dry_run.read_text(encoding="utf-8"))
+        item = data["issue_inventory"][0]
+        self.assertEqual(set(item), {
+            "policy_version", "issue_id", "raw_checksum", "normalization_version",
+            "normalized_checksum", "normalized_identity", "classification", "status",
+            "reason_code", "expected_destination",
+        })
+        self.assertEqual(item["status"], "collectable")
+        self.assertEqual(data["issue_collection"]["collectable"], 1)
+        receipt_text = dry_run.read_text(encoding="utf-8")
+        self.assertNotIn(str(target), receipt_text)
+        self.assertNotIn("Run ", receipt_text)
+
+    def test_deployment_dry_run_blocks_raw_credential_regardless_of_kind(self):
+        manifest = self.prepare()
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        issue = target / "workspace" / "issues" / "domain.md"
+        issue.parent.mkdir(parents=True)
+        issue.write_text(
+            "# Domain note\n**타입**: 도메인 지식\ntoken: exposed-value\n",
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(ValueError, "blocked by project issue preflight"):
+            release_manager.deployment_dry_run(argparse.Namespace(
+                manifest=str(manifest), target=str(target), target_ref="target"))
+
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
+        data = json.loads(dry_run.read_text(encoding="utf-8"))
+        self.assertEqual(data["issue_inventory"][0]["reason_code"], "credential_detected")
+        self.assertEqual(data["issue_collection"]["status"], "blocked")
+        self.assertNotIn("exposed-value", dry_run.read_text(encoding="utf-8"))
+        self.assertTrue(issue.exists())
+
+    def test_preflight_blocks_non_string_required_metadata(self):
+        project = self.root / "project"
+        issue = project / "workspace" / "issues" / "issue.md"
+        issue.parent.mkdir(parents=True)
+        text = release_manager.issue_text("test", "summary", "methodology_improvement")
+        raw_metadata, body = text[4:].split("\n---\n", 1)
+        metadata = json.loads(raw_metadata)
+        metadata["canonical_issue_key"] = ["not", "a", "string"]
+        issue.write_text(
+            "---\n" + json.dumps(metadata) + "\n---\n" + body,
+            encoding="utf-8",
+        )
+
+        decision = release_manager.preflight_issue(issue, project, "project")
+
+        self.assertEqual(decision["status"], "blocked")
+        self.assertEqual(decision["reason_code"], "candidate_invalid")
+
+    def test_deployment_dry_run_blocks_unsafe_issue_filename_without_leaking_it(self):
+        manifest = self.prepare()
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        issue = target / "workspace" / "issues" / "token: leaked.md"
+        issue.parent.mkdir(parents=True)
+        issue.write_text(
+            "# Safe content\n**타입**: 방법론 개선\n",
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(ValueError, "blocked by project issue preflight"):
+            release_manager.deployment_dry_run(argparse.Namespace(
+                manifest=str(manifest), target=str(target), target_ref="target"))
+
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
+        data = json.loads(dry_run.read_text(encoding="utf-8"))
+        self.assertEqual(data["issue_inventory"][0]["reason_code"], "unsafe_issue_id")
+        self.assertNotIn("token: leaked", dry_run.read_text(encoding="utf-8"))
         self.assertTrue(issue.exists())
 
     def test_release_allows_scoped_dirty_or_no_git_source(self):
@@ -1098,10 +1205,19 @@ class ReleaseManagerTest(unittest.TestCase):
         project = self.root / "project"
         with self.assertRaisesRegex(ValueError, "credential-like"):
             release_manager.create_issue(argparse.Namespace(
-                project=str(project), title="leak", summary="api_key: super-secret", kind="observation",
+                project=str(project), title="leak", summary="api_key: super-secret", kind="methodology_improvement",
                 key="sensitive", occurrence="first_observed", area="runtime",
                 observed_release="unknown", collection_purpose="review"))
         self.assertFalse(list((project / "workspace" / "issues").glob("*.md")))
+
+    def test_create_issue_routes_non_methodology_kind_without_writing(self):
+        project = self.root / "project"
+        with self.assertRaisesRegex(ValueError, "tasks/docs/memory"):
+            release_manager.create_issue(argparse.Namespace(
+                project=str(project), title="domain", summary="knowledge", kind="domain_knowledge",
+                key="domain", occurrence="first_observed", area="domain",
+                observed_release="unknown", collection_purpose="review"))
+        self.assertFalse((project / "workspace" / "issues").exists())
 
     def test_collect_verification_failure_restores_project_issue(self):
         project = self.root / "project"
@@ -1124,6 +1240,104 @@ class ReleaseManagerTest(unittest.TestCase):
             with self.assertRaisesRegex(OSError, "source deletion failed"):
                 release_manager.collect_issue(argparse.Namespace(project=str(project), project_ref="project", issue=source.name))
         self.assertTrue(source.is_file())
+        self.assertFalse(destination.exists())
+
+    def test_collect_quarantine_delete_failure_restores_source_and_removes_destination(self):
+        project = self.root / "project"
+        source = project / "workspace" / "issues" / "issue.md"
+        source.parent.mkdir(parents=True)
+        original = release_manager.issue_text("test", "summary", "methodology_improvement")
+        source.write_text(original, encoding="utf-8")
+        destination = release_manager.ISSUES / "inbox" / "project" / "issue.md"
+        original_unlink = Path.unlink
+
+        def fail_quarantine_unlink(path, *args, **kwargs):
+            if path.name.startswith(".issue.md.collecting-"):
+                raise OSError("quarantine delete failed")
+            return original_unlink(path, *args, **kwargs)
+
+        with mock.patch.object(Path, "unlink", new=fail_quarantine_unlink):
+            with self.assertRaisesRegex(OSError, "quarantine delete failed"):
+                release_manager.collect_issue(argparse.Namespace(
+                    project=str(project), project_ref="project", issue=source.name))
+
+        self.assertEqual(source.read_text(encoding="utf-8"), original)
+        self.assertFalse(destination.exists())
+        self.assertFalse(list(source.parent.glob(".issue.md.collecting-*")))
+
+    def test_collect_quarantine_checksum_read_failure_restores_source(self):
+        project = self.root / "project"
+        source = project / "workspace" / "issues" / "issue.md"
+        source.parent.mkdir(parents=True)
+        original = release_manager.issue_text("test", "summary", "methodology_improvement")
+        source.write_text(original, encoding="utf-8")
+        destination = release_manager.ISSUES / "inbox" / "project" / "issue.md"
+        original_sha = release_manager.sha
+
+        def fail_quarantine_sha(path):
+            if path.name.startswith(".issue.md.collecting-"):
+                raise OSError("quarantine read failed")
+            return original_sha(path)
+
+        with mock.patch.object(release_manager, "sha", side_effect=fail_quarantine_sha):
+            with self.assertRaisesRegex(OSError, "changed before deletion"):
+                release_manager.collect_issue(argparse.Namespace(
+                    project=str(project), project_ref="project", issue=source.name))
+
+        self.assertEqual(source.read_text(encoding="utf-8"), original)
+        self.assertFalse(destination.exists())
+        self.assertFalse(list(source.parent.glob(".issue.md.collecting-*")))
+
+    def test_collect_source_change_before_delete_preserves_changed_source(self):
+        project = self.root / "project"
+        source = project / "workspace" / "issues" / "issue.md"
+        source.parent.mkdir(parents=True)
+        source.write_text(
+            release_manager.issue_text("original", "summary", "methodology_improvement"),
+            encoding="utf-8",
+        )
+        destination = release_manager.ISSUES / "inbox" / "project" / "issue.md"
+        original_delete = release_manager.delete_issue_source
+
+        def change_then_delete(actual_source, expected_checksum=None):
+            actual_source.write_text(
+                release_manager.issue_text("changed", "summary", "methodology_improvement"),
+                encoding="utf-8",
+            )
+            return original_delete(actual_source, expected_checksum)
+
+        with mock.patch.object(
+                release_manager, "delete_issue_source", side_effect=change_then_delete):
+            with self.assertRaisesRegex(OSError, "changed before deletion"):
+                release_manager.collect_issue(argparse.Namespace(
+                    project=str(project), project_ref="project", issue=source.name))
+
+        self.assertIn("changed", source.read_text(encoding="utf-8"))
+        self.assertFalse(destination.exists())
+
+    def test_collect_source_change_after_preflight_is_rejected(self):
+        project = self.root / "project"
+        source = project / "workspace" / "issues" / "issue.md"
+        source.parent.mkdir(parents=True)
+        source.write_text(
+            release_manager.issue_text("original", "summary", "methodology_improvement"),
+            encoding="utf-8",
+        )
+        destination = release_manager.ISSUES / "inbox" / "project" / "issue.md"
+        original_preflight = release_manager.preflight_issue
+
+        def preflight_then_change(*arguments):
+            decision = original_preflight(*arguments)
+            source.write_text("# Changed\n**타입**: 방법론 개선\ntoken: race-secret\n", encoding="utf-8")
+            return decision
+
+        with mock.patch.object(
+                release_manager, "preflight_issue", side_effect=preflight_then_change):
+            with self.assertRaisesRegex(ValueError, "changed after preflight"):
+                release_manager.collect_issue(argparse.Namespace(
+                    project=str(project), project_ref="project", issue=source.name))
+
+        self.assertIn("race-secret", source.read_text(encoding="utf-8"))
         self.assertFalse(destination.exists())
 
     def test_collect_destination_race_preserves_existing_destination_and_source(self):
@@ -1192,7 +1406,9 @@ class ReleaseManagerTest(unittest.TestCase):
         self.write_runtime(target / ".mpa/runtime", "old")
         issue = target / "workspace" / "issues" / "issue.md"
         issue.parent.mkdir(parents=True)
-        issue.write_text(release_manager.issue_text("test", "summary", "methodology_improvement"), encoding="utf-8")
+        original = release_manager.issue_text(
+            "test", f"run {target}/.mpa/runtime/hooks/code_gate.py", "methodology_improvement")
+        issue.write_text(original, encoding="utf-8")
         release_manager.deployment_dry_run(argparse.Namespace(manifest=str(manifest), target=str(target), target_ref="target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
         original_write = release_manager.write_json
@@ -1206,10 +1422,40 @@ class ReleaseManagerTest(unittest.TestCase):
                     manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
                     dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         self.assertEqual((target / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "old")
-        self.assertTrue(issue.exists())
+        self.assertEqual(issue.read_text(encoding="utf-8"), original)
         self.assertFalse((release_manager.ISSUES / "inbox" / "target" / issue.name).exists())
 
-    def test_deploy_collects_legacy_issue_then_adds_inbox_metadata(self):
+    def test_issue_rollback_failure_does_not_skip_runtime_recovery(self):
+        manifest = self.prepare()
+        target = self.root / "target"
+        self.write_runtime(target / ".mpa/runtime", "old")
+        issue = target / "workspace" / "issues" / "issue.md"
+        issue.parent.mkdir(parents=True)
+        issue.write_text(
+            release_manager.issue_text("test", "summary", "methodology_improvement"),
+            encoding="utf-8",
+        )
+        release_manager.deployment_dry_run(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target"))
+        dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
+        original_write = release_manager.write_json
+
+        def fail_deploy_receipt(path, value):
+            if path.parent == release_manager.DEPLOYMENT_RECEIPTS / "target" and path.name.startswith("deploy-"):
+                raise OSError("deployment receipt failed")
+            return original_write(path, value)
+
+        with mock.patch.object(release_manager, "write_json", side_effect=fail_deploy_receipt):
+            with mock.patch.object(
+                    release_manager, "_rollback_issue_moves", side_effect=OSError("issue rollback failed")):
+                with self.assertRaisesRegex(OSError, "recovery was incomplete: issues"):
+                    release_manager.deploy(argparse.Namespace(
+                        manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
+                        dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
+
+        self.assertEqual((target / ".mpa/runtime" / "rule.md").read_text(encoding="utf-8"), "old")
+
+    def test_deploy_preserves_kindless_legacy_issue_as_not_candidate(self):
         manifest = self.prepare()
         target = self.root / "target"
         self.write_runtime(target / ".mpa/runtime", "old")
@@ -1220,39 +1466,43 @@ class ReleaseManagerTest(unittest.TestCase):
         release_manager.deployment_dry_run(argparse.Namespace(
             manifest=str(manifest), target=str(target), target_ref="target"))
         dry_run = next((release_manager.DEPLOYMENT_RECEIPTS / "target").glob("dry-run-*.json"))
-        original_write_issue = release_manager.write_issue
-
-        def assert_collected_before_metadata(destination, metadata, body):
-            self.assertTrue(destination.is_file())
-            self.assertFalse(issue.exists())
-            self.assertEqual(destination.read_text(encoding="utf-8"), original)
-            original_write_issue(destination, metadata, body)
-
-        with mock.patch.object(release_manager, "write_issue", side_effect=assert_collected_before_metadata):
-            release_manager.deploy(argparse.Namespace(
-                manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
-                dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
+        dry_run_data = json.loads(dry_run.read_text(encoding="utf-8"))
+        self.assertEqual(dry_run_data["issue_inventory"][0]["status"], "not_candidate")
+        self.assertEqual(dry_run_data["issue_inventory"][0]["reason_code"], "kind_missing")
+        release_manager.deploy(argparse.Namespace(
+            manifest=str(manifest), target=str(target), target_ref="target", verified_by="test",
+            dry_run=str(dry_run), approved_by="test", approval_ref="unit", operator="test"))
         destination = release_manager.ISSUES / "inbox" / "target" / issue.name
-        metadata, body = release_manager.read_issue(destination)
-        self.assertEqual(metadata["kind"], "legacy_issue")
-        self.assertEqual(body, original)
-        self.assertFalse(issue.exists())
+        self.assertFalse(destination.exists())
+        self.assertEqual(issue.read_text(encoding="utf-8"), original)
 
-    def test_collect_issue_accepts_legacy_markdown_and_adds_metadata_after_move(self):
+    def test_collect_issue_rejects_kindless_legacy_markdown_and_preserves_source(self):
         project = self.root / "project"
         source = project / "workspace" / "issues" / "legacy.md"
         source.parent.mkdir(parents=True)
         original = "# Legacy observation\n\nNeeds review.\n"
         source.write_text(original, encoding="utf-8")
 
-        release_manager.collect_issue(argparse.Namespace(
-            project=str(project), project_ref="project", issue=source.name))
+        with self.assertRaisesRegex(ValueError, "not_candidate: kind_missing"):
+            release_manager.collect_issue(argparse.Namespace(
+                project=str(project), project_ref="project", issue=source.name))
 
         destination = release_manager.ISSUES / "inbox" / "project" / source.name
-        metadata, body = release_manager.read_issue(destination)
-        self.assertEqual(metadata["kind"], "legacy_issue")
-        self.assertEqual(body, original)
-        self.assertFalse(source.exists())
+        self.assertFalse(destination.exists())
+        self.assertEqual(source.read_text(encoding="utf-8"), original)
+
+    def test_collect_project_asset_returns_safe_producer_handoff(self):
+        project = self.root / "project"
+        source = project / "workspace" / "issues" / "domain.md"
+        source.parent.mkdir(parents=True)
+        source.write_text("# Domain note\n**타입**: 도메인 지식\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(
+                ValueError, "handoff=producer:tasks/docs/memory"):
+            release_manager.collect_issue(argparse.Namespace(
+                project=str(project), project_ref="project", issue=source.name))
+
+        self.assertTrue(source.exists())
 
     def test_collect_issue_preserves_methodology_improvement_kind_from_runtime_template(self):
         project = self.root / "project"
@@ -1264,6 +1514,7 @@ class ReleaseManagerTest(unittest.TestCase):
             "**발견 상황**: 설치 프로젝트의 검토 단계\n\n"
             "## 현재 방식\n\n규칙이 이슈를 작업 항목으로 오분류할 수 있다.\n\n"
             "## 개선 방안\n\nMPA 개선 관찰을 로컬 issue로 기록한다.\n"
+            f"재현 명령: {project}/.mpa/runtime/hooks/code_gate.py\n"
         )
         source.write_text(original, encoding="utf-8")
 
@@ -1273,8 +1524,118 @@ class ReleaseManagerTest(unittest.TestCase):
         destination = release_manager.ISSUES / "inbox" / "project" / source.name
         metadata, body = release_manager.read_issue(destination)
         self.assertEqual(metadata["kind"], "methodology_improvement")
-        self.assertEqual(body, original)
+        self.assertIn("<project-root>/.mpa/runtime/hooks/code_gate.py", body)
+        self.assertNotIn(str(project), body)
         self.assertFalse(source.exists())
+
+    def test_normalized_identity_deduplicates_machine_specific_project_roots(self):
+        first_project = self.root / "first-project"
+        second_project = self.root / "second-project"
+        first = first_project / "workspace" / "issues" / "runtime-path.md"
+        second = second_project / "workspace" / "issues" / "runtime-path.md"
+        first.parent.mkdir(parents=True)
+        second.parent.mkdir(parents=True)
+        template = (
+            "# Runtime path lookup\n\n"
+            "**타입**: 방법론 개선\n\n"
+            "Reproduce with {root}/.mpa/runtime/hooks/code_gate.py.\n"
+        )
+        first.write_text(template.format(root=first_project), encoding="utf-8")
+        second.write_text(template.format(root=second_project), encoding="utf-8")
+
+        release_manager.collect_issue(argparse.Namespace(
+            project=str(first_project), project_ref="first-project", issue=first.name))
+        decision = release_manager.preflight_issue(second, second_project, "second-project")
+
+        self.assertEqual(decision["status"], "not_candidate")
+        self.assertEqual(decision["reason_code"], "already_collected")
+        self.assertTrue(second.exists())
+
+    def test_normalized_identity_matches_legacy_central_absolute_path(self):
+        project = self.root / "project"
+        source = project / "workspace" / "issues" / "runtime-path.md"
+        source.parent.mkdir(parents=True)
+        source.write_text(
+            "# Runtime path lookup\n\n**타입**: 방법론 개선\n\n"
+            f"Reproduce with {project}/.mpa/runtime/hooks/code_gate.py.\n",
+            encoding="utf-8",
+        )
+        legacy = release_manager.ISSUES / "inbox" / "legacy" / "old-runtime-path.md"
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text(
+            "# Runtime path lookup\n\n**타입**: 방법론 개선\n\n"
+            "Reproduce with /Users/old/project/.mpa/runtime/hooks/code_gate.py.\n",
+            encoding="utf-8",
+        )
+
+        decision = release_manager.preflight_issue(source, project, "project")
+
+        self.assertEqual(decision["status"], "not_candidate")
+        self.assertEqual(decision["reason_code"], "already_collected")
+
+    def test_normalized_identity_preserves_distinct_relative_path_suffixes(self):
+        first_project = self.root / "first-project"
+        second_project = self.root / "second-project"
+        first = first_project / "workspace" / "issues" / "one.md"
+        second = second_project / "workspace" / "issues" / "two.md"
+        first.parent.mkdir(parents=True)
+        second.parent.mkdir(parents=True)
+        first.write_text(
+            "# Runtime path lookup\n\n**타입**: 방법론 개선\n\n"
+            f"Reproduce with {first_project}/src/one.py.\n",
+            encoding="utf-8",
+        )
+        second.write_text(
+            "# Runtime path lookup\n\n**타입**: 방법론 개선\n\n"
+            f"Reproduce with {second_project}/src/two.py.\n",
+            encoding="utf-8",
+        )
+        release_manager.collect_issue(argparse.Namespace(
+            project=str(first_project), project_ref="first-project", issue=first.name))
+
+        decision = release_manager.preflight_issue(second, second_project, "second-project")
+
+        self.assertEqual(decision["status"], "collectable")
+        self.assertEqual(decision["reason_code"], "ready")
+
+    def test_collect_rejects_symlinked_project_issue_directory(self):
+        project = self.root / "project"
+        external = self.root / "external-issues"
+        external.mkdir()
+        issue = external / "issue.md"
+        issue.write_text(
+            release_manager.issue_text("test", "summary", "methodology_improvement"),
+            encoding="utf-8",
+        )
+        (project / "workspace").mkdir(parents=True)
+        (project / "workspace" / "issues").symlink_to(external, target_is_directory=True)
+
+        with self.assertRaisesRegex(ValueError, "unsupported symlink"):
+            release_manager.collect_issue(argparse.Namespace(
+                project=str(project), project_ref="project", issue=issue.name))
+
+        self.assertTrue(issue.exists())
+        self.assertFalse((release_manager.ISSUES / "inbox" / "project" / issue.name).exists())
+
+    def test_collect_rejects_symlinked_issue_file(self):
+        project = self.root / "project"
+        external = self.root / "external.md"
+        external.write_text(
+            release_manager.issue_text("test", "summary", "methodology_improvement"),
+            encoding="utf-8",
+        )
+        folder = project / "workspace" / "issues"
+        folder.mkdir(parents=True)
+        issue = folder / "issue.md"
+        issue.symlink_to(external)
+
+        with self.assertRaisesRegex(ValueError, "regular file"):
+            release_manager.collect_issue(argparse.Namespace(
+                project=str(project), project_ref="project", issue=issue.name))
+
+        self.assertTrue(external.exists())
+        self.assertTrue(issue.is_symlink())
+        self.assertFalse((release_manager.ISSUES / "inbox" / "project" / issue.name).exists())
 
     def test_duplicate_archive_blocks_collection_and_preserves_project_issue(self):
         project = self.root / "project"
@@ -1284,7 +1645,7 @@ class ReleaseManagerTest(unittest.TestCase):
         archived = release_manager.ISSUES / "archived" / "2026" / "08" / "project" / source.name
         archived.parent.mkdir(parents=True)
         archived.write_text(release_manager.issue_text("old", "summary", "methodology_improvement"), encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "already exists"):
+        with self.assertRaisesRegex(ValueError, "destination_conflict"):
             release_manager.collect_issue(argparse.Namespace(project=str(project), project_ref="project", issue=source.name))
         self.assertTrue(source.exists())
         self.assertFalse((release_manager.ISSUES / "inbox" / "project" / source.name).exists())
