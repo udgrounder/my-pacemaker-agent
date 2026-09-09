@@ -10,7 +10,7 @@
 
 # 작업 계획서: MPA 문서 로딩·운영 코드 구조 개선
 
-**파생 출처:** [규칙 정합성과 경량 검증 보완](../../active/20260909_mpa_policy_consistency/plan.md). [효과 측정 체계](../20260909_mpa_effectiveness_evaluation/plan.md) 이후 재개할 후속 설계 초안.
+**파생 출처:** [규칙 정합성과 경량 검증 보완](../../done/20260909_mpa_policy_consistency/plan.md). [효과 측정 체계](../../active/20260909_mpa_effectiveness_evaluation/plan.md) 이후 재개할 후속 설계 초안.
 
 ## 요구사항 명세
 
