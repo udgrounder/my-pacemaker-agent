@@ -1,5 +1,7 @@
 # 워크플로우: 버그 수정
 
+> 공통 사용자 개입 기준: `core/agent_rules.md`의 "사용자 부담 최소화". minor 경로는 `core/agent_rules_detail.md`의 "minor 경량 처리 절차", 독립 비평·검증의 격리·실패 처리는 `inject/_agent_execution_priority.md`를 읽고 따른다. 아래 전체 단계는 major 기준이며 minor에는 일괄 적용하지 않는다. 단계 전환만으로 사용자에게 새 작업 생성·재승인을 요구하지 않는다.
+
 > **로드 시점:** 버그 수정 라우팅 진입 시 에이전트가 읽는다. 이 작업 유형의 특성·주의사항·세션 시퀀스를 파악한 뒤 `layer1_review.md`로 검토 세션을 시작한다.
 
 > 발견된 버그를 재현하고 최소 범위로 수정하는 세션 시퀀스  
@@ -34,13 +36,13 @@
 ## 전체 흐름
 
 ```
-[0단계] 실패 비용 추정 (인간이 직접)
+[0단계] 실패 비용 추정 (에이전트가 근거를 확인)
 실패비용 등급 추정 (critical / major / minor)
-→ core/agent_rules.md "minor 태스크 경량 처리" 섹션의 실패 비용 추정 절차(①②③) 참조 (정본)
-→ 수정 전 현재 상태를 커밋하여 롤백 지점 확보
+→ core/agent_rules_detail.md "실패비용 추정 기준" 참조 (정본)
+→ 수정 전 기존 변경을 보존하고 복구 가능한 기준점 확보
         ↓
 [1단계] 버그 경로 추적
-스레드: 🆕 새 스레드
+실행: 격리 서브에이전트 — inject/_agent_execution_priority.md 적용
 inject:  inject/layer1_review.md
          └─ 페르소나: code_reviewer
          └─ 스킬: path_tracing
@@ -60,14 +62,14 @@ inject:  inject/layer1_review.md
 - 기존 동작 변경 금지
         ↓
 [3단계] 수정 구현 세션
-스레드: 🆕 새 스레드
+실행: 현재 작업에서 단계 지침을 읽고 진행
 inject:  inject/layer1_implement.md
          └─ 페르소나: implementer
          └─ 컨텍스트: shared/ + [2단계 태스크 계획]
 핵심 지시: "최소 변경으로 버그만 수정해줘. 범위를 넘어서면 알려줘."
         ↓
 [4단계] 검증 세션
-스레드: 🆕 새 스레드
+실행: 격리 서브에이전트 — inject/_agent_execution_priority.md 적용
 inject:  inject/layer1_review.md
          └─ 페르소나: code_reviewer
          └─ 스킬: counterexample_finding
@@ -83,7 +85,7 @@ inject:  inject/layer1_review.md
 
 ## 핵심 체크포인트
 
-- [ ] 수정 전 커밋으로 롤백 지점을 확보했는가 (0단계)
+- [ ] 수정 전 복구 가능한 기준점으로 롤백 지점을 확보했는가 (0단계)
 - [ ] 버그 재현 경로를 명확히 파악했는가
 - [ ] 수정 범위가 최소화됐는가 (인터페이스 변경 없음)
 - [ ] 수정 후 버그가 재현되지 않는가

@@ -1,5 +1,7 @@
 # 워크플로우: 리팩토링
 
+> 공통 사용자 개입 기준: `core/agent_rules.md`의 "사용자 부담 최소화". minor 경로는 `core/agent_rules_detail.md`의 "minor 경량 처리 절차", 독립 비평·검증의 격리·실패 처리는 `inject/_agent_execution_priority.md`를 읽고 따른다. 아래 전체 단계는 major 기준이며 minor에는 일괄 적용하지 않는다. 단계 전환만으로 사용자에게 새 작업 생성·재승인을 요구하지 않는다.
+
 > **로드 시점:** 리팩터링 라우팅 진입 시 에이전트가 읽는다. 이 작업 유형의 특성·주의사항·세션 시퀀스를 파악한 뒤 `layer1_design.md`로 설계 세션을 시작한다.
 
 > 기능은 유지하면서 코드 구조를 개선하는 세션 시퀀스  
@@ -38,7 +40,7 @@
 
 ```
 [1단계] 범위 및 의존성 분석
-스레드: 🆕 새 스레드
+실행: 현재 작업에서 단계 지침을 읽고 진행
 inject:  inject/layer0_init.md (또는 layer1_design.md)
          └─ 페르소나: architect
          └─ 스킬: dependency_mapping
@@ -50,7 +52,7 @@ inject:  inject/layer0_init.md (또는 layer1_design.md)
    [코드 붙여넣기]"
         ↓
 [2단계] 리팩토링 계획 수립
-스레드: 🆕 새 스레드
+실행: 현재 작업에서 단계 지침을 읽고 진행
 inject:  inject/layer1_design.md
          └─ 페르소나: plan_critic
          └─ 스킬: counterexample_finding
@@ -61,14 +63,14 @@ inject:  inject/layer1_design.md
 - 기존 테스트 변경 금지 (추가는 허용)
         ↓
 [3단계] 구현 세션
-스레드: 🆕 새 스레드
+실행: 현재 작업에서 단계 지침을 읽고 진행
 inject:  inject/layer1_implement.md
          └─ 페르소나: implementer
          └─ 컨텍스트: shared/ + [2단계 태스크 계획]
 핵심 지시: "기능 변경 없이 구조만 바꿔줘. 확신이 없으면 원래 코드를 유지하고 알려줘."
         ↓
 [4단계] 동작 일치 검증
-스레드: 🆕 새 스레드
+실행: 격리 서브에이전트 — inject/_agent_execution_priority.md 적용
 inject:  inject/layer1_review.md
          └─ 페르소나: code_reviewer
          └─ 스킬: path_tracing

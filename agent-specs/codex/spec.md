@@ -29,7 +29,7 @@ tool: OpenAI Codex
 
 ## Hooks
 
-Codex는 `.codex/hooks.json` 에서 hook을 지원한다.
+이 저장소의 설치 코드는 `.codex/hooks.json`에 아래 연결 설정을 생성한다. 호스트가 해당 이벤트를 실제 호출하는지는 별도 확인 대상이다.
 install.py는 `.codex/hooks.json` 에 Codex 편집 도구명을 포함한 matcher로 등록한다. 스크립트는 `.mpa/runtime/hooks/` 에 있다.
 
 | 이벤트 | matcher | 스크립트 |
@@ -38,9 +38,15 @@ install.py는 `.codex/hooks.json` 에 Codex 편집 도구명을 포함한 matche
 | `PreToolUse` | `Edit\|Write\|MultiEdit\|apply_patch\|write_file\|replace\|edit` | `code_gate.py --agent codex` |
 | `Stop` | — | `turn_end.py --agent codex` |
 
-- 차단/주입 방식은 claude와 동일 (exit 2 차단, `additionalContext` 주입).
-- `SessionStart` / `Stop` 은 도구 이름과 무관하므로 안정적으로 작동한다.
+- 스크립트는 exit 2와 `additionalContext`를 출력하도록 구현돼 있다. 호스트의 차단·주입 수용까지 단위 테스트가 보장하지 않는다.
+- `SessionStart` / `Stop` 설정 생성과 스크립트 실행은 로컬 테스트 범위이며 실제 이벤트 호출은 미확인이다.
 
 ## 파일 참조 문법
 
-Codex는 `@path/to/file` 문법으로 파일을 import한다.
+설치 템플릿은 `@path/to/file` 참조를 기록한다. 실제 호스트에서 자동 로드됐는지는 별도 확인해야 하며, 파일을 명시적으로 읽은 것과 구분한다.
+
+## 확인 범위와 한계
+
+이 문서는 저장소의 설치·연결 계약을 설명한다. 로컬 테스트의 설정 생성·스크립트 직접 실행과 실제 호스트의 이벤트 호출·차단·참조 로딩은 별개다. 이번 정합성 검토에서 실제 호스트 통합은 미확인이며, 제품 전체의 지원 여부를 단정하지 않는다. 실제 확인 시 호스트 버전·이벤트·입력·결과를 함께 기록한다.
+
+hook의 도구·입력 경계와 승인해시의 보장 범위는 [가이드북](../../guidebook/guidebook.md)의 "승인과 hook이 확인하는 범위"를 따른다. 독립 비평·검증은 [실행 정본](../../.mpa/runtime/inject/_agent_execution_priority.md)의 격리·산출물·실패 조건을 적용한다.

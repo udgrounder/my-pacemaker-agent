@@ -1,5 +1,7 @@
 # 워크플로우: 팀 협업
 
+> 공통 사용자 개입 기준: `core/agent_rules.md`의 "사용자 부담 최소화". minor 경로는 `core/agent_rules_detail.md`의 "minor 경량 처리 절차", 독립 비평·검증의 격리·실패 처리는 `inject/_agent_execution_priority.md`를 읽고 따른다. 아래 전체 단계는 major 기준이며 minor에는 일괄 적용하지 않는다. 단계 전환만으로 사용자에게 새 작업 생성·재승인을 요구하지 않는다.
+
 > 여러 사람이 같은 프로젝트에서 AI agent와 함께 작업할 때의 흐름  
 > 핵심 문제: 각자 다른 스레드에서 작업하면 memory가 diverge된다
 
@@ -32,7 +34,7 @@
 
 ```
 [팀 Layer 0 — 함께]
-스레드: 🆕 새 스레드 (팀 대표 1명)
+실행: 팀 대표의 현재 작업에서 해당 단계 지침 로드
 inject:  inject/layer0_init.md
          └─ 페르소나: architect
          └─ 스킬: dependency_mapping
@@ -52,7 +54,7 @@ inject:  inject/layer0_init.md
         ↓
 [팀 Layer 2 — 함께]
 N개 태스크마다 팀 전체 체크포인트
-스레드: 🆕 새 스레드
+실행: 현재 작업에서 팀 체크포인트 지침 로드
 inject:  inject/layer2_checkpoint.md
          └─ 페르소나: integration_auditor
 → 개인 작업들이 전체 아키텍처와 정합한지 확인
