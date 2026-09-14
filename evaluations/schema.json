@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$vocabulary": {"https://json-schema.org/draft/2020-12/vocab/format-assertion": true},
+  "title": "MPA local effectiveness study v1",
+  "type": "object",
+  "required": ["schema_version", "study_id", "runs"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "study_id": {"$ref": "#/$defs/nonblankString"},
+    "runs": {"type": "array", "items": {"$ref": "#/$defs/run"}}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonnegative": {"type": ["integer", "null"], "minimum": 0},
+    "nonblankString": {"type": "string", "pattern": "\\S"},
+    "utcTimestamp": {"type": "string", "format": "date-time", "pattern": "^(?:(?:(?:000[1-9]|00[1-9][0-9]|0[1-9][0-9]{2}|[1-9][0-9]{3})-(?:(?:01|03|05|07|08|10|12)-(?:0[1-9]|[12][0-9]|3[01])|(?:04|06|09|11)-(?:0[1-9]|[12][0-9]|30)|02-(?:0[1-9]|1[0-9]|2[0-8])))|(?:(?:[0-9]{2}(?:0[48]|[2468][048]|[13579][26])|(?:0[48]|[2468][048]|[13579][26])00)-02-29))T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?Z$"},
+    "manifest": {
+      "type": "object",
+      "required": ["model", "model_version", "settings_ref", "tool_permissions", "source_ref", "request_ref", "time_limit_seconds"],
+      "properties": {
+        "model": {"$ref": "#/$defs/nonblankString"},
+        "model_version": {"$ref": "#/$defs/nonblankString"},
+        "settings_ref": {"$ref": "#/$defs/nonblankString"},
+        "tool_permissions": {"$ref": "#/$defs/nonblankString"},
+        "source_ref": {"$ref": "#/$defs/nonblankString"},
+        "request_ref": {"$ref": "#/$defs/nonblankString"},
+        "time_limit_seconds": {"$ref": "#/$defs/nonnegative"}
+      },
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "required": ["kind", "at", "necessity"],
+      "properties": {
+        "kind": {"enum": ["user_intervention", "duplicate_intent_request", "blocking_wait", "correction", "defect", "rework"]},
+        "at": {"$ref": "#/$defs/utcTimestamp"},
+        "necessity": {"enum": ["necessary", "unnecessary", "unknown"]}
+      },
+      "additionalProperties": false
+    },
+    "run": {
+      "type": "object",
+      "required": ["run_id", "scenario_id", "condition", "pair_id", "status", "quality", "started_at", "ended_at", "active_seconds", "user_wait_seconds", "token_count", "stop_reason", "resume_requested_at", "first_acceptance_action_at", "condition_manifest", "events"],
+      "properties": {
+        "run_id": {"$ref": "#/$defs/nonblankString"},
+        "scenario_id": {"enum": ["wording_edit", "configuration_edit", "bug_fix", "multi_step_feature", "session_resume", "intent_change"]},
+        "condition": {"enum": ["mpa", "baseline"]},
+        "pair_id": {"anyOf": [{"$ref": "#/$defs/nonblankString"}, {"type": "null"}]},
+        "status": {"enum": ["completed", "failed", "stopped"]},
+        "quality": {"enum": ["accepted", "rejected", "unverified"]},
+        "started_at": {"$ref": "#/$defs/utcTimestamp"},
+        "ended_at": {"$ref": "#/$defs/utcTimestamp"},
+        "active_seconds": {"$ref": "#/$defs/nonnegative"},
+        "user_wait_seconds": {"$ref": "#/$defs/nonnegative"},
+        "token_count": {"$ref": "#/$defs/nonnegative"},
+        "stop_reason": {"anyOf": [{"$ref": "#/$defs/nonblankString"}, {"type": "null"}]},
+        "resume_requested_at": {"anyOf": [{"$ref": "#/$defs/utcTimestamp"}, {"type": "null"}]},
+        "first_acceptance_action_at": {"anyOf": [{"$ref": "#/$defs/utcTimestamp"}, {"type": "null"}]},
+        "condition_manifest": {"$ref": "#/$defs/manifest"},
+        "events": {"type": "array", "items": {"$ref": "#/$defs/event"}}
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "stopped"}}},
+          "then": {"properties": {"stop_reason": {"$ref": "#/$defs/nonblankString"}}},
+          "else": {"properties": {"stop_reason": {"type": "null"}}}
+        },
+        {
+          "if": {"properties": {"scenario_id": {"const": "session_resume"}}},
+          "then": {"required": ["resume_requested_at", "first_acceptance_action_at"], "properties": {"resume_requested_at": {"$ref": "#/$defs/utcTimestamp"}, "first_acceptance_action_at": {"$ref": "#/$defs/utcTimestamp"}}},
+          "else": {"properties": {"resume_requested_at": {"type": "null"}, "first_acceptance_action_at": {"type": "null"}}}
+        }
+      ]
+    }
+  }
+}

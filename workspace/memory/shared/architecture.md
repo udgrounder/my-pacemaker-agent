@@ -203,6 +203,14 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 
 ---
 
+## source 운영 코드 맵
+
+- `release_manager.py`는 CLI와 release 생성·backup/config 복구·이슈 분류/이동·배포/rollback 조정을 소유한다. `deploy`가 이슈 이동, Runtime, config와 receipt/history의 실패 복구를 조정한다.
+- source-only `mpa_ops/archive_io.py`는 ZIP 생성·검사·해제를, `mpa_ops/issue_format.py`는 이슈 형식 해석·경로 정규화·identity 계산을 맡는다. release_manager의 기존 helper facade가 현재 validator·정규식·marker를 전달하므로 외부 import와 기존 monkey patch는 유지된다. 내부 모듈은 release_manager를 import하지 않는다.
+- `tests/test_release_manager.py`는 `importlib.util.spec_from_file_location`으로 모듈을 로드하고 경로 전역과 조정 함수를 교체해 임시 프로젝트·실패 상황을 만든다. 내부 구조를 바꿀 때 import 경로뿐 아니라 이 patch의 실제 호출 효과도 보존해야 한다.
+- `install.py`와 `release_manager.py`는 `project_config.py`를 직접 사용한다. install은 release_manager를 import하지 않는다.
+- source/설치 진입점과 native agent 등록은 `core/agent_rules.md`를 참조한다. `session_start.py`는 상태·라우팅 안내를 생성하며, 안내 출력만으로 호스트가 규칙 본문을 실제 읽었다고 볼 수 없다.
+
 ## 파일별 역할 (dist/.mpa/runtime/) — 구성 층위 기준
 
 | 파일/폴더 | 구성 층위 | 역할 |

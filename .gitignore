@@ -2,3 +2,5 @@
 __pycache__/
 *.pyc
 workspace/.local/
+workspace/tasks/CURRENT_TASK
+workspace/tasks/CURRENT_TASK

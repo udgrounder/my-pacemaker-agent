@@ -60,6 +60,36 @@ code_gate.py가 "구현 승인 기록 복구 필요" 또는 "구현 재승인 �
 
 ---
 
+## 승인 기록 처리
+
+> **트리거:** major 구현 승인, minor 자동 승인, 승인해시 재검증 또는 명세 변경 승인 직전.
+
+1. 사용자 승인 뒤에만 `plan_hash.py approve`를 실행한다. major는 `설계 완료`, 명확한 실행 요청의 minor는 `설계 중`이어야 하며, 명령이 상태를 `구현 중`과 `reqspec-v1:` 승인해시로 함께 전환한다. 상태나 해시를 직접 수정해 우회하지 않는다.
+   ```bash
+   python3 .mpa/runtime/hooks/plan_hash.py approve workspace/tasks/active/[태스크명]/plan.md
+   ```
+2. 승인해시는 `## 요구사항 명세`에서 계산한 `reqspec-v1:<16자리 소문자 16진수>`만 허용한다. `승인대상: 요구사항 명세`와 해당 섹션은 유지한다. 날짜·자연어 승인·임의 문자열을 넣지 않는다.
+3. `구현 중` 이후 상태에는 현재 명세와 일치하는 해시가 필수다. 명세 밖 실행 기록·검증 보완은 즉시 기록하고 누적 보고한다.
+4. 목적·범위·완료 기준·사용자 결정·위험 제약이 바뀌면 변경분을 제시해 사용자 승인을 받은 뒤에만 `renew-spec --summary`를 실행한다. 접두사 없는 구형 해시나 복구가 필요한 기록은 `구현 승인 재확인`을 따른다.
+   ```bash
+   python3 .mpa/runtime/hooks/plan_hash.py renew-spec workspace/tasks/active/[태스크명]/plan.md --summary "[승인된 변경 요약]"
+   ```
+
+---
+
+## 작업 항목 완료 처리
+
+> **트리거:** 완료 인정 판별을 통과해 사용자 또는 위임 에이전트의 완료 확인을 받았을 때.
+
+1. plan.md 상태를 `완료 승인`으로 기록한다.
+2. `workspace/tasks/INDEX.md`에서 해당 active/hold 행을 먼저 제거하고, active → hold 정렬과 Layer 2 기록 보존을 확인한다.
+3. 작업 폴더를 `workspace/tasks/done/`으로 이동한다.
+4. major는 plan의 `완료 시 문서 업데이트 대상`을 반영한 뒤 전체 정합성 점검 필요성, memory와 methodology issue 기록을 확인한다. minor의 최소 확인·위험 재판정은 `minor 경량 처리 절차`가 정본이다.
+
+완료 승인 확인이 없거나 INDEX가 손상됐으면 이동하지 않는다. done 이력으로 현재 INDEX를 추정 복구하지 않는다.
+
+---
+
 ## 태스크 재개
 
 사용자가 "이어서 해줘", "계속해줘", "어디까지 했어" 등을 발화하면:

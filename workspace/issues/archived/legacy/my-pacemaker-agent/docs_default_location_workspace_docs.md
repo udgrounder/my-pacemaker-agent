@@ -23,3 +23,10 @@
 - `.mpa/runtime/inject/layer1_design.md`
 - `.mpa/runtime/inject/layer1_implement.md`
 - `.mpa/runtime/inject/layer2_checkpoint.md`
+
+## 처리 결과
+
+- 사용자 결정: 정리된 프로젝트 문서는 최상위 `docs/`에 둔다. `workspace/`에는 두지 않는다.
+- 확인 근거: `.mpa/runtime/core/agent_rules.md`와 `dist/.mpa/runtime/core/agent_rules.md`는 모두 `docs/INDEX.md`를 기본 위치로 지정한다. 관련 템플릿과 inject 파일도 같은 경로를 사용한다.
+- 연결 작업: `workspace/tasks/active/20260914_docs_location_issue_closure/plan.md`
+- 보관 사유: 이슈의 구현 제안은 이미 반영됐다. 이 파일은 구조화된 issue metadata 이전 형식이라 `issue-archive` 명령으로는 처리할 수 없으며, legacy archive에 원문과 처리 근거를 함께 보관한다.

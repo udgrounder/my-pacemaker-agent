@@ -16,11 +16,11 @@ import subprocess
 import sys
 import tempfile
 import uuid
-import zipfile
 from contextlib import contextmanager
 from pathlib import Path
 
 import project_config
+from mpa_ops import archive_io, issue_format
 
 
 ROOT = Path(__file__).resolve().parent
@@ -258,98 +258,34 @@ def _bundle_paths(release_id: str) -> dict[str, Path]:
 
 
 def _zip_runtime(source: Path, destination: Path) -> None:
-    """Write a deterministic, symlink-free Runtime archive."""
-    assert_safe_runtime_tree(source)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
-        for path in sorted(source.rglob("*")):
-            relative = path.relative_to(source)
-            if any(part in IGNORED_RUNTIME_NAMES for part in relative.parts):
-                continue
-            if path.is_dir():
-                continue
-            info = zipfile.ZipInfo(relative.as_posix(), date_time=(1980, 1, 1, 0, 0, 0))
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = (path.stat().st_mode & 0o777) << 16
-            archive.writestr(info, path.read_bytes())
+    """Compatibility facade for the deterministic Runtime archive writer."""
+    archive_io.zip_runtime(
+        source,
+        destination,
+        validate_tree=assert_safe_runtime_tree,
+        ignored_names=IGNORED_RUNTIME_NAMES,
+    )
 
 
 def _write_backup_archive(source: Path, destination: Path) -> None:
-    """Write a managed Runtime tree archive without following symlinks."""
-    assert_safe_runtime_tree(source)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
-        for path in sorted(source.rglob("*")):
-            if path.is_dir():
-                continue
-            relative = path.relative_to(source)
-            info = zipfile.ZipInfo(relative.as_posix(), date_time=(1980, 1, 1, 0, 0, 0))
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = (path.stat().st_mode & 0o777) << 16
-            archive.writestr(info, path.read_bytes())
+    """Compatibility facade for the managed backup archive writer."""
+    archive_io.write_backup_archive(source, destination, validate_tree=assert_safe_runtime_tree)
 
 
 def _zip_entries(archive_path: Path) -> list[str]:
-    try:
-        with zipfile.ZipFile(archive_path) as archive:
-            return archive.namelist()
-    except (OSError, zipfile.BadZipFile) as error:
-        raise ValueError(f"release package is not a valid ZIP: {archive_path.name}") from error
+    return archive_io.zip_entries(archive_path)
 
 
 def _validate_zip_member(name: str) -> None:
-    path = Path(name)
-    if not name or path.is_absolute() or ".." in path.parts:
-        raise ValueError(f"release package contains an unsafe path: {name}")
+    archive_io.validate_zip_member(name)
 
 
 def _archive_current_release(archive_path: Path) -> str:
-    try:
-        with zipfile.ZipFile(archive_path) as archive:
-            info = archive.getinfo(".mpa-version")
-            for line in archive.read(info).decode("utf-8").splitlines():
-                if line.startswith("current_release:"):
-                    return line.split(":", 1)[1].strip()
-    except (KeyError, UnicodeDecodeError, OSError, zipfile.BadZipFile) as error:
-        raise ValueError("release package .mpa-version is invalid") from error
-    raise ValueError("release package current_release is missing")
+    return archive_io.archive_current_release(archive_path)
 
 
 def _extract_runtime(archive_path: Path, destination: Path) -> None:
-    destination.mkdir(parents=True, exist_ok=False)
-    names: set[str] = set()
-    try:
-        with zipfile.ZipFile(archive_path) as archive:
-            for info in archive.infolist():
-                _validate_zip_member(info.filename)
-                if info.filename in names:
-                    raise ValueError(f"release package contains a duplicate path: {info.filename}")
-                names.add(info.filename)
-                mode = (info.external_attr >> 16) & 0xFFFF
-                kind = stat.S_IFMT(mode)
-                if kind == stat.S_IFLNK:
-                    raise ValueError(f"release package contains a symlink: {info.filename}")
-                if kind not in (0, stat.S_IFREG, stat.S_IFDIR):
-                    raise ValueError(f"release package contains an unsupported file type: {info.filename}")
-                if info.is_dir() and kind not in (0, stat.S_IFDIR):
-                    raise ValueError(f"release package directory has an invalid type: {info.filename}")
-                if not info.is_dir() and kind == stat.S_IFDIR:
-                    raise ValueError(f"release package file has an invalid type: {info.filename}")
-                target = (destination / info.filename).resolve()
-                if destination.resolve() not in target.parents and target != destination.resolve():
-                    raise ValueError(f"release package path escapes staging: {info.filename}")
-                if info.is_dir():
-                    target.mkdir(parents=True, exist_ok=True)
-                    continue
-                target.parent.mkdir(parents=True, exist_ok=True)
-                with archive.open(info) as source, target.open("wb") as output:
-                    shutil.copyfileobj(source, output)
-                permissions = (info.external_attr >> 16) & 0o777
-                if permissions:
-                    target.chmod(permissions)
-    except (OSError, ValueError, zipfile.BadZipFile) as error:
-        shutil.rmtree(destination, ignore_errors=True)
-        raise ValueError("release package extraction failed") from error
+    archive_io.extract_runtime(archive_path, destination, validate_member=_validate_zip_member)
 
 
 @contextmanager
@@ -1290,48 +1226,16 @@ def issue_metadata_for_collection(path: Path, text: str) -> tuple[dict, str | No
 
 
 def _parse_issue_candidate(text: str) -> tuple[str | None, dict | None, str]:
-    """Classify raw issue metadata without normalizing or rewriting its body."""
-    marker_values = {value.strip() for value in ISSUE_TYPE_MARKER.findall(text)}
-    if len(marker_values) > 1:
-        raise ValueError("issue type markers conflict")
-    marker = next(iter(marker_values), None)
-
-    if not text.startswith("---\n"):
-        if marker == METHODOLOGY_TYPE_MARKER:
-            return METHODOLOGY_KIND, None, text
-        if marker is None:
-            return None, None, text
-        return "project_asset", None, text
-
-    try:
-        raw_metadata, body = text[4:].split("\n---\n", 1)
-        metadata = json.loads(raw_metadata)
-    except (ValueError, json.JSONDecodeError) as error:
-        raise ValueError("issue metadata is invalid") from error
-    if not isinstance(metadata, dict) or metadata.get("type") != "issue":
-        raise ValueError("issue metadata is invalid")
-    kind = metadata.get("kind")
-    if kind is not None and (not isinstance(kind, str) or not kind.strip()):
-        raise ValueError("issue kind is invalid")
-    kind = kind.strip() if isinstance(kind, str) else None
-    if marker is not None:
-        marker_is_methodology = marker == METHODOLOGY_TYPE_MARKER
-        if marker_is_methodology != (kind == METHODOLOGY_KIND):
-            raise ValueError("issue metadata and type marker conflict")
-    return kind, metadata, body
+    return issue_format.parse_issue_candidate(
+        text,
+        type_marker_pattern=ISSUE_TYPE_MARKER,
+        methodology_type_marker=METHODOLOGY_TYPE_MARKER,
+        methodology_kind=METHODOLOGY_KIND,
+    )
 
 
 def _candidate_metadata_is_complete(metadata: dict | None) -> bool:
-    if metadata is None:
-        return True
-    required = (
-        "status", "canonical_key", "canonical_issue_key", "occurrence", "area",
-        "observed_release", "collection_purpose", "source_issue_id", "workspace_issue_id",
-    )
-    return metadata.get("status") == "open" and all(
-        isinstance(metadata.get(field), str) and metadata[field].strip()
-        for field in required
-    )
+    return issue_format.candidate_metadata_is_complete(metadata)
 
 
 def _require_regular_issue(path: Path) -> None:
@@ -1344,69 +1248,17 @@ def _require_regular_issue(path: Path) -> None:
 
 
 def normalize_issue_machine_paths(text: str, project_root: Path) -> str:
-    """Replace machine paths while preserving project-relative reproduction detail."""
-    project_roots = {
-        project_root.absolute().as_posix().rstrip("/"),
-        project_root.resolve().as_posix().rstrip("/"),
-    }
-    # macOS exposes the same temporary tree through both /var and /private/var.
-    # Accept either spelling so normalization does not depend on how a caller
-    # obtained the project path.
-    for root in tuple(project_roots):
-        if root.startswith("/private/var/"):
-            project_roots.add(root.removeprefix("/private"))
-        elif root.startswith("/var/"):
-            project_roots.add(f"/private{root}")
-
-    def replace(match: re.Match[str]) -> str:
-        token = match.group(0)
-        suffix = ""
-        while token and token[-1] in ".,;:!?":
-            suffix = token[-1] + suffix
-            token = token[:-1]
-        matching_root = next(
-            (root for root in sorted(project_roots, key=len, reverse=True)
-             if token == root or token.startswith(f"{root}/")),
-            None,
-        )
-        if matching_root is not None:
-            return f"<project-root>{token[len(matching_root):]}{suffix}"
-        parts = [part for part in token.split("/") if part]
-        safe_tail = parts[-2:] if len(parts) > 1 else parts
-        replacement = "<redacted-path>"
-        if safe_tail:
-            replacement += "/" + "/".join(safe_tail)
-        return replacement + suffix
-
-    return MACHINE_ABSOLUTE_PATH.sub(replace, text)
+    return issue_format.normalize_machine_paths(
+        text, project_root, machine_absolute_path=MACHINE_ABSOLUTE_PATH)
 
 
 def normalize_issue_identity_paths(text: str) -> str:
-    """Remove machine roots while retaining stable path detail for identity."""
-    def stable_path(parts: list[str]) -> str:
-        anchor = next(
-            (index for index, part in enumerate(parts) if part in ISSUE_IDENTITY_PATH_ANCHORS),
-            None,
-        )
-        safe_parts = parts[anchor:] if anchor is not None else parts[-2:]
-        return "<machine-path>" + ("/" + "/".join(safe_parts) if safe_parts else "")
-
-    def replace_absolute(match: re.Match[str]) -> str:
-        token = match.group(0)
-        suffix = ""
-        while token and token[-1] in ".,;:!?":
-            suffix = token[-1] + suffix
-            token = token[:-1]
-        return stable_path([part for part in token.split("/") if part]) + suffix
-
-    def replace_placeholder(match: re.Match[str]) -> str:
-        token = match.group(0)
-        prefix_end = token.find(">") + 1
-        parts = [part for part in token[prefix_end:].split("/") if part]
-        return stable_path(parts)
-
-    return NORMALIZED_MACHINE_PATH.sub(
-        replace_placeholder, MACHINE_ABSOLUTE_PATH.sub(replace_absolute, text))
+    return issue_format.normalize_identity_paths(
+        text,
+        normalized_machine_path=NORMALIZED_MACHINE_PATH,
+        machine_absolute_path=MACHINE_ABSOLUTE_PATH,
+        identity_path_anchors=ISSUE_IDENTITY_PATH_ANCHORS,
+    )
 
 
 def _normalized_issue_values(text: str, project_root: Path) -> tuple[str, str, str]:
@@ -1534,11 +1386,7 @@ def render_collected_issue(source: Path, text: str, project_root: Path) -> str:
 
 
 def _metadata_identity(metadata: dict) -> dict[str, str]:
-    return {
-        key: str(metadata[key])
-        for key in ("source_issue_id", "workspace_issue_id", "canonical_issue_key")
-        if metadata.get(key)
-    }
+    return issue_format.metadata_identity(metadata)
 
 
 def _issue_identity(path: Path) -> dict[str, str]:

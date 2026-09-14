@@ -12,3 +12,10 @@
 ## 적용 대상 파일
 - `.mpa/runtime/core/agent_rules_detail.md` ("minor 경량 처리 절차" 섹션)
 - (선택) `.mpa/runtime/hooks/plan_hash.py` (approve 성공 메시지에 리마인더 추가)
+
+## 처리 결과
+
+- 확인 근거: `.mpa/runtime/core/agent_rules_detail.md`와 `dist/.mpa/runtime/core/agent_rules_detail.md`의 minor 경량 처리 절차 3단계는 새 태스크를 `workspace/tasks/INDEX.md`에 `active` 상태로 등록하도록 명시한다.
+- 범위 결정: `plan_hash.py`의 리마인더는 제안된 선택 사항이며, 절차 자체가 이미 등록 시점을 독립 단계로 고정하므로 이번 이슈에서 중복 구현하지 않는다.
+- 연결 작업: `workspace/tasks/active/20260914_minor_index_registration_issue_closure/plan.md`
+- 보관 사유: 이 파일은 구조화된 issue metadata 이전 형식이라 `issue-archive` 명령으로는 처리할 수 없다. legacy archive에 원문과 처리 근거를 함께 보관한다.
