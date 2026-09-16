@@ -22,6 +22,18 @@
 
 ---
 
+## Runtime 참조 계약 V1
+
+설치된 프로젝트의 외부 도구는 .mpa/runtime/contracts/agent_reference.toml을 읽어 MPA의 작업·문서 경로, 상태 모델, 규칙 문서 진입점을 확인할 수 있다. 이 계약은 experimental이며 읽기·검증 전용이다. 기존 agent의 승인·라우팅·hook 동작을 바꾸지 않고, 외부 도구에도 hook 실행·파일 수정·승인·배포 권한을 주지 않는다.
+
+프로젝트 root에서 다음처럼 검사한다.
+
+    python3 .mpa/runtime/hooks/contract_reference.py --project-root .
+
+정상 종료는 0이다. 오류가 나면 도구는 결과만 보고하고 자동 승인·수정·배포·hook 실행을 중단해야 한다. 문법과 version 정책, 오류 코드, 정본 문서와의 동치 규칙은 .mpa/runtime/contracts/agent_reference_profile.md에 있다.
+
+---
+
 ## 1부: 왜 필요한가 — 문제 인식
 
 > AI agent와 일할 때 느끼는 불편함의 정체를 먼저 이해한다.

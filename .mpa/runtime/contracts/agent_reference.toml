@@ -1,0 +1,59 @@
+# mpa-toml-v1: experimental, inspect-only Runtime reference contract.
+[contract]
+protocol = "mpa-agent-reference"
+contract_version = 1
+profile = "mpa-toml-v1"
+maturity = "experimental"
+usage = "inspect-only"
+authority = "not-invokable"
+discovery_path = ".mpa/runtime/contracts/agent_reference.toml"
+
+[paths]
+tasks_root = "workspace/tasks"
+docs_root = "docs"
+
+[[lifecycle]]
+field_id = "lifecycle.major"
+track = "major"
+owner_path = "core/agent_rules.md"
+owner_anchor = "major-stage-model"
+usage = "inspect-only"
+authority = "not-invokable"
+state_ids = ["designing", "design_complete", "implementing", "verifying", "testing", "review_complete", "completion_approved", "done"]
+labels_ko = ["설계 중", "설계 완료", "구현 중", "검증 중", "테스트 중", "검토 완료", "완료 승인", "done"]
+transitions = ["designing>design_complete", "design_complete>implementing", "implementing>verifying", "verifying>testing", "testing>review_complete", "review_complete>completion_approved", "completion_approved>done"]
+
+[[lifecycle]]
+field_id = "lifecycle.minor"
+track = "minor"
+owner_path = "core/agent_rules.md"
+owner_anchor = "minor-stage-model"
+usage = "inspect-only"
+authority = "not-invokable"
+state_ids = ["drafting", "implementing", "completion_approved", "done"]
+labels_ko = ["작성 중", "구현 중", "완료 승인", "done"]
+transitions = ["drafting>implementing", "implementing>completion_approved", "completion_approved>done"]
+
+[[references]]
+field_id = "entry.agent_rules"
+owner_kind = "markdown_file"
+owner_path = "core/agent_rules.md"
+owner_anchor = "agent-behavior-rules"
+usage = "inspect-only"
+authority = "not-invokable"
+
+[[references]]
+field_id = "entry.user_burden_minimization"
+owner_kind = "markdown_section"
+owner_path = "core/agent_rules.md"
+owner_anchor = "user-burden-minimization"
+usage = "inspect-only"
+authority = "not-invokable"
+
+[[references]]
+field_id = "entry.agent_rules_detail"
+owner_kind = "markdown_file"
+owner_path = "core/agent_rules_detail.md"
+owner_anchor = "agent-rules-detail"
+usage = "inspect-only"
+authority = "not-invokable"

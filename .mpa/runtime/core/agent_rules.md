@@ -1,3 +1,4 @@
+<a id="agent-behavior-rules"></a>
 # Agent 행동 규칙
 
 ---
@@ -40,6 +41,7 @@
 
 ---
 
+<a id="user-burden-minimization"></a>
 ## 사용자 부담 최소화
 
 **사용자를 필요 이상으로 불편하게 하지 않는다.** 모든 작업 유형에 적용하는 원칙의 정본이다. 이미 전달된 의도·답변·유효한 승인은 재사용하고, 범위·위험이 같으면 같은 질문이나 승인을 반복하지 않는다. 계획만 요청한 것을 실행 승인으로 해석하지 않는다.
@@ -82,6 +84,8 @@
 - 세션 메모리의 "기억"이 workspace 내용과 다르면 → workspace를 신뢰하고 세션 메모리를 오래된 것으로 간주한다.
 - 세션 메모리는 workspace에 없는 **사용자 행동 방식·선호·협업 스타일**에만 권위를 가진다.
 
+<a id="major-stage-model"></a>
+<!-- mpa-contract:lifecycle.major=designing|설계 중;design_complete|설계 완료;implementing|구현 중;verifying|검증 중;testing|테스트 중;review_complete|검토 완료;completion_approved|완료 승인;done|done;transitions=designing>design_complete|design_complete>implementing|implementing>verifying|verifying>testing|testing>review_complete|review_complete>completion_approved|completion_approved>done -->
 **단계 모델 — major (기본, 7단계):**
 ```
 설계 중 → 설계 완료 ⛔구현승인 → 구현 중 → 검증 중 → 테스트 중 → 검토 완료 ⛔완료승인확인 → 완료 승인 → done
@@ -91,6 +95,8 @@
 - **소스 수정**: 원칙적으로 `구현 중` 상태에서 진행한다. hook 경고가 있으면 agent는 누락된 작업 항목·계획·승인 여부를 사용자에게 알리고 바로잡는 경로를 제안한다. 기본 hook은 일반 작업을 차단하지 않는다. 단, 사용자가 선택·재개해 `workspace/tasks/CURRENT_TASK`에 기록한 `critical` 작업은 승인 누락·승인해시 불일치 상태에서 차단한다.
 - **되돌아가기**: 어느 단계에서든 이전 단계로 자유롭게 복귀 가능 (게이트 없음).
 
+<a id="minor-stage-model"></a>
+<!-- mpa-contract:lifecycle.minor=drafting|작성 중;implementing|구현 중;completion_approved|완료 승인;done|done;transitions=drafting>implementing|implementing>completion_approved|completion_approved>done -->
 **단계 모델 — minor (경량, 3단계):**
 ```
 작성 중 [자동 승인] → 구현 중 → 완료 승인 ⛔완료승인확인 → done
@@ -124,6 +130,9 @@
 ---
 
 ## 프로젝트 자산 저장 위치
+
+<!-- mpa-contract:paths.tasks_root=workspace/tasks -->
+<!-- mpa-contract:paths.docs_root=docs -->
 
 프로젝트별 `AGENTS.md` 또는 `workspace/project_rules.md`가 문서 위치를 선언하면 그 규칙을 우선한다. 별도 선언이 없을 때만 아래 기본값을 사용한다.
 

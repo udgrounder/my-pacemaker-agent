@@ -3,8 +3,8 @@
 생성일: 2026-09-14
 타입: major
 실패비용: major
-상태: 설계 완료
-승인해시: ""
+상태: 테스트 중
+승인해시: reqspec-v1:7109a1fa91c52401
 승인대상: 요구사항 명세
 ---
 
@@ -156,27 +156,27 @@ Runtime 변경자는 위 표에 걸린 값을 바꿀 때 validator와 source/dis
 
 ### 구현·에이전트 검증
 
-- [ ] V1 profile·discovery·호환성·diagnostic schema 확정.
-- [ ] field provenance·binding marker·동치 fixture 확정.
-- [ ] 검사기·계약·guidebook·가상 consumer·회귀 테스트 구현.
-- [ ] source/dist sync 및 독립 구현 검증.
+- [x] V1 profile·discovery·호환성·diagnostic schema 확정.
+- [x] field provenance·binding marker·동치 fixture 확정.
+- [x] 검사기·계약·guidebook·가상 consumer·회귀 테스트 구현.
+- [x] source/dist sync 및 독립 구현 검증.
 
 ### 사용자 결정·승인 필요
 
-- [ ] 계획서 검토 후 읽기 전용 TOML 계약 V1 구현 승인.
+- [x] 계획서 검토 후 읽기 전용 TOML 계약 V1 구현 승인.
 
 ## 검증 결과
 
-자기 점검: 1차 범위·제외 범위·호환성·권한·정본 소유자·실행 순서·반례·검증 기준을 확인했다. 독립 비평: 5단계 의존 구현과 Runtime 계약 영향으로 수행했고, 자체 parser의 표준 호환성, version 정책, semantic drift, 외부 consumer 권한, source/dist parity 지적을 모두 profile·provenance·consumer·parity 검증에 반영했다. 구현 전에는 아래 검증을 모두 수행한다.
+자기 점검: 1차 범위·제외 범위·호환성·권한·정본 소유자·실행 순서·반례·검증 기준을 확인했다. 독립 비평: 5단계 의존 구현과 Runtime 계약 영향으로 수행했고, 자체 parser의 표준 호환성, version 정책, semantic drift, 외부 consumer 권한, source/dist parity 지적을 모두 profile·provenance·consumer·parity 검증에 반영했다. 구현 후 독립 시행 검증은 final_independent_verification.md에 기록했다.
 
 ### 검증 체크리스트
 
-- [ ] Python 3.9: 정상 V1 계약을 source와 dist에서 모두 discover·parse·validate한다.
-- [ ] profile: 허용/금지 문법·중복 key·BOM·unknown key·경로 이탈을 기대 error code로 검사한다.
-- [ ] compatibility: V1/미지원 version·미래 key·label 변경·id 및 전이 변경 fixture를 검사한다.
-- [ ] provenance: owner file/section/anchor/marker와 path·상태·전이 값의 양방향 drift를 검사한다.
-- [ ] consumer: 가상 외부 consumer가 read/validate만 수행하고 hook 실행·파일 변경·승인 판단을 하지 않는다.
-- [ ] parity: sync 뒤 source/dist 계약, validator, profile 문서, guide reference의 parity와 dist validator 실행을 확인한다.
+- [x] Python 3.9: 정상 V1 계약을 source와 dist에서 모두 discover·parse·validate했다.
+- [x] profile: 허용/금지 문법·중복 key·BOM·unknown key·경로 이탈을 기대 error code로 검사했다.
+- [x] compatibility: V1/미지원 version·미래 key·label 변경·id 및 전이 변경 fixture를 검사했다.
+- [x] provenance: owner file/section/anchor/marker와 path·상태·전이 값의 양방향 drift를 검사했다.
+- [x] consumer: 가상 외부 consumer가 read/validate만 수행하고 hook 실행·파일 변경·승인 판단을 하지 않음을 확인했다.
+- [x] parity: sync 뒤 source/dist 계약, validator, profile 문서, guide reference의 parity와 dist validator 실행을 확인했다.
 
 ### 완료 시 문서 업데이트 대상
 
@@ -191,6 +191,10 @@ V1 계약은 Runtime 구조를 읽고 검증하는 메타데이터다. validator
 | 변경 내용 | 이유 | 명세 영향 |
 |---|---|---|
 | 독립 비평 반영 | TOML 표준 호환성, semantic drift, consumer 권한·source/dist 경계를 명확화 | V1 profile·provenance·호환성·검증 범위를 구체화 |
+| 제한 profile의 문자열 배열을 JSON 호환 문법으로 고정 | Python 3.9에서 외부 설치 parser 없이 profile을 결정론적으로 검사 | 없음 — 승인된 제한 profile의 구현 세부 |
+| 독립 구현 검토 보완 | same-version public field drift와 손상 입력 오류가 안전 중단해야 함을 확인 | 없음 — 승인된 version·safe-stop 정책의 구현 보완 |
+| 배열의 비표준 escape 거부 | 2차 독립 검토에서 scalar와 array profile 검사의 차이를 발견 | 없음 — 표준 TOML subset 경계의 버그 수정 |
+| 최종 독립 시행 검증 | 구현 대화와 검토 기록을 보지 않는 검증자가 Python 3.9과 source/dist/실패 경계를 실제 실행 | 없음 — 검증 증빙 추가 |
 
 ## 명세 변경 이력
 

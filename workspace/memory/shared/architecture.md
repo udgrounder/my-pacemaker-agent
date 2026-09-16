@@ -103,6 +103,10 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 - source Runtime 수정 후 `sync-runtime`으로 dist에 동기화한다. 설치 대상 배포·릴리즈는 별도 명시 요청 때만 한다.
 - 라우팅 키워드: "규칙 바꿔줘", "inject 수정", "페르소나 수정", "MPA 시스템 파일 수정"
 
+### Runtime 참조 계약
+
+.mpa/runtime/contracts/agent_reference.toml은 외부 consumer가 Runtime 구조 사실을 읽고 검증하는 experimental·inspect-only 계약이다. V1은 작업·문서 기본 경로, major/minor 상태 모델, Markdown 진입점만 제공하며 hook 실행·수정·승인·배포 인터페이스를 만들지 않는다. hooks/contract_reference.py는 Python 3.9 표준 기능으로 제한 profile, version, Runtime 내부 reference, Markdown binding marker를 검사한다. 오류면 consumer는 관찰·보고만 하고 중단한다. source 수정 뒤 dist에서도 같은 validator를 실행한다.
+
 ### 요구사항 명세 체크섬
 새 major·minor plan은 `승인해시`의 `reqspec-v1:<16자리 소문자 16진수>` 접두사와 프론트매터 `승인대상: 요구사항 명세`, `## 요구사항 명세` 블록의 조합으로 식별한다. 최초 해시는 `approve`, 사용자 승인 뒤 명세 변경은 `renew-spec`만 기록하며 사람이 날짜·문구·임의 문자열을 직접 쓰지 않는다. `구현 중` 이후 상태에서는 이 형식과 현재 명세의 일치가 필수다. 접두사 없는 기존 해시는 보존된 과거 이력의 읽기에서만 구형 방식으로 유지한다. `hooks/plan_hash.py`가 최신 명세 블록 또는 구형 본문 규칙의 체크섬을 계산하고, `hooks/code_gate.py`는 같은 함수를 호출해 검증한다. 실행 계획·변경 기록·검증 결과는 최신 명세 체크섬 대상이 아니며, 명세 변경은 사용자 승인 뒤 `renew-spec`으로 이력을 남긴다.
 
