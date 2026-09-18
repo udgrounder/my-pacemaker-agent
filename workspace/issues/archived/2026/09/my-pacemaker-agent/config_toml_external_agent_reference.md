@@ -1,5 +1,7 @@
 # MPA 규칙의 TOML 기반 외부 에이전트 참조 형식
 
+> **채택 결정:** `workspace/tasks/active/20260914_mpa_toml_reference_contract/plan.md`에서 inspect-only 참조 계약으로 범위를 좁혀 구현했다. 이 이슈는 채택 기록으로 보관한다.
+
 **타입**: 방법론 개선
 
 **발견 상황**: 현재 MPA 규칙이 Markdown 문서로만 존재하여 다른 AI 에이전트가 프로그래매틱하게 참조하거나 자동화 도구가 파싱하기 어려운 상황에서 발견됨

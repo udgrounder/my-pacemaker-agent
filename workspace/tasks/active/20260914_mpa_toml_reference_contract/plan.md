@@ -195,6 +195,7 @@ V1 계약은 Runtime 구조를 읽고 검증하는 메타데이터다. validator
 | 독립 구현 검토 보완 | same-version public field drift와 손상 입력 오류가 안전 중단해야 함을 확인 | 없음 — 승인된 version·safe-stop 정책의 구현 보완 |
 | 배열의 비표준 escape 거부 | 2차 독립 검토에서 scalar와 array profile 검사의 차이를 발견 | 없음 — 표준 TOML subset 경계의 버그 수정 |
 | 최종 독립 시행 검증 | 구현 대화와 검토 기록을 보지 않는 검증자가 Python 3.9과 source/dist/실패 경계를 실제 실행 | 없음 — 검증 증빙 추가 |
+| immutable Runtime release 생성 | 사용자의 명시적 release 요청으로 release_manager 표준 preflight·전체 테스트·bundle audit 실행 | 없음 — 구현 범위 밖 운영 요청을 별도 실행 |
 
 ## 명세 변경 이력
 

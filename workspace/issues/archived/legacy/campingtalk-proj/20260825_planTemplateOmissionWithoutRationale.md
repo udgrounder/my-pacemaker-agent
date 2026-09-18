@@ -37,3 +37,9 @@
 
 - `.mpa/runtime/templates/plan_template.md`
 - (연동 지시가 있다면) `.mpa/runtime/inject/layer1_design.md`의 "완료 기준" 체크리스트에 "생략 표기에 근거가 있는가"를 추가하는 것도 고려
+
+## 처리 결과
+
+- 사용자 결정: 채택
+- 연결 작업: `workspace/tasks/active/20260916_plan_omission_rationale/plan.md`
+- 판단 근거: 선택적 계획서 섹션의 생략 근거는 모든 MPA 채택 프로젝트에서 재사용되는 작성·검토 방법론에 해당한다. 단, 필수 항목과 과거 계획서까지 일괄적으로 설명을 강제하지 않아 사용자 부담 최소화 원칙을 지킨다.

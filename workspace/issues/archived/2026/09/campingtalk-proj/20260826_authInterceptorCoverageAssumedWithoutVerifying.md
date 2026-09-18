@@ -1,7 +1,7 @@
 ---
 {
   "type": "issue",
-  "status": "open",
+  "status": "rejected",
   "kind": "legacy_issue",
   "canonical_key": "legacy-b41f40f67b6f5648",
   "canonical_issue_key": "legacy-b41f40f67b6f5648",
@@ -32,3 +32,9 @@
 ## 적용 대상 파일
 
 - `agent_rules_detail.md` "코드 탐색" 섹션 또는 `personas/code_reviewer.md`에 위 원칙을 규칙으로 추가하는 것을 검토
+
+## 기각 결정
+
+**결정일:** 2026-09-18
+
+현재 MPA의 공통 개선으로 채택하지 않는다. 인터셉터 등록 방식과 인증 컨텍스트의 신뢰성은 해당 서비스의 경로·보안 설계에 종속된다. 모든 프로젝트의 계획 절차에 고정 검사를 추가하면 일반적인 작업에 불필요한 조사를 강제한다.

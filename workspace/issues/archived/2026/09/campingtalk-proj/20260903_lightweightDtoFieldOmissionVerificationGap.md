@@ -1,7 +1,7 @@
 ---
 {
   "type": "issue",
-  "status": "open",
+  "status": "rejected",
   "kind": "methodology_improvement",
   "canonical_key": "legacy-901551dcf70e8efd",
   "canonical_issue_key": "legacy-901551dcf70e8efd",
@@ -34,3 +34,9 @@
 ## 적용 대상 파일
 - `.mpa/runtime/inject/layer1_review.md`
 - `.mpa/runtime/inject/layer1_design.md`
+
+## 기각 결정
+
+**결정일:** 2026-09-18
+
+현재 MPA의 공통 개선으로 채택하지 않는다. DTO와 화면 필드의 대조 범위는 특정 애플리케이션의 데이터 모델·소비 경로에 종속된다. 이를 공통 필수 검토로 만들면 관련 없는 작업에도 과도한 전수 조사를 요구하게 된다.

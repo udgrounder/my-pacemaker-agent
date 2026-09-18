@@ -52,6 +52,12 @@
 - **변경 유형:** 수정
 - **내역:** 문자열 배열에도 scalar와 같은 non-TOML slash escape 거부를 적용했다. profile parser와 독립 parser oracle의 허용 경계를 맞추고 회귀 fixture를 추가했다.
 
+### Release 생성
+
+- **대상:** workspace/releases/20260916031907-05597730/
+- **변경 유형:** 추가
+- **내역:** 사용자의 명시 요청으로 immutable Runtime bundle을 생성했다. 표준 release preflight, 전체 단위 테스트, package audit을 통과했고 설치 대상 배포는 수행하지 않았다.
+
 ---
 
 ## 요구사항 명세 대비 변경 사항

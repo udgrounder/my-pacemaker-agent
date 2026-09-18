@@ -65,6 +65,37 @@ def reference_issues(documents):
     return issues
 
 
+def plan_omission_issues(documents):
+    required_by_file = {
+        "templates/plan_template.md": (
+            "### 작업 분류 판단 근거",
+            "### 생략 항목과 사유",
+            "형식적인 `없음`·`해당 없음`·`불필요`만으로 된 개별 사유는 쓰지 않는다",
+            "[적용 조건] — [이 작업에서 생략해도 되는 사실]",
+            "완료 시 문서 업데이트 대상",
+            "대상 섹션 | 이전 판단 | 새 판단 | 근거 | 명세 영향",
+        ),
+        "inject/layer1_design.md": (
+            "major에서는 minor 전용 네 항목을 작성하지 않음",
+            "major의 `사전 조사`, `완료 시 문서 업데이트 대상`",
+            "각 행이 실제 적용 조건과 작업 사실에 맞는지 대조함",
+            "사용자 확인과 `renew-spec`",
+        ),
+        "core/agent_rules_detail.md": (
+            "자동 `approve` 전에",
+            "대상 섹션·이전 판단·새 판단·근거·명세 영향",
+            "사용자 확인과 `renew-spec`",
+        ),
+        "inject/layer1_review.md": (
+            "초기 `생략 항목과 사유` 표",
+            "확인 필요",
+        ),
+    }
+    return [f"missing plan omission policy: {path}: {phrase}"
+            for path, phrases in required_by_file.items()
+            for phrase in phrases if phrase not in documents.get(path, "")]
+
+
 class PolicyReferenceTest(unittest.TestCase):
     def load(self, root):
         return {str(p.relative_to(root)): p.read_text(encoding="utf-8")
@@ -107,6 +138,26 @@ class PolicyReferenceTest(unittest.TestCase):
             self.assertIn("설치 대상 갱신은", text)
             self.assertIn("명시적 릴리즈·배포 요청", text)
             self.assertNotIn("dist/`와 설치본 양쪽 동기화 필수", text)
+
+    def test_plan_omission_policy_is_enforced_in_source(self):
+        self.assertEqual(plan_omission_issues(self.load(RUNTIME)), [])
+
+    def test_plan_omission_policy_is_consistent_in_distribution(self):
+        self.assertEqual(plan_omission_issues(self.load(ROOT / "dist/.mpa/runtime")), [])
+
+    def test_detects_missing_minor_omission_change_record_rule(self):
+        documents = self.load(RUNTIME)
+        key = "core/agent_rules_detail.md"
+        documents[key] = documents[key].replace(
+            "대상 섹션·이전 판단·새 판단·근거·명세 영향", "누락된 변경 기록")
+        self.assertTrue(any(key in issue for issue in plan_omission_issues(documents)))
+
+    def test_detects_missing_specific_omission_reason_rule(self):
+        documents = self.load(RUNTIME)
+        key = "templates/plan_template.md"
+        documents[key] = documents[key].replace(
+            "[적용 조건] — [이 작업에서 생략해도 되는 사실]", "형식적 사유")
+        self.assertTrue(any(key in issue for issue in plan_omission_issues(documents)))
 
     def test_detects_completion_bypass_in_discovery(self):
         docs = self.load(RUNTIME)

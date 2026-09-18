@@ -1,7 +1,7 @@
 ---
 {
   "type": "issue",
-  "status": "open",
+  "status": "rejected",
   "kind": "methodology_improvement",
   "canonical_key": "legacy-22f5ce68c73fbfd3",
   "canonical_issue_key": "legacy-22f5ce68c73fbfd3",
@@ -30,3 +30,9 @@
 
 ## 적용 대상 파일
 - `.mpa/runtime/hooks/code_gate.py`
+
+## 기각 결정
+
+**결정일:** 2026-09-18
+
+현재 MPA의 공통 개선으로 채택하지 않는다. 이 이슈는 특정 프로젝트의 중첩 저장소·지속 작업 디렉터리 조합에서 나온 호환성 문제이며, 현재 작업 환경에서 재현 근거가 없다. 일반 Runtime 규칙으로 추가하면 모든 프로젝트에 불필요한 작업 디렉터리 복구 절차를 요구하게 된다.

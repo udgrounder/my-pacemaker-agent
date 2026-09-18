@@ -3,6 +3,7 @@ import contextlib
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -72,8 +73,11 @@ MINOR_PLAN = """---
 - 없음
 ### 결정 대기 항목 (Open Questions)
 - 없음
-### minor 판단 근거
-- 단일 관심사
+### 작업 분류 판단 근거
+- minor일 때 한 파일/단일 관심사: 단일 관심사
+- minor일 때 설계 결정 불필요: 방법이 자명함
+- minor일 때 git reset으로 복구 가능: 즉시 복구 가능
+- minor일 때 사용자 취향·의사결정 불필요: 사용자 판단 불필요
 ## 실행 계획
 ### 구현 단계
 1. 파일을 수정한다.
@@ -270,7 +274,7 @@ class PlanHashTest(unittest.TestCase):
         for heading in (
             "### 요청 기준", "### 목적", "### 범위·제외 범위", "### 완료 기준",
             "### 사용자 결정", "### 변경 불가 제약", "### 에이전트 가정",
-            "### 결정 대기 항목 (Open Questions)", "### minor 판단 근거",
+            "### 결정 대기 항목 (Open Questions)", "### 작업 분류 판단 근거",
         ):
             self.assertIn(heading, template)
 
@@ -285,6 +289,28 @@ class PlanHashTest(unittest.TestCase):
             baseline,
             plan_hash.compute_for_plan(front_matter, body.replace("작은 결과를 만든다.", "다른 결과를 만든다.")),
         )
+
+    def test_classification_reason_is_in_specification_hash(self):
+        _, front_matter, body = MINOR_PLAN.split("---\n", 2)
+        baseline = plan_hash.compute_for_plan(front_matter, body)
+        changed = body.replace("단일 관심사", "여러 관심사")
+        self.assertNotEqual(baseline, plan_hash.compute_for_plan(front_matter, changed))
+
+    def test_source_and_distribution_cli_compute_same_classification_hash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            path.write_text(MINOR_PLAN, encoding="utf-8")
+            outputs = []
+            for runtime in (ROOT / ".mpa/runtime", ROOT / "dist/.mpa/runtime"):
+                result = subprocess.run(
+                    ["python3", str(runtime / "hooks/plan_hash.py"), "compute", str(path)],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                outputs.append(result.stdout.strip())
+            self.assertEqual(outputs[0], outputs[1])
 
     def test_approve_rejects_legacy_plan_before_state_transition(self):
         with tempfile.TemporaryDirectory() as directory:
