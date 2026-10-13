@@ -103,6 +103,12 @@ def active_tasks(cwd):
         if not os.path.isdir(task_dir):
             continue
         plan = os.path.join(task_dir, "plan.md")
+        if os.path.lexists(os.path.join(task_dir, ".plan-renewal.json")):
+            rows.append(
+                f"  - {name} — 승인 저장 중단 복구 필요 (.plan-renewal.json). "
+                "core/agent_rules_detail.md '승인 이력 저장과 복구'를 먼저 읽고, 복구 전 init/재승인을 하지 마세요."
+            )
+            continue
         if not os.path.exists(plan):
             rows.append(f"  - {name} — plan.md 없음")
             continue

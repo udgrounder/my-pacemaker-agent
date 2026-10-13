@@ -26,6 +26,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 from datetime import datetime, timezone
 
 REQUIRED_FIELDS = ["태스크", "생성일", "타입", "실패비용", "상태", "승인해시"]
@@ -132,7 +133,7 @@ def compute_for_plan(front_matter, body):
     return compute_legacy(body)
 
 
-def approval_hash_issue(front_matter, body):
+def approval_hash_issue(front_matter, body, plan_path=None):
     """승인 이후 상태의 승인해시 형식·현재 명세 일치 문제를 반환한다.
 
     최신 plan(`승인대상: 요구사항 명세`)의 승인해시는 반드시
@@ -140,6 +141,8 @@ def approval_hash_issue(front_matter, body):
     `reqspec-v1:<16자리 소문자 16진수>`여야 한다. 구형 plan은 기존 본문
     해시와의 일치만 검사해 과거 이력의 읽기 호환성을 유지한다.
     """
+    if plan_path and os.path.lexists(renewal_recovery_path(plan_path)):
+        return "승인 기록 복구 필요: .plan-renewal.json의 원본·예상 작성본과 plan/changelog를 대조하세요"
     status = get_field(front_matter, "상태")
     if status not in HASH_REQUIRED_STATUSES:
         return None
@@ -172,12 +175,198 @@ def get_field(front_matter, key):
     return None
 
 
-def write_plan(plan_path, front_matter, body):
-    new_content = f"---\n{front_matter}\n---\n{body}"
-    tmp_path = plan_path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        f.write(new_content)
-    os.replace(tmp_path, plan_path)
+def atomic_write(path, content):
+    """동일 디렉터리 임시 파일을 원자 교체하고 실패 시 임시 파일을 정리한다."""
+    descriptor, tmp_path = tempfile.mkstemp(prefix=".plan-write-", dir=os.path.dirname(os.path.abspath(path)))
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if os.path.exists(path):
+            os.chmod(tmp_path, os.stat(path).st_mode & 0o777)
+        os.replace(tmp_path, path)
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+
+def write_plan(plan_path, front_matter, body, transaction=None):
+    content = f"---\n{front_matter}\n---\n{body}"
+    if transaction is None:
+        atomic_write(plan_path, content)
+    else:
+        recovery_path, recovery, expected = transaction
+        guarded_write(plan_path, content, expected, recovery_path, recovery)
+
+
+def renewal_recovery_path(plan_path):
+    return os.path.join(os.path.dirname(os.path.abspath(plan_path)), ".plan-renewal.json")
+
+
+def read_optional(path):
+    if not os.path.lexists(path):
+        return None
+    if os.path.islink(path):
+        raise ValueError("승인 갱신 파일은 심볼릭 링크일 수 없습니다")
+    with open(path, encoding="utf-8") as stream:
+        return stream.read()
+
+
+def guarded_write(path, content, expected, recovery_path, recovery):
+    """교체할 파일을 먼저 확보하고 빈 경로에만 새 내용을 설치한다.
+
+    예상 원본 비교와 os.replace 사이의 경합을 만들지 않는다. rename으로
+    실제 교체 대상 inode를 확보하고 link의 no-clobber 생성으로 외부 파일을
+    덮지 않는다. 확보된 파일은 최종 대조 전까지 삭제하지 않는다.
+    """
+    directory = os.path.dirname(os.path.abspath(path))
+    descriptor, stage = tempfile.mkstemp(prefix=".plan-write-", dir=directory)
+    backup = None
+    captured = False
+    reserved_identity = None
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            if content is not None:
+                stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if expected is not None:
+            descriptor, backup = tempfile.mkstemp(prefix=".plan-renewal-preserved-", dir=directory)
+            os.close(descriptor)
+            reserved = os.stat(backup, follow_symlinks=False)
+            reserved_identity = (reserved.st_dev, reserved.st_ino)
+            recovery.setdefault("preserved", []).append({
+                "target": os.path.basename(path), "file": os.path.basename(backup), "expected": expected,
+            })
+            atomic_write(recovery_path, json.dumps(recovery, ensure_ascii=False, indent=2))
+            # 여기서 확보하는 것은 읽기 검사 시점이 아니라 실제 교체 직전 파일이다.
+            os.rename(path, backup)
+            captured = True
+            if read_optional(backup) != expected:
+                raise ValueError("교체 직전 외부 편집을 확보했습니다. 자동 교체하지 않습니다")
+            os.chmod(stage, os.stat(backup).st_mode & 0o777)
+        elif os.path.lexists(path):
+            raise ValueError("새 파일 경로에 외부 파일이 생겨 덮어쓰지 않습니다")
+        if content is not None:
+            os.link(stage, path)  # 경로가 생겼으면 EEXIST, 덮어쓰기 없음.
+        elif os.path.lexists(path):
+            raise ValueError("삭제 대상 경로에 외부 파일이 생겨 보존합니다")
+    except BaseException:
+        if backup is not None:
+            # rename 성공 직후 captured=True 이전의 인터럽트도 실제 inode로 판별한다.
+            try:
+                saved = os.stat(backup, follow_symlinks=False)
+                captured = reserved_identity is None or (saved.st_dev, saved.st_ino) != reserved_identity
+            except OSError:
+                captured = True  # 미확인은 삭제 근거로 사용하지 않는다.
+        if backup is not None and not captured:
+            os.unlink(backup)
+            recovery["preserved"].pop()
+        if backup is not None and not os.path.lexists(path):
+            # 확보 파일을 되돌릴 때도 현재 경로를 덮지 않는다.
+            try:
+                if captured:
+                    os.link(backup, path)
+            except OSError:
+                pass  # JSON과 확보 파일에서 수동 복구한다.
+        raise
+    finally:
+        if os.path.exists(stage):
+            os.unlink(stage)
+
+
+def verify_approval_files(plan_path, history_path, expected_plan, expected_history, recovery):
+    if read_optional(plan_path) != expected_plan or read_optional(history_path) != expected_history:
+        raise ValueError("최종 plan/changelog가 예상 작성본과 다릅니다")
+    directory = os.path.dirname(os.path.abspath(plan_path))
+    for saved in recovery.get("preserved", []):
+        if read_optional(os.path.join(directory, saved["file"])) != saved["expected"]:
+            raise ValueError("확보한 원본에 외부 편집이 있어 복구 자료를 보존합니다")
+
+
+def cleanup_approval_recovery(recovery_path, recovery):
+    directory = os.path.dirname(recovery_path)
+    for saved in recovery.get("preserved", []):
+        os.unlink(os.path.join(directory, saved["file"]))
+    # 중간 정리 실패가 성공으로 읽히지 않도록 journal은 마지막에 지운다.
+    os.unlink(recovery_path)
+
+
+def approval_history_match(text, plan=False):
+    matches = list(re.finditer(r"(?m)^##\s+명세 변경 이력\s*$", text))
+    if len(matches) > 1:
+        raise ValueError("명세 변경 이력 헤딩이 중복되어 기록 위치를 확정할 수 없습니다")
+    if matches and plan:
+        headings = list(re.finditer(r"(?m)^##\s+(.+)$", text[:matches[0].start()]))
+        if not headings or headings[-1].group(1).strip() == "요구사항 명세":
+            raise ValueError("명세 변경 이력은 요구사항 명세 바깥 실행 영역 뒤에 있어야 합니다")
+        if not any(heading.group(1).strip() == "요구사항 명세" for heading in headings):
+            raise ValueError("명세 변경 이력 위치가 요구사항 명세보다 앞입니다")
+    return matches[0] if matches else None
+
+
+def append_approval_history(text, row):
+    """정확한 최상위 이력 헤딩에만 기록하며 후속 섹션을 보존한다."""
+    match = approval_history_match(text)
+    if match is None:
+        text = text.rstrip() + "\n\n## 명세 변경 이력\n"
+        match = re.search(r"(?m)^##\s+명세 변경 이력\s*$", text)
+    start = match.end()
+    next_heading = re.search(r"(?m)^#{1,6}\s+", text[start:])
+    end = len(text) if next_heading is None else start + next_heading.start()
+    history = text[start:end]
+    header = "| 승인 시각 | 이전 체크섬 | 새 체크섬 | 변경 요약 |\n|---|---|---|---|"
+    if header not in history:
+        history = "\n\n" + header + "\n" + history.strip() + "\n"
+    return text[:start] + history.rstrip() + "\n" + row + "\n\n" + text[end:]
+
+
+def write_approval_pair(plan_path, front_matter, body, history_path, old_history, new_history, old_plan):
+    """지원 writer는 갱신 중 문서 편집을 직렬화한다.
+
+    비협조 writer와 충돌하면 실제 교체 원본과 JSON을 보존한다. 두 파일 및
+    확보 파일을 최종 대조한 뒤에만 완료한다. 임의 편집기의 작업 완료 후
+    저장까지 원자적으로 통제하거나 두 파일 crash-atomicity를 보장하지 않는다.
+    """
+    recovery_path = renewal_recovery_path(plan_path)
+    new_plan = f"---\n{front_matter}\n---\n{body}"
+    recovery = {"plan_before": old_plan, "plan_after": new_plan,
+                "changelog_before": old_history, "changelog_after": new_history,
+                "preserved": []}
+    descriptor = os.open(recovery_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+        json.dump(recovery, stream, ensure_ascii=False, indent=2)
+        stream.flush()
+        os.fsync(stream.fileno())
+    if read_optional(plan_path) != old_plan or read_optional(history_path) != old_history:
+        os.unlink(recovery_path)
+        raise ValueError("승인 갱신 충돌: plan/changelog가 읽은 원본과 달라 저장하지 않았습니다. 최신 기록을 다시 확인하세요")
+    try:
+        guarded_write(history_path, new_history, old_history, recovery_path, recovery)
+        write_plan(plan_path, front_matter, body, (recovery_path, recovery, old_plan))
+    except (OSError, ValueError) as error:
+        try:
+            if read_optional(plan_path) != old_plan:
+                raise ValueError("plan에 외부 변경 또는 미완료 저장이 있어 자동 원복하지 않습니다")
+            current = read_optional(history_path)
+            if current == new_history:
+                guarded_write(history_path, old_history, new_history, recovery_path, recovery)
+            elif current != old_history:
+                raise ValueError("changelog에 외부 변경이 있어 자동 원복하지 않습니다")
+            verify_approval_files(plan_path, history_path, old_plan, old_history, recovery)
+            cleanup_approval_recovery(recovery_path, recovery)
+        except (OSError, ValueError) as rollback_error:
+            raise ValueError(f"승인 갱신 실패; 복구 필요: .plan-renewal.json과 확보 파일 보존 ({rollback_error})") from error
+        raise ValueError(f"승인 갱신 실패; 기존 승인해시와 이력을 보존했습니다 ({error})") from error
+    try:
+        verify_approval_files(plan_path, history_path, new_plan, new_history, recovery)
+    except (OSError, ValueError) as error:
+        raise ValueError(f"승인 갱신 최종 대조 실패; .plan-renewal.json과 확보 파일 보존·복구 필요 ({error})") from error
+    try:
+        cleanup_approval_recovery(recovery_path, recovery)
+    except OSError as error:
+        raise ValueError("두 파일 저장 후 복구 기록 정리 실패; .plan-renewal.json 대조·복구 필요") from error
 
 
 def set_field(plan_path, key, value):
@@ -200,7 +389,9 @@ def set_field(plan_path, key, value):
 
 
 def renew_spec(plan_path, summary):
-    front_matter, body, _ = parse(plan_path)
+    if os.path.lexists(renewal_recovery_path(plan_path)):
+        raise ValueError("승인 기록 복구 필요: .plan-renewal.json을 먼저 대조하세요")
+    front_matter, body, original = parse(plan_path)
     if front_matter is None or extract_specification(body) is None:
         raise ValueError("renew-spec은 `## 요구사항 명세`가 있는 plan.md에서만 사용할 수 있습니다")
     if not summary.strip():
@@ -208,26 +399,31 @@ def renew_spec(plan_path, summary):
     old_hash = get_field(front_matter, "승인해시")
     if not old_hash:
         raise ValueError("기존 승인해시가 없습니다. 최초 승인은 approve로 처리하세요")
-    history_match = re.search(r"(?m)^##\s+명세 변경 이력\s*$", body)
-    if history_match is None:
-        raise ValueError("`## 명세 변경 이력` 섹션이 없어 승인 이력을 기록할 수 없습니다")
+    if not SPEC_HASH_RE.fullmatch(old_hash):
+        raise ValueError("구형 승인해시는 최신 명세로 정리하고 사용자 재승인 뒤 approve로 처리하세요")
+    if get_field(front_matter, "상태") not in HASH_REQUIRED_STATUSES:
+        raise ValueError("renew-spec은 최초 승인 이후 상태에서만 사용할 수 있습니다")
     new_hash = compute_for_plan(front_matter, body)
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    row = f"| {timestamp} | {old_hash} | {new_hash} | {summary.strip()} |"
-    start = history_match.end()
-    next_heading_match = re.search(r"(?m)^#{1,6}\s+", body[start:])
-    end = len(body) if next_heading_match is None else start + next_heading_match.start()
-    history = body[start:end]
-    header = "| 승인 시각 | 이전 체크섬 | 새 체크섬 | 변경 요약 |\n|---|---|---|---|"
-    if header not in history:
-        history = "\n\n" + header + "\n" + history.strip() + "\n"
-    if not history.endswith("\n"):
-        history += "\n"
-    body = body[:start] + history + row + "\n" + body[end:]
+    safe_summary = summary.strip().replace("|", "&#124;").replace("\r", " ").replace("\n", " ")
+    row = f"| {timestamp} | {old_hash} | {new_hash} | {safe_summary} |"
     lines = []
     for line in front_matter.splitlines():
         lines.append(f"승인해시: {new_hash}" if line.startswith("승인해시:") else line)
-    write_plan(plan_path, "\n".join(lines), body)
+    new_front = "\n".join(lines)
+    if approval_history_match(body, plan=True):
+        write_plan(plan_path, new_front, append_approval_history(body, row))
+    else:
+        history_path = os.path.join(os.path.dirname(os.path.abspath(plan_path)), "changelog.md")
+        if os.path.islink(history_path) or os.path.islink(plan_path):
+            raise ValueError("승인 갱신의 plan/changelog는 심볼릭 링크일 수 없습니다")
+        old_history = None
+        if os.path.exists(history_path):
+            with open(history_path, encoding="utf-8") as stream:
+                old_history = stream.read()
+        text = old_history if old_history is not None else "# 변경 이력\n\n**계획서:** `plan.md`\n"
+        write_approval_pair(plan_path, new_front, body, history_path, old_history,
+                            append_approval_history(text, row), original)
     return old_hash, new_hash, timestamp
 
 
@@ -235,10 +431,17 @@ def audit(plan_path):
     """프론트매터 필드 상태를 검사한다.
     반환: dict {"frontmatter_exists": bool, "missing": [...], "invalid": [{field, value, reason}]}
     """
+    if not os.path.isfile(plan_path) and os.path.lexists(renewal_recovery_path(plan_path)):
+        return {"frontmatter_exists": False, "missing": list(REQUIRED_FIELDS),
+                "invalid": [{"field": "승인해시", "value": "",
+                             "reason": "승인 저장 중단 복구 필요: .plan-renewal.json과 확보 파일을 먼저 대조하세요"}]}
     front_matter, body, _ = parse(plan_path)
     result = {"frontmatter_exists": front_matter is not None, "missing": [], "invalid": []}
     if front_matter is None:
         result["missing"] = list(REQUIRED_FIELDS)
+        if os.path.lexists(renewal_recovery_path(plan_path)):
+            result["invalid"].append({"field": "승인해시", "value": "",
+                                      "reason": "승인 저장 중단 복구 필요: .plan-renewal.json을 먼저 대조하세요"})
         return result
 
     for key in REQUIRED_FIELDS:
@@ -258,7 +461,7 @@ def audit(plan_path):
         elif key == "실패비용" and val not in VALID_COST:
             result["invalid"].append({"field": key, "value": val, "reason": f"유효하지 않은 실패비용. 허용: {sorted(VALID_COST)}"})
 
-    issue = approval_hash_issue(front_matter, body)
+    issue = approval_hash_issue(front_matter, body, plan_path)
     if issue:
         result["invalid"].append({
             "field": "승인해시",
@@ -333,6 +536,9 @@ def main():
         front_matter, body, _ = parse(plan_path)
         print(compute_for_plan(front_matter, body))
     elif cmd == "approve":
+        if os.path.lexists(renewal_recovery_path(plan_path)):
+            sys.stderr.write("approve 거부: 승인 기록 복구 필요 (.plan-renewal.json)\n")
+            sys.exit(2)
         front_matter, body, _ = parse(plan_path)
         status = get_field(front_matter, "상태") if front_matter else None
         task_type = get_field(front_matter, "타입") if front_matter else None
@@ -363,9 +569,19 @@ def main():
         except ValueError as error:
             sys.stderr.write(f"⛔ approve 거부: {error}\n")
             sys.exit(2)
-        # 상태를 '구현 중'으로 전환하고 해시를 원자적으로 기록
-        set_field(plan_path, "상태", "구현 중")
-        set_field(plan_path, "승인해시", h)
+        # 최초 승인도 상태와 해시를 한 번의 원자 교체로 기록한다.
+        lines = []
+        for line in front_matter.splitlines():
+            if line.startswith("상태:"):
+                line = "상태: 구현 중"
+            elif line.startswith("승인해시:"):
+                line = f"승인해시: {h}"
+            lines.append(line)
+        if get_field(front_matter, "승인해시") is None:
+            lines.append(f"승인해시: {h}")
+        if get_field(front_matter, "상태") is None:
+            lines.append("상태: 구현 중")
+        write_plan(plan_path, "\n".join(lines), body)
         print(f"구현 승인됨: 상태 → 구현 중 / 승인해시: {h}")
     elif cmd == "renew-spec":
         args = sys.argv[3:]
@@ -374,11 +590,14 @@ def main():
             summary = args[1]
         try:
             old_hash, new_hash, timestamp = renew_spec(plan_path, summary)
-        except ValueError as error:
+        except (ValueError, OSError) as error:
             sys.stderr.write(f"⛔ 명세 승인 기록 갱신 실패: {error}\n")
             sys.exit(2)
         print(f"요구사항 명세 승인 기록 갱신됨: {old_hash} → {new_hash} / {timestamp}")
     elif cmd == "check":
+        if os.path.lexists(renewal_recovery_path(plan_path)):
+            print("불일치 — 승인 기록 복구 필요 (.plan-renewal.json)")
+            sys.exit(1)
         front_matter, body, _ = parse(plan_path)
         approved = get_field(front_matter, "승인해시")
         try:
@@ -399,6 +618,9 @@ def main():
             sys.exit(1)
         sys.exit(0)
     elif cmd == "init":
+        if os.path.lexists(renewal_recovery_path(plan_path)):
+            sys.stderr.write("init 거부: 승인 저장 중단 복구 필요 (.plan-renewal.json)\n")
+            sys.exit(2)
         kv = parse_field_args(sys.argv[3:])
         if not kv:
             sys.stderr.write("init은 최소 1개 --field key=value 가 필요합니다\n")

@@ -13,6 +13,7 @@ class TodoPolicyTest(unittest.TestCase):
         detail = (SOURCE / "core/agent_rules_detail.md").read_text(encoding="utf-8")
         design = (SOURCE / "inject/layer1_design.md").read_text(encoding="utf-8")
         review = (SOURCE / "inject/layer1_review.md").read_text(encoding="utf-8")
+        changelog = (SOURCE / "templates/changelog_template.md").read_text(encoding="utf-8")
 
         self.assertFalse((SOURCE / "templates/minor_plan_template.md").exists())
         self.assertIn("이번 작업 항목 종료 전 증빙", template)
@@ -27,7 +28,10 @@ class TodoPolicyTest(unittest.TestCase):
         self.assertIn("### 생략 항목과 사유", template)
         self.assertIn("형식적인 `없음`·`해당 없음`·`불필요`만으로 된 개별 사유는 쓰지 않는다", template)
         self.assertIn("[적용 조건] — [이 작업에서 생략해도 되는 사실]", template)
-        self.assertIn("대상 섹션 | 이전 판단 | 새 판단 | 근거 | 명세 영향", template)
+        self.assertIn("대상 섹션 | 이전 판단 | 새 판단 | 근거 | 명세 영향", changelog)
+        self.assertNotIn("## 실행 중 변경 기록", template)
+        self.assertNotIn("## 명세 변경 이력", template)
+        self.assertIn("이력 저장 성공을 확인한 뒤 plan을 교체", rules)
         self.assertIn("생략 항목과 사유", design)
         self.assertIn("각 행이 실제 적용 조건과 작업 사실에 맞는지 대조함", design)
         self.assertIn("자동 `approve` 전에", detail)
@@ -36,6 +40,10 @@ class TodoPolicyTest(unittest.TestCase):
         self.assertIn("사용자 확인과 `renew-spec`", detail)
         self.assertIn("완료 시 문서 업데이트 대상", design)
         self.assertIn("초기 `생략 항목과 사유` 표", review)
+        discovery = template.index("## 구현 후 발견")
+        operating = template.index("## 운영 시 안내 사항")
+        self.assertGreater(discovery, operating)
+        self.assertNotIn("### 구현 후 발견", template)
 
 
 if __name__ == "__main__":

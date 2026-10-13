@@ -73,7 +73,13 @@ def plan_omission_issues(documents):
             "형식적인 `없음`·`해당 없음`·`불필요`만으로 된 개별 사유는 쓰지 않는다",
             "[적용 조건] — [이 작업에서 생략해도 되는 사실]",
             "완료 시 문서 업데이트 대상",
+            "changelog.md",
+            "현재 유효한 판단·실행·검증 상태",
+        ),
+        "templates/changelog_template.md": (
             "대상 섹션 | 이전 판단 | 새 판단 | 근거 | 명세 영향",
+            "계획·결정 변경 이력",
+            "명세 변경 이력",
         ),
         "inject/layer1_design.md": (
             "major에서는 minor 전용 네 항목을 작성하지 않음",

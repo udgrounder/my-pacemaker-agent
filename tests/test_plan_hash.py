@@ -169,6 +169,384 @@ class PlanHashTest(unittest.TestCase):
             self.assertIn("목적 변경 승인", text)
             self.assertIn(f"승인해시: {new_hash}", text)
 
+    def history_free_plan(self, path):
+        approved = self.new_plan_hash()
+        content = NEW_PLAN.replace("oldhash", approved).replace("결과를 만든다.", "변경된 결과를 만든다.")
+        content = content.replace("## 명세 변경 이력\n\n", "")
+        path.write_text(content, encoding="utf-8")
+        return content
+
+    def test_new_layout_creates_changelog_without_adding_plan_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            original = self.history_free_plan(path)
+            old_hash, new_hash, _ = plan_hash.renew_spec(str(path), "목적 | 변경\n승인")
+            self.assertNotEqual(old_hash, new_hash)
+            self.assertEqual(path.read_text(encoding="utf-8"), original.replace(old_hash, new_hash))
+            history = (path.parent / "changelog.md").read_text(encoding="utf-8")
+            self.assertIn("목적 &#124; 변경 승인", history)
+            self.assertIn(old_hash, history)
+            self.assertIn(new_hash, history)
+            self.assertFalse(Path(plan_hash.renewal_recovery_path(path)).exists())
+            self.assertEqual(plan_hash.audit(str(path))["invalid"], [])
+
+    def test_new_layout_preserves_existing_history_and_following_sections(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            self.history_free_plan(path)
+            history_path = path.parent / "changelog.md"
+            history_path.write_text("# 내역\n기존 구현 증빙\n## 명세 변경 이력\n\n### 검증\n실패 증빙\n", encoding="utf-8")
+            plan_hash.renew_spec(str(path), "첫 승인")
+            plan_hash.renew_spec(str(path), "위험 재승인")
+            history = history_path.read_text(encoding="utf-8")
+            self.assertIn("기존 구현 증빙", history)
+            self.assertIn("실패 증빙", history)
+            self.assertEqual(history.count("## 명세 변경 이력"), 1)
+            self.assertLess(history.index("위험 재승인"), history.index("### 검증"))
+
+    def test_new_layout_restores_existing_or_absent_changelog_on_plan_failure(self):
+        for previous in (None, "# 변경 이력\n기존 증빙\n"):
+            with self.subTest(previous=previous), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "plan.md"
+                original = self.history_free_plan(path)
+                history_path = path.parent / "changelog.md"
+                if previous is not None:
+                    history_path.write_text(previous, encoding="utf-8")
+                with mock.patch.object(plan_hash, "write_plan", side_effect=OSError("plan 저장 실패")):
+                    with self.assertRaisesRegex(ValueError, "기존 승인해시와 이력을 보존"):
+                        plan_hash.renew_spec(str(path), "명세 승인")
+                self.assertEqual(path.read_text(encoding="utf-8"), original)
+                self.assertEqual(history_path.read_text(encoding="utf-8") if history_path.exists() else None, previous)
+                self.assertFalse(Path(plan_hash.renewal_recovery_path(path)).exists())
+
+    def test_new_layout_history_write_failure_preserves_plan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            original = self.history_free_plan(path)
+            with mock.patch.object(plan_hash, "guarded_write", side_effect=OSError("이력 저장 실패")):
+                with self.assertRaisesRegex(ValueError, "기존 승인해시와 이력을 보존"):
+                    plan_hash.renew_spec(str(path), "명세 승인")
+            self.assertEqual(path.read_text(encoding="utf-8"), original)
+            self.assertFalse((path.parent / "changelog.md").exists())
+
+    def test_late_external_plan_save_is_not_overwritten_at_install(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            original = self.history_free_plan(path)
+            real_link = os.link
+            injected = False
+            def edit_before_link(source, target):
+                nonlocal injected
+                if str(target) == str(path) and not injected:
+                    injected = True
+                    path.write_text(original + "\n사용자 실패 증빙\n", encoding="utf-8")
+                return real_link(source, target)
+            with mock.patch.object(plan_hash.os, "link", side_effect=edit_before_link):
+                with self.assertRaisesRegex(ValueError, "복구 필요"):
+                    plan_hash.renew_spec(str(path), "명세 승인")
+            self.assertIn("사용자 실패 증빙", path.read_text(encoding="utf-8"))
+            self.assertTrue(Path(plan_hash.renewal_recovery_path(path)).exists())
+            self.assertIn("복구 필요", plan_hash.audit(str(path))["invalid"][0]["reason"])
+
+    def test_edit_immediately_before_capture_is_preserved_and_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            original = self.history_free_plan(path)
+            real_rename = os.rename
+            def edit_before_capture(source, target):
+                if str(source) == str(path):
+                    path.write_text(original + "\n늦은 외부 편집\n", encoding="utf-8")
+                return real_rename(source, target)
+            with mock.patch.object(plan_hash.os, "rename", side_effect=edit_before_capture):
+                with self.assertRaisesRegex(ValueError, "복구 필요"):
+                    plan_hash.renew_spec(str(path), "명세 승인")
+            self.assertIn("늦은 외부 편집", path.read_text(encoding="utf-8"))
+            recovery = json.loads(Path(plan_hash.renewal_recovery_path(path)).read_text(encoding="utf-8"))
+            self.assertTrue(any("늦은 외부 편집" in (path.parent / saved["file"]).read_text(encoding="utf-8")
+                                for saved in recovery["preserved"]))
+
+    def test_interrupt_immediately_after_capture_keeps_actual_external_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            original = self.history_free_plan(path)
+            real_rename = os.rename
+            def interrupt_after_capture(source, target):
+                if str(source) == str(path):
+                    path.write_text(original + "\n이동 직전 사용자 증빙\n", encoding="utf-8")
+                    real_rename(source, target)
+                    raise KeyboardInterrupt
+                return real_rename(source, target)
+            with mock.patch.object(plan_hash.os, "rename", side_effect=interrupt_after_capture):
+                with self.assertRaises(KeyboardInterrupt):
+                    plan_hash.renew_spec(str(path), "명세 승인")
+            self.assertIn("이동 직전 사용자 증빙", path.read_text(encoding="utf-8"))
+            recovery = json.loads(Path(plan_hash.renewal_recovery_path(path)).read_text(encoding="utf-8"))
+            self.assertTrue(any("이동 직전 사용자 증빙" in (path.parent / saved["file"]).read_text(encoding="utf-8")
+                                for saved in recovery["preserved"]))
+
+    def test_external_edit_to_captured_inode_is_kept_as_recovery_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            self.history_free_plan(path)
+            real_link = os.link
+            def edit_old_inode(source, target):
+                if str(target) == str(path):
+                    recovery = json.loads(Path(plan_hash.renewal_recovery_path(path)).read_text(encoding="utf-8"))
+                    saved = path.parent / recovery["preserved"][-1]["file"]
+                    with saved.open("a", encoding="utf-8") as stream:
+                        stream.write("\n확보 파일의 사용자 증빙\n")
+                return real_link(source, target)
+            with mock.patch.object(plan_hash.os, "link", side_effect=edit_old_inode):
+                with self.assertRaisesRegex(ValueError, "최종 대조 실패"):
+                    plan_hash.renew_spec(str(path), "명세 승인")
+            recovery = json.loads(Path(plan_hash.renewal_recovery_path(path)).read_text(encoding="utf-8"))
+            self.assertTrue(any("확보 파일의 사용자 증빙" in (path.parent / saved["file"]).read_text(encoding="utf-8")
+                                for saved in recovery["preserved"]))
+
+    def test_external_history_edit_after_commit_is_not_reported_as_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            self.history_free_plan(path)
+            history_path = path.parent / "changelog.md"
+            real_write_plan = plan_hash.write_plan
+            def edit_after_commit(*args):
+                history_path.write_text("승인행 없는 사용자 편집", encoding="utf-8")
+                return real_write_plan(*args)
+            with mock.patch.object(plan_hash, "write_plan", side_effect=edit_after_commit):
+                with self.assertRaisesRegex(ValueError, "최종 대조 실패"):
+                    plan_hash.renew_spec(str(path), "명세 승인")
+            self.assertEqual(history_path.read_text(encoding="utf-8"), "승인행 없는 사용자 편집")
+            self.assertTrue(Path(plan_hash.renewal_recovery_path(path)).exists())
+            self.assertIn("복구 필요", plan_hash.audit(str(path))["invalid"][0]["reason"])
+
+    def test_external_history_edit_at_rollback_install_is_not_overwritten(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            original = self.history_free_plan(path)
+            history_path = path.parent / "changelog.md"
+            history_path.write_text("원래 이력", encoding="utf-8")
+            real_link = os.link
+            installs = 0
+            def edit_before_restore(source, target):
+                nonlocal installs
+                if str(target) == str(history_path):
+                    installs += 1
+                    if installs == 2:
+                        history_path.write_text("원복 직전 외부 편집", encoding="utf-8")
+                return real_link(source, target)
+            with mock.patch.object(plan_hash.os, "link", side_effect=edit_before_restore), mock.patch.object(
+                plan_hash, "write_plan", side_effect=OSError("plan 저장 실패")
+            ):
+                with self.assertRaisesRegex(ValueError, "복구 필요"):
+                    plan_hash.renew_spec(str(path), "명세 승인")
+            self.assertEqual(path.read_text(encoding="utf-8"), original)
+            self.assertEqual(history_path.read_text(encoding="utf-8"), "원복 직전 외부 편집")
+            self.assertTrue(Path(plan_hash.renewal_recovery_path(path)).exists())
+
+    def test_pending_recovery_with_missing_plan_does_not_init_or_approve(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            Path(plan_hash.renewal_recovery_path(path)).write_text("{}", encoding="utf-8")
+            result = plan_hash.audit(str(path))
+            self.assertIn("복구 필요", result["invalid"][0]["reason"])
+            for command in ("check", "approve", "init"):
+                code, output, error = self.run_plan_hash_cli(command, str(path))
+                self.assertIn(code, (1, 2))
+                self.assertIn("복구 필요", output + error)
+
+    def test_selected_critical_recovery_is_blocked_when_plan_is_captured(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            approved = self.new_plan_hash()
+            critical = NEW_PLAN.replace("oldhash", approved).replace("실패비용: major", "실패비용: critical")
+            self.write_active_plan(root, critical)
+            self.write_current_task(root)
+            path = next((root / "workspace/tasks/active").glob("*/plan.md"))
+            Path(plan_hash.renewal_recovery_path(path)).write_text(json.dumps({"plan_before": critical}), encoding="utf-8")
+            path.unlink()
+            code, output, error = self.run_gate_main(root, "warn")
+            self.assertEqual(code, 2)
+            self.assertIn("승인 저장 중단 복구 필요", error)
+            self.assertIn("승인 이력 저장과 복구", error)
+            self.assertNotIn("상태를 '설계 완료'로", error)
+
+    def test_session_start_routes_pending_storage_to_recovery_even_without_plan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_active_plan(root, NEW_PLAN)
+            path = next((root / "workspace/tasks/active").glob("*/plan.md"))
+            Path(plan_hash.renewal_recovery_path(path)).write_text("{}", encoding="utf-8")
+            for missing in (False, True):
+                if missing:
+                    path.unlink()
+                message = session_start.build_message(str(root))
+                self.assertIn("승인 저장 중단 복구 필요", message)
+                self.assertIn("승인 이력 저장과 복구", message)
+                self.assertNotIn("누락 필드는 본문 근거", message)
+
+    def test_audit_prioritizes_pending_recovery_for_headerless_external_plan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            path.write_text("사용자가 저장한 외부 문서", encoding="utf-8")
+            Path(plan_hash.renewal_recovery_path(path)).write_text("{}", encoding="utf-8")
+            result = plan_hash.audit(str(path))
+            self.assertFalse(result["frontmatter_exists"])
+            self.assertIn("승인 저장 중단 복구 필요", result["invalid"][0]["reason"])
+
+    def test_recovery_creation_failure_does_not_write_either_document(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            original = self.history_free_plan(path)
+            with mock.patch.object(plan_hash.os, "open", side_effect=PermissionError("복구 기록 생성 실패")):
+                with self.assertRaises(PermissionError):
+                    plan_hash.renew_spec(str(path), "명세 승인")
+            self.assertEqual(path.read_text(encoding="utf-8"), original)
+            self.assertFalse((path.parent / "changelog.md").exists())
+
+    def test_initial_approval_replace_failure_preserves_state_and_hash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            original = NEW_PLAN.replace("상태: 구현 중", "상태: 설계 완료").replace("승인해시: oldhash", '승인해시: ""')
+            path.write_text(original, encoding="utf-8")
+            with mock.patch.object(plan_hash.os, "replace", side_effect=OSError("교체 실패")):
+                with self.assertRaises(OSError):
+                    self.run_plan_hash_cli("approve", str(path))
+            self.assertEqual(path.read_text(encoding="utf-8"), original)
+            self.assertEqual(list(path.parent.glob(".plan-write-*")), [])
+
+    def test_new_layout_rollback_failure_keeps_recovery_and_original_plan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            original = self.history_free_plan(path)
+            (path.parent / "changelog.md").write_text("기존 증빙", encoding="utf-8")
+            actual_write = plan_hash.atomic_write
+            calls = 0
+            def fail_rollback(target, content):
+                nonlocal calls
+                calls += 1
+                if calls > 1:
+                    raise OSError("원복 실패")
+                actual_write(target, content)
+            with mock.patch.object(plan_hash, "atomic_write", side_effect=fail_rollback), mock.patch.object(
+                plan_hash, "write_plan", side_effect=OSError("plan 저장 실패")
+            ):
+                with self.assertRaisesRegex(ValueError, "복구 필요"):
+                    plan_hash.renew_spec(str(path), "명세 승인")
+            self.assertEqual(path.read_text(encoding="utf-8"), original)
+            recovery = json.loads(Path(plan_hash.renewal_recovery_path(path)).read_text(encoding="utf-8"))
+            self.assertEqual(recovery["plan_before"], original)
+            self.assertEqual(recovery["changelog_before"], "기존 증빙")
+            self.assertIn("승인 기록 복구 필요", plan_hash.audit(str(path))["invalid"][0]["reason"])
+
+    def test_new_layout_does_not_overwrite_external_history_edit_during_rollback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            self.history_free_plan(path)
+            history_path = path.parent / "changelog.md"
+            def external_edit(*args):
+                history_path.write_text("외부 편집", encoding="utf-8")
+                raise OSError("plan 저장 실패")
+            with mock.patch.object(plan_hash, "write_plan", side_effect=external_edit):
+                with self.assertRaisesRegex(ValueError, "복구 필요"):
+                    plan_hash.renew_spec(str(path), "명세 승인")
+            self.assertEqual(history_path.read_text(encoding="utf-8"), "외부 편집")
+            self.assertTrue(Path(plan_hash.renewal_recovery_path(path)).exists())
+
+    def test_new_layout_rejects_stale_snapshot_after_prior_renewal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            original = self.history_free_plan(path)
+            history_path = path.parent / "changelog.md"
+            history_path.write_text("이전 증빙", encoding="utf-8")
+            pair_write = plan_hash.write_approval_pair
+            def prior_writer(*args):
+                history_path.write_text("선행 승인 기록", encoding="utf-8")
+                return pair_write(*args)
+            with mock.patch.object(plan_hash, "write_approval_pair", side_effect=prior_writer):
+                with self.assertRaisesRegex(ValueError, "승인 갱신 충돌"):
+                    plan_hash.renew_spec(str(path), "둘째 승인")
+            self.assertEqual(path.read_text(encoding="utf-8"), original)
+            self.assertEqual(history_path.read_text(encoding="utf-8"), "선행 승인 기록")
+            self.assertFalse(Path(plan_hash.renewal_recovery_path(path)).exists())
+
+    def test_committed_pair_with_recovery_cleanup_failure_is_not_reported_as_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            self.history_free_plan(path)
+            real_unlink = os.unlink
+            def fail_journal_cleanup(target):
+                if str(target).endswith(".plan-renewal.json"):
+                    raise OSError("정리 실패")
+                return real_unlink(target)
+            with mock.patch.object(plan_hash.os, "unlink", side_effect=fail_journal_cleanup):
+                with self.assertRaisesRegex(ValueError, "두 파일 저장 후"):
+                    plan_hash.renew_spec(str(path), "명세 승인")
+            front, body, _ = plan_hash.parse(str(path))
+            self.assertEqual(plan_hash.get_field(front, "승인해시"), plan_hash.compute_for_plan(front, body))
+            self.assertIn("복구 필요", plan_hash.audit(str(path))["invalid"][0]["reason"])
+
+    def test_pending_recovery_blocks_commands_and_selected_critical_gate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            approved = self.new_plan_hash()
+            self.write_active_plan(root, NEW_PLAN.replace("oldhash", approved).replace("실패비용: major", "실패비용: critical"))
+            # write_active_plan helper does not return a path.
+            path = next((root / "workspace/tasks/active").glob("*/plan.md"))
+            Path(plan_hash.renewal_recovery_path(path)).write_text("{}", encoding="utf-8")
+            for command in ("check", "approve"):
+                code, output, error = self.run_plan_hash_cli(command, str(path))
+                self.assertIn(code, (1, 2))
+                self.assertIn("복구 필요", output + error)
+            with self.assertRaisesRegex(ValueError, "복구 필요"):
+                plan_hash.renew_spec(str(path), "재시도")
+            self.write_current_task(root)
+            code, output, error = self.run_gate_main(root, "warn")
+            self.assertEqual(code, 2)
+            self.assertIn("복구 필요", error)
+
+    def test_process_interruption_after_history_commit_keeps_detectable_recovery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            original = self.history_free_plan(path)
+            with mock.patch.object(plan_hash, "write_plan", side_effect=KeyboardInterrupt):
+                with self.assertRaises(KeyboardInterrupt):
+                    plan_hash.renew_spec(str(path), "명세 승인")
+            self.assertEqual(path.read_text(encoding="utf-8"), original)
+            self.assertTrue((path.parent / "changelog.md").exists())
+            self.assertIn("복구 필요", plan_hash.audit(str(path))["invalid"][0]["reason"])
+
+    def test_invalid_history_layout_and_hash_are_rejected_without_writes(self):
+        for transform in (
+            lambda text: text + "## 명세 변경 이력\n",
+            lambda text: text.replace("## 명세 변경 이력\n\n", "").replace("## 실행 계획", "## 명세 변경 이력\n\n## 실행 계획"),
+            lambda text: text.replace(self.new_plan_hash(), "legacyhash"),
+        ):
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "plan.md"
+                original = transform(NEW_PLAN.replace("oldhash", self.new_plan_hash()))
+                path.write_text(original, encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    plan_hash.renew_spec(str(path), "명세 승인")
+                self.assertEqual(path.read_text(encoding="utf-8"), original)
+                self.assertFalse((path.parent / "changelog.md").exists())
+
+    def test_new_layout_rejects_duplicate_history_and_symlink(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.md"
+            original = self.history_free_plan(path)
+            history_path = path.parent / "changelog.md"
+            history_path.write_text("## 명세 변경 이력\n## 명세 변경 이력\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                plan_hash.renew_spec(str(path), "명세 승인")
+            self.assertEqual(path.read_text(encoding="utf-8"), original)
+            history_path.unlink()
+            target = path.parent / "external.md"
+            target.write_text("원본", encoding="utf-8")
+            history_path.symlink_to(target)
+            with self.assertRaisesRegex(ValueError, "심볼릭 링크"):
+                plan_hash.renew_spec(str(path), "명세 승인")
+            self.assertEqual(target.read_text(encoding="utf-8"), "원본")
+
     def test_renew_spec_appends_a_second_history_row(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "plan.md"

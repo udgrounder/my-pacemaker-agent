@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_ROOTS = (ROOT / ".mpa/runtime", ROOT / "dist/.mpa/runtime")
 CORE_BASELINE_BYTES = 34_731
 ROUTE_CONTRACTS = (
+    ("approval transaction recovery", "core/agent_rules.md", "승인 저장 중단 복구 필요", "core/agent_rules_detail.md", "## 승인 이력 저장과 복구"),
     ("simple question", "core/agent_rules.md", "사용자 부담 최소화", "core/agent_rules.md", "| 단순 질문/탐색 | 없음 | on-demand |"),
     ("major design", "core/agent_rules.md", "layer1_design.md", "inject/layer1_design.md", "## major 설계 절차"),
     ("major approval", "core/agent_rules.md", '"승인 기록 처리"', "core/agent_rules_detail.md", "## 승인 기록 처리"),
@@ -47,6 +48,14 @@ class StructureLoadingTest(unittest.TestCase):
                 minor = section(detail, "## minor 경량 처리 절차")
                 self.assertIn("공통 `templates/plan_template.md`를 Read하여 작성한다", minor)
                 self.assertNotIn("inject/layer1_design.md", minor)
+
+    def test_pending_approval_recovery_is_reachable_before_reapproval(self):
+        for root in RUNTIME_ROOTS:
+            detail = (root / "core/agent_rules_detail.md").read_text(encoding="utf-8")
+            for heading in ("## 프론트매터 누락 처리", "## 구현 승인 재확인", "## 승인 기록 처리"):
+                with self.subTest(root=root, heading=heading):
+                    self.assertIn("승인 이력 저장과 복구", section(detail, heading))
+                    self.assertIn(".plan-renewal.json", section(detail, heading))
 
     def test_source_and_distribution_runtime_files_are_identical(self):
         source = RUNTIME_ROOTS[0]

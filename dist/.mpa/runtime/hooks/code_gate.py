@@ -29,7 +29,7 @@ import json
 import os
 import re
 import sys
-from plan_hash import HASH_REQUIRED_STATUSES, approval_hash_issue
+from plan_hash import HASH_REQUIRED_STATUSES, approval_hash_issue, renewal_recovery_path
 
 # 항상 허용하는 경로 접두사 (방법론·프로젝트 데이터·agent 설정)
 ALLOW_PREFIXES = (
@@ -105,8 +105,13 @@ def parse_plan_fields(plan_path):
     fields = {}
     body = ""
     try:
-        with open(plan_path, encoding="utf-8") as f:
-            content = f.read()
+        try:
+            with open(plan_path, encoding="utf-8") as f:
+                content = f.read()
+        except FileNotFoundError:
+            # 확보 후 설치 전 중단된 경우에도 원본의 실패비용을 읽어 gate 정책을 유지한다.
+            with open(renewal_recovery_path(plan_path), encoding="utf-8") as f:
+                content = json.load(f)["plan_before"]
         match = re.match(r"^---\n(.*?)\n---\n?(.*)", content, re.DOTALL)
         if match:
             for line in match.group(1).splitlines():
@@ -144,7 +149,7 @@ def find_active_statuses(cwd):
         if not os.path.isdir(task_dir):
             continue
         plan_path = os.path.join(task_dir, "plan.md")
-        if os.path.exists(plan_path):
+        if os.path.exists(plan_path) or os.path.lexists(renewal_recovery_path(plan_path)):
             results.append((name, parse_plan_status(plan_path)))
     return results
 
@@ -172,13 +177,21 @@ def current_task_plan(cwd):
     if not name:
         return None
     plan_path = os.path.join(cwd, "workspace", "tasks", "active", name, "plan.md")
-    if not os.path.isfile(plan_path):
+    if not os.path.isfile(plan_path) and not os.path.lexists(renewal_recovery_path(plan_path)):
         return None
     fields, body = parse_plan_fields(plan_path)
     return name, fields, body
 
 
 def _approval_recovery_message(name, status, issue):
+    if ".plan-renewal.json" in issue:
+        return (
+            f"승인 저장 중단 복구 필요: '{name}'의 plan/changelog 갱신이 완료되지 않았습니다.\n"
+            f"  사유: {issue}\n"
+            "core/agent_rules_detail.md의 '승인 이력 저장과 복구'를 먼저 읽으세요.\n"
+            ".plan-renewal.json과 확보 파일을 보존하고 현재 파일과 대조하세요.\n"
+            "복구 전 approve/renew-spec 재실행 또는 승인해시 직접 입력으로 우회하지 마세요."
+        )
     return (
         f"⛔ 구현 승인 기록 복구 필요: '{name}' plan.md 상태는 '{status}'이며 승인해시가 유효하지 않습니다.\n"
         f"  사유: {issue}\n"
@@ -206,7 +219,7 @@ def check_selected_critical_integrity(cwd):
             "사용자에게 계획서 검토 후 구현 승인을 받은 뒤 plan_hash.py approve로 '구현 중' 상태와 승인해시를 기록하세요."
         )
     front_matter = "\n".join(f"{k}: {v}" for k, v in fields.items())
-    issue = approval_hash_issue(front_matter, body)
+    issue = approval_hash_issue(front_matter, body, os.path.join(cwd, "workspace", "tasks", "active", name, "plan.md"))
     if issue:
         return _approval_recovery_message(name, status, issue)
     return None
@@ -224,14 +237,15 @@ def check_hash_integrity(cwd, mode, agent):
     for name in sorted(os.listdir(base)):
         task_dir = os.path.join(base, name)
         plan_path = os.path.join(task_dir, "plan.md")
-        if not os.path.exists(plan_path):
+        pending = os.path.lexists(renewal_recovery_path(plan_path))
+        if not os.path.exists(plan_path) and not pending:
             continue
         fields, body = parse_plan_fields(plan_path)
         status = fields.get("상태")
-        if status not in HASH_REQUIRED_STATUSES:
+        if status not in HASH_REQUIRED_STATUSES and not pending:
             continue
         front_matter = "\n".join(f"{k}: {v}" for k, v in fields.items())
-        issue = approval_hash_issue(front_matter, body)
+        issue = approval_hash_issue(front_matter, body, plan_path)
         if issue:
             msg = _approval_recovery_message(name, status, issue)
             if mode == "warn":
