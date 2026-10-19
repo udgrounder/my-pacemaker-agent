@@ -1,5 +1,9 @@
 # Layer 1 — 설계 세션
 
+## 문서 선택 선행
+
+새 작업은 templates/plan_minimal_template.md를 읽고 inject/task_documents.md를 따른다. plan의 구현 단계·반례·검증 참조는 선택된 implementation/verification이 있으면 그 문서를 뜻한다. 없으면 plan에 필요한 만큼 둔다. 비평에는 선택 문서의 기준도 전달한다. 추가 문서나 모든 템플릿 칸을 강제하지 않는다.
+
 > **사용 시점:** 새 기능 / 버그픽스 / 리팩터링의 구현 계획을 세울 때
 
 ---
@@ -101,7 +105,7 @@ INDEX.md에서 이 태스크의 **파생 출처**를 확인한다.
 
 > **plan.md 작성 전 반드시 템플릿을 Read한다:**
 > ```
-> Read .mpa/runtime/templates/plan_template.md
+> Read .mpa/runtime/templates/plan_minimal_template.md
 > ```
 > 템플릿을 기억에서 꺼내 쓰지 않는다 — 파일을 직접 읽어 최신 형식을 확인한 뒤 작성한다.
 

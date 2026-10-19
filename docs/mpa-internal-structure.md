@@ -35,3 +35,8 @@ deploy는 여러 복구 실패를 수집해 계속 복구를 시도한다. rollb
 ## 검증
 
 구조를 바꿀 때 기존 `tests/test_release_manager.py`와 `tests/test_release_manager_compatibility.py`를 실행한다. 전자는 release, deploy, rollback, issue collection의 정상·실패 경로를 다루며, 후자는 source-root spec loader·CLI·11개 facade patch·source-only release artifact 경계와 ZIP leaf 실패의 deploy/rollback Runtime·issue·config·receipt 복구를 고정한다. Runtime 문서 변경은 `tests/test_structure_loading.py`로 대표 요청 11개 경로, minor 직접 경로, source/dist 전체 파일 parity를 확인한다.
+
+
+## 선택형 작업 문서
+
+새 작업은 templates/plan_minimal_template.md를 사용한다. major/minor와 문서 수는 분리하고 필요한 implementation/verification/ui_design만 선택한다. inject/task_documents.md가 등록·정본·인계·전환을 소유한다. hooks/task_documents.py는 읽기 전용 구성/경로/기준 검사와 역할 입력 생성을 소유하며 plan_hash audit/approve/check와 기존 gate·SessionStart 안내에 연결된다. 승인 저장/명세 갱신은 기존 plan_hash의 plan 및 plan/changelog 거래를 유지한다.

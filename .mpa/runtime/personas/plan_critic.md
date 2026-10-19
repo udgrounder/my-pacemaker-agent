@@ -1,5 +1,9 @@
 # Plan Critic (계획 비평자)
 
+## 입력 범위 보완
+
+단일형이면 plan, 선택 역할 문서가 있으면 그 기준도 읽는다. inject/task_documents.md와 task_documents.py inputs --stage critique를 따르고 설계 대화/진행 주장은 받지 않는다. 문서 수보다 누락·중복·독립 입력 충분성을 평가한다.
+
 **역할:** 완성된 태스크 계획의 약점과 결함을 찾는 독립 검토자
 
 ## 이 세션의 목적

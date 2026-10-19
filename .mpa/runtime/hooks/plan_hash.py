@@ -133,7 +133,7 @@ def compute_for_plan(front_matter, body):
     return compute_legacy(body)
 
 
-def approval_hash_issue(front_matter, body, plan_path=None):
+def approval_hash_issue(front_matter, body, plan_path=None, check_documents=True):
     """승인 이후 상태의 승인해시 형식·현재 명세 일치 문제를 반환한다.
 
     최신 plan(`승인대상: 요구사항 명세`)의 승인해시는 반드시
@@ -163,6 +163,9 @@ def approval_hash_issue(front_matter, body, plan_path=None):
         return str(error)
     if approved_hash != current_hash:
         return f"승인해시가 현재 승인 대상과 일치하지 않습니다 (현재: {current_hash})"
+    if plan_path and check_documents:
+        from task_documents import issue
+        return issue(plan_path)
     return None
 
 
@@ -464,10 +467,15 @@ def audit(plan_path):
     issue = approval_hash_issue(front_matter, body, plan_path)
     if issue:
         result["invalid"].append({
-            "field": "승인해시",
+            "field": "작업 문서" if issue.startswith("작업 문서") else "승인해시",
             "value": get_field(front_matter, "승인해시") or "",
             "reason": issue,
         })
+    if not issue:
+        from task_documents import issue as document_issue
+        problem = document_issue(plan_path)
+        if problem:
+            result["invalid"].append({"field": "작업 문서", "value": "", "reason": problem})
     return result
 
 
@@ -569,6 +577,11 @@ def main():
         except ValueError as error:
             sys.stderr.write(f"⛔ approve 거부: {error}\n")
             sys.exit(2)
+        from task_documents import issue as document_issue
+        problem = document_issue(plan_path, before_approval=True)
+        if problem:
+            sys.stderr.write(f"approve 거부: {problem}\n")
+            sys.exit(2)
         # 최초 승인도 상태와 해시를 한 번의 원자 교체로 기록한다.
         lines = []
         for line in front_matter.splitlines():
@@ -606,6 +619,11 @@ def main():
             print(f"불일치 — {error}")
             sys.exit(1)
         if approved == current:
+            from task_documents import issue as document_issue
+            problem = document_issue(plan_path)
+            if problem:
+                print(problem)
+                sys.exit(1)
             print(f"일치: {current}")
             sys.exit(0)
         else:

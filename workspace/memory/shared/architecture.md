@@ -250,3 +250,8 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 - 시스템 파일 수정은 source `.mpa/runtime/`에서 하고 `release_manager.py sync-runtime`으로 `dist/.mpa/runtime/`에 동기화한다. 설치 대상 갱신은 사용자 명시 릴리즈·배포 요청과 immutable bundle 절차에서만 한다. `dist/`·`agent-configs/`(동기화·생성 대상)를 직접 편집하지 않는다 — 미러·재생성 시 어긋나거나 덮인다
 - shared/ 파일에 결정 로그를 누적하지 않는다. 현재 상태만 유지한다
 - 에이전트가 사용자 확인 없이 태스크 상태를 완료로 전환하지 않는다
+
+
+## 선택형 작업 문서의 현재 계약
+
+plan은 최소 요구사항·승인·전체 상태 정본이다. major/minor는 문서 수를 강제하지 않는다. implementation(설계/실행/진행), verification(검증 방법), ui_design(화면 기준)은 분리 이익이 있는 경우만 선택한다. inject/task_documents.md는 선택·인계·전환의 정본, hooks/task_documents.py는 읽기 전용 구성/경로/기준 검사 및 역할 입력의 소유자다. plan_hash의 승인/복구 거래는 유지하고 audit/approve/check·gate·SessionStart는 문서 연결 문제를 승인 복구와 구분한다. 큰 작업/조사의 하위 자료는 상위 plan에 연결하며 단일 수정자 원칙과 별개다.

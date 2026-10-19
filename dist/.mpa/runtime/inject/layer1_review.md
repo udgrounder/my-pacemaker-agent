@@ -1,5 +1,9 @@
 # Layer 1 — 작업 결과 검토 세션
 
+## 역할 입력 우선
+
+inject/task_documents.md를 읽고 1차는 task_documents.py inputs --stage review1과 실제 제품/Runtime 소스를 사용한다. implementation 전체·전체 git diff를 읽지 않는다. 설계 기준만 재사용하고 plan 진행·실행/완료 주장·changelog·조사 결과·2차 결과는 배제한다. 기존 구현 step 대조는 2차에서 implementation 또는 plan 실행 기록으로 수행한다. review2 입력에 1차 결과를 명시 추가한다. 아래 plan/changelog 전달 목록에는 이 우선 범위를 적용한다. 결과 파일과 1차→2차 순서를 유지한다.
+
 > **사용 시점:** 구현이 완료된 결과물을 검토할 때
 >
 > **단계 구분:**

@@ -1,5 +1,9 @@
 # Layer 1 — 구현 세션
 
+## 역할 입력 선행
+
+inject/task_documents.md에 따라 plan의 승인·선택 문서·입력 연결을 확인한다. implementation이 있으면 설계·실행 TODO·수정 파일의 정본은 그 문서다. 아래 plan의 해당 섹션 참조는 선택 문서로 해석한다. 없으면 plan을 사용한다. task_documents.py inputs --stage implement로 인계 입력을 재사용하고 기준 변경과 진행 기록을 구분한다.
+
 > **사용 시점:** 설계가 완료된 태스크를 구현할 때
 
 ---

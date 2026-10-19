@@ -184,6 +184,11 @@ def current_task_plan(cwd):
 
 
 def _approval_recovery_message(name, status, issue):
+    if issue.startswith("작업 문서"):
+        return (f"{name}: {issue}\n"
+                "등록 문서와 기준 내용을 대조해 연결을 보완하세요. "
+                "문서 문제 때문에 approve를 반복하거나 승인해시를 바꾸지 마세요. "
+                "inject/task_documents.md를 읽고 해당 역할 실행을 보류하세요.")
     if ".plan-renewal.json" in issue:
         return (
             f"승인 저장 중단 복구 필요: '{name}'의 plan/changelog 갱신이 완료되지 않았습니다.\n"

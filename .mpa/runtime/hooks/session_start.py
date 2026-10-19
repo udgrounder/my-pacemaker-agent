@@ -122,6 +122,9 @@ def active_tasks(cwd):
             rows.append(f"  - {name} — {status}{type_tag}  ⚠️ 누락 필드: {', '.join(missing)}")
         elif invalid:
             fields = ", ".join(item["field"] for item in invalid)
+            reasons = "; ".join(item["reason"] for item in invalid if item["field"] == "작업 문서")
+            if reasons:
+                fields += " (" + reasons + ")"
             rows.append(f"  - {name} — {status}{type_tag}  ⚠️ 유효하지 않은 필드: {fields}")
         else:
             rows.append(f"  - {name} — {status}{type_tag}")
@@ -152,7 +155,8 @@ def build_message(cwd):
         # 프론트매터 누락 항목이 있으면 처리 지시 추가
         if any("⚠️" in row for row in rows):
             lines.append("")
-            lines.append("⚠️ 일부 plan.md의 프론트매터 또는 승인해시가 유효하지 않습니다.")
+            lines.append("⚠️ 일부 plan.md의 프론트매터·승인해시·선택 문서 연결 확인이 필요합니다.")
+            lines.append("작업 문서 문제는 inject/task_documents.md를 읽어 연결을 보완하세요. 문서 문제만으로 재승인하지 마세요.")
             lines.append("해당 작업 항목 진입 시 다음 절차를 따르세요:")
             lines.append("  1. `plan_hash.py audit <path>`로 누락·형식·일치 문제를 확인")
             lines.append("  2. 누락 필드는 본문 근거와 사용자 확인 후 `init`으로 주입")
