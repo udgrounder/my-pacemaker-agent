@@ -1,5 +1,7 @@
 # 아키텍처 결정
 
+> 변경 이력과 이전 설계의 경위는 [architecture_history.md](architecture_history.md)를 참조한다.
+
 ## 디렉토리 구조 원칙
 
 ### map-product와 Runtime 배포 경계
@@ -59,16 +61,20 @@ git 추적 대상(이 repo의 자산)이며 `dist/`에는 동기화하지 않는
 ## 핵심 설계 결정
 
 ### shared/ 파일은 로그가 아니라 현재 상태 스냅샷
-결정이 바뀌면 기존 항목을 교체한다. 이전 내용을 남기지 않는다.  
-폐기된 규칙은 삭제한다.  
-append 누적은 모순을 만든다.
+`architecture.md`는 현재 유효한 최종 설계·결정 이유·제약만 주제별로 유지한다. 날짜별 타임라인이나 변경 내역을 본문에 누적하지 않는다.
+설계가 바뀌면 이전 판단·새 판단·이유·근거를 `architecture_history.md`에 먼저 보존하고 저장을 확인한 뒤 해당 주제를 교체한다. 폐기·대체된 설계와 변경 경위는 이력 파일에서만 유지한다.
+Runtime의 상세 관리 절차는 `core/architecture_memory.md`가 정본이다. 아키텍처 메모리 생성·변경·정리·정합성 점검 전에 읽으며, 상시 로드하는 agent_rules.md는 정본 구분과 로드 조건만 유지한다.
 
 ### 작업 계획은 현재 기준, changelog는 변경 이력
 plan.md는 현재 유효한 요구사항·접근·실행/검증 상태를 유지한다. 폐기한 방향·취소 단계·해결된 질문은 changelog에 성공적으로 보존한 뒤 현재 계획에서 교체한다. 현재 제약·미해결 실패·위험은 plan에 남기며, 과거 성공 증빙의 현재 효력이 바뀌면 재검증 필요를 표시한다.
 
-changelog는 계획·결정 변경과 실제 구현 결과를 구분하는 이력 정본이다. 새 reqspec-v1 plan의 승인 갱신은 changelog에 기록하고 기존 plan 내부 표는 배치 호환을 유지한다. 접두사 없는 legacy 해시는 기존 재승인 절차를 따른다. 두 파일 갱신에는 일시 `.plan-renewal.json` 원본/예상 작성본을 먼저 저장하고 잔존 시 check/audit/gate·승인 명령이 복구 필요로 판정한다. 실행 정본은 core/agent_rules.md의 "계획서와 변경 이력 관리"와 detail의 "승인 이력 저장과 복구"다. 독립 1차 검증은 changelog를 읽지 않고 2차에서 이력과 승인 근거를 대조한다.
+changelog는 계획·결정 변경과 실제 구현 결과를 구분하는 이력 정본이다. reqspec-v1 plan의 승인 갱신은 changelog에 기록한다. 호환 대상으로 지원하는 plan 내부 표는 기존 배치를 유지하며, 접두사 없는 legacy 해시는 기존 재승인 절차를 따른다. 두 파일 갱신에는 일시 `.plan-renewal.json` 원본/예상 작성본을 먼저 저장하고 잔존 시 check/audit/gate·승인 명령이 복구 필요로 판정한다. 실행 정본은 core/agent_rules.md의 "계획서와 변경 이력 관리"와 detail의 "승인 이력 저장과 복구"다. 독립 1차 검증은 changelog를 읽지 않고 2차에서 이력과 승인 근거를 대조한다.
 
 승인 두 파일 교체·원복은 대상 파일을 별도 `.plan-renewal-preserved-*`로 확보하고 예상 원본을 대조한 뒤 빈 경로에만 새 파일을 설치한다. JSON은 확보 파일을 추적하며 최종 plan/changelog·확보 원본 대조 전에는 정리하지 않는다. 지원 에이전트는 갱신 중 같은 문서 편집을 직렬화한다. 비협조 편집기와의 완전한 동시 쓰기를 보장하지 않으며 실제 충돌은 확보 파일과 JSON으로 복구한다. 저장 중단 복구는 명세 재승인과 구분해 필수 로드한다.
+
+### 선택형 작업 문서
+
+plan은 최소 요구사항·승인·전체 상태 정본이다. major/minor는 문서 수를 강제하지 않는다. implementation(설계/실행/진행), verification(검증 방법), ui_design(화면 기준)은 분리 이익이 있는 경우만 선택한다. inject/task_documents.md는 선택·인계·전환의 정본, hooks/task_documents.py는 읽기 전용 구성/경로/기준 검사 및 역할 입력의 소유자다. plan_hash의 승인/복구 거래는 유지하고 audit/approve/check·gate·SessionStart는 문서 연결 문제를 승인 복구와 구분한다. 큰 작업/조사의 하위 자료는 상위 plan에 연결하며 단일 수정자 원칙과 별개다.
 
 ### 전진 증류 원칙
 태스크 간 방향 연속성은 과거 plan.md를 읽어서 유지하지 않는다.  
@@ -115,13 +121,13 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 .mpa/runtime/contracts/agent_reference.toml은 외부 consumer가 Runtime 구조 사실을 읽고 검증하는 experimental·inspect-only 계약이다. V1은 작업·문서 기본 경로, major/minor 상태 모델, Markdown 진입점만 제공하며 hook 실행·수정·승인·배포 인터페이스를 만들지 않는다. hooks/contract_reference.py는 Python 3.9 표준 기능으로 제한 profile, version, Runtime 내부 reference, Markdown binding marker를 검사한다. 오류면 consumer는 관찰·보고만 하고 중단한다. source 수정 뒤 dist에서도 같은 validator를 실행한다.
 
 ### 요구사항 명세 체크섬
-새 major·minor plan은 `승인해시`의 `reqspec-v1:<16자리 소문자 16진수>` 접두사와 프론트매터 `승인대상: 요구사항 명세`, `## 요구사항 명세` 블록의 조합으로 식별한다. 최초 해시는 `approve`, 사용자 승인 뒤 명세 변경은 `renew-spec`만 기록하며 사람이 날짜·문구·임의 문자열을 직접 쓰지 않는다. `구현 중` 이후 상태에서는 이 형식과 현재 명세의 일치가 필수다. 접두사 없는 기존 해시는 보존된 과거 이력의 읽기에서만 구형 방식으로 유지한다. `hooks/plan_hash.py`가 최신 명세 블록 또는 구형 본문 규칙의 체크섬을 계산하고, `hooks/code_gate.py`는 같은 함수를 호출해 검증한다. 실행 계획·변경 기록·검증 결과는 최신 명세 체크섬 대상이 아니며, 명세 변경은 사용자 승인 뒤 `renew-spec`으로 이력을 남긴다.
+major·minor plan의 현행 승인 형식은 `승인해시`의 `reqspec-v1:<16자리 소문자 16진수>` 접두사와 프론트매터 `승인대상: 요구사항 명세`, `## 요구사항 명세` 블록의 조합이다. 최초 해시는 `approve`, 사용자 승인 뒤 명세 변경은 `renew-spec`만 기록하며 사람이 날짜·문구·임의 문자열을 직접 쓰지 않는다. `구현 중` 이후 상태에서는 이 형식과 현재 명세의 일치가 필수다. 접두사 없는 기존 해시는 보존된 과거 이력의 읽기에서만 구형 방식으로 유지한다. `hooks/plan_hash.py`가 최신 명세 블록 또는 구형 본문 규칙의 체크섬을 계산하고, `hooks/code_gate.py`는 같은 함수를 호출해 검증한다. 실행 계획·변경 기록·검증 결과는 최신 명세 체크섬 대상이 아니며, 명세 변경은 사용자 승인 뒤 `renew-spec`으로 이력을 남긴다.
 
 ---
 
 ## 구성 층위 모델 (페르소나·스킬·워크플로우·도메인)
 
-> 출처: persona_skill_relationship 토론(R1~14) + 설계 세션 정밀화(M1~M11). 상세 원칙은 `guidebook/persona_skill_principles.md`.
+상세 원칙은 `guidebook/persona_skill_principles.md`를 따른다.
 
 ### 용어 — "구성 층위" ≠ "Layer"
 
@@ -227,6 +233,7 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 | 파일/폴더 | 구성 층위 | 역할 |
 |------|------|------|
 | `core/agent_rules.md` | **메타 워크플로우** | 라우팅·게이트·상태 전이·정합성 통치. 진입 쓰레드 무조건 로드 |
+| `core/architecture_memory.md` | (상세 관리 절차) | 아키텍처 현재 설계/이력의 작성·변경·보존·이관·읽기·점검 정본. 관련 작업 전에만 필수 로드 |
 | `core/session_protocol.md` | (사용자 가이드) | inject 파일 선택 가이드 (사용자용) |
 | `core/glossary.md` | (도구/disclosed reference) | 핵심 용어 정의·구분. `agent_rules.md`와 달리 무조건 로드 대상이 아니며, 용어 모호성 의심 시에만 트리거로 읽는다 — `core/`라는 위치가 곧 "무조건 로드"를 뜻하지 않는 예외 사례 |
 | `workflows/*.md` | **작업 워크플로우** | 작업유형 단계 시퀀스 + 단계↔자원 바인딩(정본) |
@@ -248,10 +255,5 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 ## 안티패턴
 
 - 시스템 파일 수정은 source `.mpa/runtime/`에서 하고 `release_manager.py sync-runtime`으로 `dist/.mpa/runtime/`에 동기화한다. 설치 대상 갱신은 사용자 명시 릴리즈·배포 요청과 immutable bundle 절차에서만 한다. `dist/`·`agent-configs/`(동기화·생성 대상)를 직접 편집하지 않는다 — 미러·재생성 시 어긋나거나 덮인다
-- shared/ 파일에 결정 로그를 누적하지 않는다. 현재 상태만 유지한다
+- shared/ 파일에 결정 로그를 누적하지 않는다. architecture.md에는 현재 설계만 유지하고 변경 이력은 architecture_history.md에 보존한다
 - 에이전트가 사용자 확인 없이 태스크 상태를 완료로 전환하지 않는다
-
-
-## 선택형 작업 문서의 현재 계약
-
-plan은 최소 요구사항·승인·전체 상태 정본이다. major/minor는 문서 수를 강제하지 않는다. implementation(설계/실행/진행), verification(검증 방법), ui_design(화면 기준)은 분리 이익이 있는 경우만 선택한다. inject/task_documents.md는 선택·인계·전환의 정본, hooks/task_documents.py는 읽기 전용 구성/경로/기준 검사 및 역할 입력의 소유자다. plan_hash의 승인/복구 거래는 유지하고 audit/approve/check·gate·SessionStart는 문서 연결 문제를 승인 복구와 구분한다. 큰 작업/조사의 하위 자료는 상위 plan에 연결하며 단일 수정자 원칙과 별개다.

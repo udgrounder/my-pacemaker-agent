@@ -120,6 +120,8 @@
 | 도메인별 규칙 | `domains/[도메인명]/rules.md` |
 | 도메인·역할 메모리 선별 인덱스 | `memory/INDEX.md` (`templates/memory_index_template.md` 복사, 도메인 초안 작성 시 행 등록) |
 
+아키텍처 초안 작성 전에 `core/architecture_memory.md`를 반드시 읽고 신규 작성·기존 문서 전환 절차를 따른다. 문서 골격은 `templates/shared_template.md`와 `templates/architecture_history_template.md`를 사용한다.
+
 ### 5단계 — 태스크 분해
 
 | 태스크 유형 | 내용 |

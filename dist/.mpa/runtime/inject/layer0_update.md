@@ -65,7 +65,7 @@ MPA 시스템 → 프로젝트 (인바운드)
 ### 3단계 — memory 정합성 확인
 
 업데이트 후 `workspace/memory/` 파일이 현재 프로젝트 상태와 맞는지 간단히 확인한다:
-- `shared/architecture.md`: 아키텍처 결정 이력이 최신인가?
+- `shared/architecture.md`: 점검 전에 `core/architecture_memory.md`를 반드시 읽고 현재 설계·이력 정합성을 확인한다. 갱신이 필요하면 그 파일의 기존 문서 전환 절차를 따른다.
 - `shared/contracts.md`: 인터페이스 계약이 현재 코드와 맞는가?
 
 ---

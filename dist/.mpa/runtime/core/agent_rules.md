@@ -12,9 +12,9 @@
 
 ## 상세 파일 로드 트리거
 
-> 이 파일(`agent_rules.md`)은 항상 로드된다. `agent_rules_detail.md`는 아래 트리거에 해당하는 시점에 **반드시 즉시 읽는다**.
+> 이 파일(`agent_rules.md`)은 항상 로드된다. 아래 트리거에 해당하면 지정된 파일·섹션을 **반드시 즉시 읽는다**. 파일을 생략한 섹션은 `agent_rules_detail.md`에 있다.
 
-| 트리거 조건 | 읽을 detail 섹션 |
+| 트리거 조건 | 읽을 파일·섹션 |
 |----------|----------------|
 | 세션 시작 시 "⚠️ 프론트매터 없음/누락 필드" 알림 받은 작업 항목 진입 | "프론트매터 누락 처리" |
 | code_gate.py가 "구현 승인 기록 복구 필요" 또는 "구현 재승인 필요" 출력 | "구현 승인 재확인" |
@@ -28,6 +28,7 @@
 | 라우팅 정정이 발생해 기록할 때 | "issue 기록" (`methodology_improvement`) |
 | 코드 탐색이 필요한 시점 (구현·검증 진입 전) | "코드 탐색" |
 | 세션 종료 시 memory(architecture/contracts/domains/roles) 기록 여부를 판단할 시점 | "기억 여부 판단" |
+| 아키텍처 메모리 생성·변경·정리·정합성 점검 전 | `core/architecture_memory.md` |
 | 기술·도메인 지식을 기록해야 할 시점 | "기술/도메인 지식 기록 기준" |
 | 역할 메모리 업데이트 단계 진입 시 | "역할 메모리 업데이트" |
 | 다음 행동 제안 메시지 출력 직전 | "다음 행동 제안" |
@@ -38,7 +39,7 @@
 | "규칙 바꿔줘"·"inject 수정"·".mpa/runtime 수정" 등 발화 시 | "MPA 파일 수정 세부" |
 | 용어(요청/작업 항목/실행 항목/계획서/GATE/Zone/Tier 또는 외부 표준 용어) 의미가 모호할 때 | `core/glossary.md` (disclosed reference — agent_rules_detail.md가 아니라 별도 파일) |
 
-> **"참조"라는 표시만 보고 건너뛰지 않는다.** 트리거 조건이 충족되면 detail 파일의 해당 섹션을 즉시 Read 도구로 읽는다.
+> **"참조"라는 표시만 보고 건너뛰지 않는다.** 트리거 조건이 충족되면 지정된 파일·섹션을 즉시 Read 도구로 읽는다.
 
 ---
 
@@ -85,6 +86,10 @@
 - 세션 메모리의 "기억"이 workspace 내용과 다르면 → workspace를 신뢰하고 세션 메모리를 오래된 것으로 간주한다.
 - 세션 메모리는 workspace에 없는 **사용자 행동 방식·선호·협업 스타일**에만 권위를 가진다.
 
+### 아키텍처 현재 설계와 이력 분리
+
+`workspace/memory/shared/architecture.md`는 현재 설계, 같은 폴더 `architecture_history.md`는 변경 이력의 정본이다. 생성·변경·정리·정합성 점검 전에 `core/architecture_memory.md`를 반드시 읽고 그 절차를 따른다.
+
 <a id="major-stage-model"></a>
 <!-- mpa-contract:lifecycle.major=designing|설계 중;design_complete|설계 완료;implementing|구현 중;verifying|검증 중;testing|테스트 중;review_complete|검토 완료;completion_approved|완료 승인;done|done;transitions=designing>design_complete|design_complete>implementing|implementing>verifying|verifying>testing|testing>review_complete|review_complete>completion_approved|completion_approved>done -->
 **단계 모델 — major (기본, 7단계):**
@@ -116,7 +121,7 @@
 | 설계 완료 | "결정사항을 반영해 계획서를 보완했습니다. 검토하시고 구현을 승인해주시면 구현을 진행하겠습니다." | 계획서 검토·구현 승인 요청 |
 | 구현 중 | "구현이 진행 중입니다. 이어서 계속할까요?" | `layer1_implement.md` |
 | 검증 중 | "에이전트 검증이 진행 중입니다. 이어서 계속할까요?" | `layer1_review.md` |
-| 테스트 중 | "사용자 테스트 단계입니다. 테스트 완료 후 알려주세요." | 사용자 확인 대기 |
+| 테스트 중 | "사용자 테스트 단계입니다. 테스트 완료 후 알려주세요." | 사용자 확인 대기. 현재 작업의 버그·증상 보고가 있으면 `layer1_review.md` |
 | 검토 완료 | "검토가 완료됐습니다. 완료 처리를 승인해주세요." | 완료 처리 (완료 승인 확인) |
 | 완료 승인 | "완료 승인에 따라 작업 기록을 정리합니다." | 작업 항목 완료 처리 (추가 확인 없음) |
 
@@ -159,9 +164,11 @@
 | 설계 완료 | 계획서 검토·구현 승인 요청 | — |
 | 구현 중 | 구현 이어서 | `layer1_implement.md` |
 | 검증 중 | 에이전트 검증 이어서 | `layer1_review.md` |
-| 테스트 중 | 사용자 테스트 대기 | — |
+| 테스트 중 | 사용자 테스트 대기. 현재 작업의 버그·증상 보고가 있으면 검토 진입 | 보고 시 `layer1_review.md` |
 | 검토 완료 | 완료 처리 (완료 승인 확인 대기) | — |
 | 완료 승인 | done 이동 처리 | — |
+
+현재 작업 범위의 버그·증상 보고는 새 세션에서도 단순 대기로 끝내지 않고 `layer1_review.md`의 "사용자 보고 진입 시 — 증상 수집"과 "검증·테스트 중 버그 발견 시"를 읽는다. 원인 확인 기준은 수정 전에 적용하며 보고·질문 자체를 수정 승인으로 간주하거나 새 작업을 자동 생성하지 않는다. 유효한 기존 위임·명세·위험 기준을 유지하고 보고만으로 상태를 되돌리지 않는다.
 
 **단, 아래 조건 중 하나라도 해당하면 신규 요청으로 처리한다:**
 - 현재 작업 항목과 무관한 파일·기능을 명시적으로 언급
@@ -333,7 +340,7 @@ major 계획의 작성·의도 확인·TODO 구성·자기 점검·독립 비평
 
 minor와 major 모두 완료 승인 확인 없이는 done으로 이동하지 않는다. 발화의 완료 인정 여부는 detail의 `완료 인정 판별 기준`, 실제 처리 순서는 `작업 항목 완료 처리`를 먼저 읽고 따른다.
 
-완료 확인 뒤에는 `상태: 완료 승인` 기록 → INDEX에서 **해당 active/hold 행을 제거**하고 유지보수 → done 이동 순서를 지킨다. major는 이어서 plan의 문서 대상 반영·필요한 전체 정합성 점검 제안·memory 및 methodology issue 확인을 수행한다. INDEX 손상은 done 이력으로 추정 복구하지 않는다.
+완료 확인 뒤에는 detail의 `작업 항목 완료 처리`에 따라 중복·목적지 충돌이 없음을 먼저 확인한 뒤 `상태: 완료 승인` 기록 → INDEX에서 **해당 active/hold 행을 제거**하고 유지보수 → done 이동 순서를 지킨다. 충돌 시 양쪽 기록을 보존하고 처리를 중단한다. major는 이어서 plan의 문서 대상 반영·필요한 전체 정합성 점검 제안·memory 및 methodology issue 확인을 수행한다. INDEX 손상은 done 이력으로 추정 복구하지 않는다.
 
 ---
 

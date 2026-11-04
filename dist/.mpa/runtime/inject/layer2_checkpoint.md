@@ -44,6 +44,7 @@
 ### 1. 문서 vs 현실 괴리 (Documentation Drift)
 - 현재 코드에서 `architecture.md` 규칙을 위반한 부분이 있는가?
 - `architecture.md`에 기록된 결정이 실제로 바뀌었는데 문서는 이전 내용 그대로인 항목이 있는가?
+- 아키텍처 메모리 점검 전에 `core/architecture_memory.md`를 반드시 읽고 현재 설계·이력 정합성을 확인한다. 정리가 필요하면 그 파일의 보존·전환 절차를 따른다.
 - `contracts.md`에 없는 인터페이스가 실제로 사용되고 있는가?
 - registry에 없는 재사용 요소가 새로 만들어졌는가?
 - `workspace/project_rules.md`가 존재하는 경우: 현재 프로젝트 상태와 맞는가? (라우팅 힌트가 유효한가, 금지 패턴이 실제로 지켜지고 있는가)
