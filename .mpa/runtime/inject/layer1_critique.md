@@ -67,6 +67,7 @@ inject/task_documents.md를 읽고 task_documents.py inputs --stage critique로 
 Agent 도구를 사용해 서브에이전트를 생성하고 아래 프롬프트 템플릿을 전달한다.
 
 **전달할 것 (프롬프트에 포함):**
+- `inject/_agent_execution_priority.md`의 "소통 언어 전달"에 따른 소통 언어·결과 작성 언어·예외 (언어 조건만 전달하며 설계 대화는 제외)
 - 태스크 폴더 경로 (`workspace/tasks/active/[태스크명]/`) ← critique.md 저장 위치 결정에 사용
 - 비평 대상 plan.md 경로
 - `workspace/memory/shared/project_identity.md` 경로

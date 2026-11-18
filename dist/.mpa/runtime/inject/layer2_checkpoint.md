@@ -1,7 +1,7 @@
 # Layer 2 — 통합 체크포인트
 
 > **사용 시점:** 여러 기능이 축적된 후 전체 정합성 점검 시
-> **권장 주기:** 3~5개 태스크 완료 후, 또는 스프린트 종료 시
+> **주기·현황 안내:** `core/agent_rules_detail.md`의 "Layer 2 현황 표시"를 따른다. 스프린트 종료 등 사용자가 점검을 명시 요청하면 횟수와 무관하게 진행한다.
 
 ---
 
@@ -178,6 +178,8 @@ methodology issue 누적: [N]개
 ---
 
 ## 세션 종료 시
+
+실제 점검의 위 완료 기준을 충족하고 결과·미해결 항목을 기록한 뒤 `core/agent_rules_detail.md`의 "Layer 2 현황 표시"를 읽고 완료 마커를 기록한다. 제안·중단·미완료에는 기록하지 않으며 기존 INDEX 행·과거 마커를 보존한다.
 
 산출물에 따라 `workspace/` 파일을 직접 업데이트한다.
 MPA 시스템 개선 발견 시 local `workspace/issues/`에 `methodology_improvement` issue를 기록한다.

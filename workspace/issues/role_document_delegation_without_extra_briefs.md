@@ -10,7 +10,7 @@
 
 ## 개선 방안
 
-역할 문서 자체를 실행 입력으로 사용한다. 문서 타입·실제 독립성·분리 이익을 판단해 메인 또는 서브에이전트가 담당한다. 필요한 호출 범위는 해당 문서의 섹션과 호출 지시로 지정하고 추가 파일을 자동 생성하지 않는다. task_role_documents 계획에서 별도 작업지시서 구조를 제거했으며 Runtime은 미구현이다.
+역할 문서 자체를 실행 입력으로 사용한다. 문서 타입·실제 독립성·분리 이익을 판단해 메인 또는 서브에이전트가 담당한다. 필요한 호출 범위는 해당 문서의 섹션과 호출 지시로 지정하고 추가 파일을 자동 생성하지 않는다. 설계 당시 task_role_documents 계획에서 별도 작업지시서 구조를 제거했고 Runtime은 미구현 상태였다. 현재 구현 상태는 아래 정합성 점검 기록을 따른다.
 
 ## 후속 확정
 
@@ -23,3 +23,6 @@
 - .mpa/runtime/templates/verification_template.md (계획상 신규)
 - .mpa/runtime/inject/layer1_implement.md
 - .mpa/runtime/inject/layer1_review.md
+
+## 현재 상태 확인 — 2026-11-17
+현재 Runtime의 inject/task_documents.md와 docs/task-documents.md에 역할 문서 직접 입력·선택적 실행·큰 작업 분리 원칙이 구현되어 있다. 연결 작업은 독립 검증 후 테스트 중이며 사용자 결과 확인을 기다린다. 위 미구현 설명은 발견 당시 이력이다. 이 상태 보완으로 채택·archive·작업 완료를 자동 처리하지 않는다.

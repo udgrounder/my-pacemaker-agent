@@ -12,6 +12,8 @@
 | minor 계획·자동 승인·최소 확인 | `core/agent_rules_detail.md`의 `minor 경량 처리 절차` → `templates/plan_template.md` |
 | 승인 기록·명세 해시 갱신 | detail의 `승인 기록 처리` |
 | 완료 인정·done 이동 | detail의 `완료 인정 판별 기준`, `작업 항목 완료 처리` |
+| 계획 생성·편집·검증 입력 준비·재개 | detail의 `계획서와 변경 이력 관리` — 단일 수정자·복구 우선·현재 실패 노출을 행동 전에 확인 |
+| 완료 후 점검 제안·실제 점검 완료 기록 | detail의 `Layer 2 현황 표시` — 제안과 실제 점검 완료를 구별 |
 | 독립 비평·구현 검증 | `inject/layer1_critique.md`, `inject/layer1_review.md`, `_agent_execution_priority.md` |
 
 minor는 `layer1_design.md`를 선행 조건으로 삼지 않는다. 이 규칙은 필요한 규칙만 읽으면서 기존 minor 흐름을 보존한다.
@@ -34,7 +36,7 @@ deploy는 여러 복구 실패를 수집해 계속 복구를 시도한다. rollb
 
 ## 검증
 
-구조를 바꿀 때 기존 `tests/test_release_manager.py`와 `tests/test_release_manager_compatibility.py`를 실행한다. 전자는 release, deploy, rollback, issue collection의 정상·실패 경로를 다루며, 후자는 source-root spec loader·CLI·11개 facade patch·source-only release artifact 경계와 ZIP leaf 실패의 deploy/rollback Runtime·issue·config·receipt 복구를 고정한다. Runtime 문서 변경은 `tests/test_structure_loading.py`로 대표 요청 11개 경로, minor 직접 경로, source/dist 전체 파일 parity를 확인한다.
+구조를 바꿀 때 기존 `tests/test_release_manager.py`와 `tests/test_release_manager_compatibility.py`를 실행한다. 전자는 release, deploy, rollback, issue collection의 정상·실패 경로를 다루며, 후자는 source-root spec loader·CLI·11개 facade patch·source-only release artifact 경계와 ZIP leaf 실패의 deploy/rollback Runtime·issue·config·receipt 복구를 고정한다. Runtime 문서 변경은 `tests/test_structure_loading.py`로 대표 요청 경로, minor 직접 경로, source/dist 전체 파일 parity를 확인한다.
 
 
 ## 선택형 작업 문서

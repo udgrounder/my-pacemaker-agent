@@ -10,7 +10,7 @@
 
 ## 개선 방안
 
-화면 설계가 필요한 경우만 ui_design.md를 추가하고 design.md와 책임을 구분한다. 실제 디자인 원본을 연결하고 역할별 구현·시각 검증 입력으로 사용한다. task_role_documents 계획에 반영했으며 Runtime은 미구현이다.
+화면 설계가 필요한 경우만 ui_design.md를 추가하고 design.md와 책임을 구분한다. 실제 디자인 원본을 연결하고 역할별 구현·시각 검증 입력으로 사용한다. 설계 당시 task_role_documents 계획에 반영했고 Runtime은 미구현 상태였다. 현재 구현 상태는 아래 정합성 점검 기록을 따른다.
 
 ## 적용 대상 파일
 
@@ -18,3 +18,6 @@
 - .mpa/runtime/templates/ui_design_template.md (계획상 신규)
 - .mpa/runtime/inject/layer1_design.md
 - .mpa/runtime/inject/layer1_review.md
+
+## 현재 상태 확인 — 2026-11-17
+현재 Runtime에 templates/ui_design_template.md가 존재하며 inject/task_documents.md에 선택적 UI 기준·HTML 미리보기·역할별 입력 연결이 구현되어 있다. 연결 작업은 독립 검증 후 테스트 중이며 사용자 결과 확인을 기다린다. 실제 호스트의 HTML 생성·렌더링까지 검증됐다고 주장하지 않는다. 위 미구현 설명은 발견 당시 이력이며 이 상태 보완으로 채택·archive·작업 완료를 자동 처리하지 않는다.

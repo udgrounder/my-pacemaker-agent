@@ -2,6 +2,8 @@
 
 ## 역할 입력 우선
 
+계획 문서 생성·편집 전과 검증 입력 준비 전에는 `core/agent_rules_detail.md`의 "계획서와 변경 이력 관리"를 먼저 읽는다. 같은 변경 단위에서 이미 읽은 내용은 반복 로드하지 않는다.
+
 inject/task_documents.md를 읽고 1차는 task_documents.py inputs --stage review1과 실제 제품/Runtime 소스를 사용한다. implementation 전체·전체 git diff를 읽지 않는다. 설계 기준만 재사용하고 plan 진행·실행/완료 주장·changelog·조사 결과·2차 결과는 배제한다. 기존 구현 step 대조는 2차에서 implementation 또는 plan 실행 기록으로 수행한다. review2 입력에 1차 결과를 명시 추가한다. 아래 plan/changelog 전달 목록에는 이 우선 범위를 적용한다. 결과 파일과 1차→2차 순서를 유지한다.
 
 > **사용 시점:** 구현이 완료된 결과물을 검토할 때
@@ -24,6 +26,7 @@ inject/task_documents.md를 읽고 1차는 task_documents.py inputs --stage revi
 ### 서브에이전트 실행 시 전달할 것
 
 **프롬프트에 포함:**
+- `inject/_agent_execution_priority.md`의 "소통 언어 전달"에 따른 소통 언어·결과 작성 언어·예외 (1·2차 모두 적용, 구현 대화는 제외)
 - 태스크 폴더 경로 (`workspace/tasks/active/[태스크명]/`)
 - 검증 대상 plan.md 경로
 - `workspace/memory/shared/architecture.md` 경로
@@ -79,6 +82,7 @@ Write 도구로 [태스크 폴더 경로]/review_phase1.md에 직접 저장한�
 1차 검증이 완료되면 두 번째 서브에이전트를 호출한다. 1차 결과(`review_phase1.md`)와 changelog.md를 함께 전달해 "구현자 주장 vs 1차 검증 결과"를 대조한다.
 
 **2차 프롬프트 추가 지시:**
+2차 호출에도 현재 소통 언어·결과 작성 언어·예외를 포함한다. 상세 phase 결과·메타 요약·반환 안내의 설명에 동일하게 적용하며 고정 형식은 유지한다.
 ```
 1차 검증 결과(`review_phase1.md`)와 changelog.md를 비교해 다음을 판단한다:
 - changelog 주장이 실제 코드와 일치하는가?
@@ -239,7 +243,7 @@ review_summary.md 형식:
 - 단, **"구현자가 그렇게 설명했으니까"는 재평가 사유가 되지 않는다.** 객관적 근거(코드·문서·아키텍처)로 뒷받침되어야 한다.
 
 #### 2.3 현재 계획·변경 이력·승인 대조
-- `core/agent_rules.md`의 "계획서와 변경 이력 관리"를 기준으로 changelog의 변경 전후·이유·명세 영향과 현재 plan을 대조한다. 동일 설명의 중복 복제를 요구하지 않는다.
+- `core/agent_rules_detail.md`의 "계획서와 변경 이력 관리"를 기준으로 changelog의 변경 전후·이유·명세 영향과 현재 plan을 대조한다. 동일 설명의 중복 복제를 요구하지 않는다.
 - 초기 `생략 항목과 사유` 표에서 바뀐 판단·폐기한 가정·취소 항목은 이력에 보존되고 현재 판단과 구현이 일치하는가? 틀린 가정의 영향과 기존 실패 증빙도 확인한다.
 - `확인 필요` 또는 완료 증거 축소가 명세 밖 보완으로 처리되지 않았는가? 승인된 명세 변경 전후·사용자 승인 근거·체크섬 연결을 확인한다.
 - 새 배치의 changelog 또는 기존 plan 내부 `명세 변경 이력`에 승인 기록이 남아 있는가? 기존 배치의 보존·전환 근거를 확인한다.
