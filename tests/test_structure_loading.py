@@ -33,6 +33,7 @@ def section(text: str, heading: str) -> str:
 DETAIL = "core/agent_rules_detail.md"
 MANAGEMENT = "계획서와 변경 이력 관리"
 LAYER2 = "Layer 2 현황 표시"
+CLEANUP = "완료 산출물 정리"
 CONSUMER_ROUTES = (
     ("inject/layer1_design.md", "## 문서 선택 선행", MANAGEMENT),
     ("inject/layer1_implement.md", "## 역할 입력 선행", MANAGEMENT),
@@ -41,6 +42,20 @@ CONSUMER_ROUTES = (
     (DETAIL, "## minor 경량 처리 절차", MANAGEMENT),
     (DETAIL, "## 태스크 재개", MANAGEMENT),
     ("core/session_protocol.md", "## 세션 재개 (중단된 세션 이어가기)", MANAGEMENT),
+    (DETAIL, "## 작업 항목 완료 처리", CLEANUP),
+    (DETAIL, "## minor 경량 처리 절차", CLEANUP),
+    (DETAIL, "## 계획서와 변경 이력 관리", CLEANUP),
+    ("inject/layer1_implement.md", "## 세션 종료 시", CLEANUP),
+    ("inject/layer1_review.md", "## 실행 환경", CLEANUP),
+    ("inject/layer1_review.md", "## 세션 종료 시", CLEANUP),
+    ("inject/layer1_critique.md", "## 세션 종료 시", CLEANUP),
+    ("inject/_agent_execution_priority.md", "## 독립 실행의 완료 조건", CLEANUP),
+    ("inject/task_documents.md", "## 전환·완료", CLEANUP),
+    ("core/session_protocol.md", "## 완료 자료의 수명", CLEANUP),
+    ("templates/plan_template.md", "## 검증 결과", CLEANUP),
+    ("templates/plan_minimal_template.md", "## 현재 상태", CLEANUP),
+    ("templates/changelog_template.md", "## 계획·결정 변경 이력", CLEANUP),
+    ("templates/verification_template.md", "## 검증 기준", CLEANUP),
     (DETAIL, "## 작업 항목 완료 처리", LAYER2),
     ("inject/layer2_checkpoint.md", "## 세션 종료 시", LAYER2),
 )
@@ -110,6 +125,8 @@ def loading_route_issues(documents):
         elif not files:
             issues.append(f"unparseable trigger target: {target}")
     required_routes = (
+        ("완료 보고 준비 시", CLEANUP),
+        ("완료 승인 후 보조 자료 정리 전", CLEANUP),
         ("계획 문서 생성·편집 전", MANAGEMENT),
         ("검증 입력 준비 전", MANAGEMENT),
         ("재개 시", MANAGEMENT),
@@ -263,6 +280,104 @@ class ActualLoadingRoutesTest(unittest.TestCase):
                            "과거 마커는 보존", "중복 추가하지 않는다"):
                 with self.subTest(root=root, phrase=phrase):
                     self.assertIn(phrase, text)
+
+
+
+# These checks inspect executable policy, not host file deletion or model judgment.
+CLEANUP_STEPS = ("대상·잔존 정보 재확인", "최소 정보 저장", "내용·현재 결론 대조",
+                 "참조·등록·승인 영향 확인", "삭제", "실제 상태·연결 확인")
+CLEANUP_GUARDS = {
+    "mixed information": ("지적 종결과 파일 전체 역할 종료는 별개", "혼합 파일", "원본 의존"),
+    "current evidence": ("실패·미확인을 처리 불필요로 바꾸거나", "현재 제약/수용 위험", "재현 입력·복구 원문"),
+    "approval timing": ("사용자 결과 확인까지", "기존 완료 승인으로 처리", "파일마다 새 승인을 요구하지 않는다"),
+    "protected assets": ("다른 작업 자산", "release/backup", "진행 중 승인 복구/충돌 자료",
+                         "외부 경로·symlink", "기존 done 정리는 별도 명시 요청"),
+    "save failure": ("저장 성공만으로 이관 완료라 하지 않는다", "각 단계가 실패하면 영향받는 원본을 보존"),
+    "approval boundary": ("reqspec-v1 명세 밖", "legacy 본문 해시", "필요한 승인이 없으면 해당 원본을 보관"),
+    "active dependencies": ("선택 문서 등록", "활성 참조·등록을 먼저 정리", "링크 부재만으로"),
+    "restart and failure": ("실제 상태에서 재개", "단순 삭제 실패", "정합성 실패는 INDEX/done 이동을 보류"),
+    "bounded work": ("영구 manifest", "원문을 통째로 복제하지 않는다", "이번 작업 보조 자료 밖으로"),
+}
+
+
+def cleanup_policy_issues(documents):
+    try:
+        body = exact_section(documents.get(DETAIL, ""), "## " + CLEANUP)
+        execution = exact_section(body, "### 완료 승인 후 실행")
+    except ValueError as error:
+        return [str(error)]
+    issues = []
+    steps = re.findall(r"^\d+\. \*\*([^:*]+):\*\*", execution, re.MULTILINE)
+    if tuple(steps) != CLEANUP_STEPS:
+        issues.append("cleanup step order")
+    for name, phrases in CLEANUP_GUARDS.items():
+        if any(phrase not in body for phrase in phrases):
+            issues.append("cleanup guard: " + name)
+    try:
+        completion = exact_section(documents[DETAIL], "## 작업 항목 완료 처리")
+        order = ("0. 상태·INDEX", "1. plan.md 상태", f'`{DETAIL}`의 "{CLEANUP}"',
+                 "2. `workspace/tasks/INDEX.md`", "3. 작업 폴더")
+        positions = [completion.index(token) for token in order]
+        if positions != sorted(positions):
+            issues.append("completion cleanup order")
+    except (ValueError, KeyError):
+        issues.append("completion cleanup order")
+    return issues
+
+
+class CompletionCleanupPolicyTest(unittest.TestCase):
+    def test_real_source_and_distribution_policy(self):
+        for root in RUNTIME_ROOTS:
+            with self.subTest(root=root):
+                docs = load_policy_documents(root)
+                self.assertEqual(cleanup_policy_issues(docs), [])
+
+    def test_detects_missing_and_reordered_cleanup_stages(self):
+        for root in RUNTIME_ROOTS:
+            for step in CLEANUP_STEPS:
+                docs = load_policy_documents(root)
+                docs[DETAIL] = docs[DETAIL].replace(f"**{step}:**", "**removed:**")
+                with self.subTest(root=root, step=step):
+                    self.assertIn("cleanup step order", cleanup_policy_issues(docs))
+            docs = load_policy_documents(root)
+            text = docs[DETAIL]
+            # Swap stage numbers: persistence must precede deletion in the procedure.
+            text = text.replace("2. **최소 정보 저장:**", "5. **최소 정보 저장:**")
+            text = text.replace("5. **삭제:**", "2. **삭제:**")
+            lines = text.splitlines()
+            start = next(i for i, line in enumerate(lines) if line.startswith("1. **대상·잔존"))
+            stop = next(i for i, line in enumerate(lines[start:], start)
+                        if line.startswith("6. **실제 상태"))
+            lines[start:stop + 1] = sorted(lines[start:stop + 1],
+                                         key=lambda line: int(line[0]))
+            docs[DETAIL] = "\n".join(lines)
+            self.assertIn("cleanup step order", cleanup_policy_issues(docs))
+
+    def test_each_guard_removal_is_detected_without_touching_real_files(self):
+        for name, phrases in CLEANUP_GUARDS.items():
+            for phrase in phrases:
+                docs = load_policy_documents(RUNTIME_ROOTS[0])
+                body = exact_section(docs[DETAIL], "## " + CLEANUP)
+                docs[DETAIL] = docs[DETAIL].replace(body, body.replace(phrase, "removed"))
+                with self.subTest(guard=name, phrase=phrase):
+                    self.assertIn("cleanup guard: " + name, cleanup_policy_issues(docs))
+
+    def test_cleanup_cannot_move_after_index_removal(self):
+        docs = load_policy_documents(RUNTIME_ROOTS[0])
+        text = docs[DETAIL]
+        start = text.index("   - INDEX 변경·done 이동 전에")
+        stop = text.index("\n2. `workspace/tasks/INDEX.md`", start)
+        cleanup = text[start:stop]
+        text = text[:start] + text[stop:]
+        marker = "3. 작업 폴더를 `workspace/tasks/done/`으로 이동한다."
+        docs[DETAIL] = text.replace(marker, marker + "\n" + cleanup)
+        self.assertIn("completion cleanup order", cleanup_policy_issues(docs))
+
+    def test_both_cleanup_trigger_events_are_required(self):
+        for event in ("완료 보고 준비 시", "완료 승인 후 보조 자료 정리 전"):
+            docs = load_policy_documents(RUNTIME_ROOTS[0])
+            docs["core/agent_rules.md"] = docs["core/agent_rules.md"].replace(event, "removed")
+            self.assertIn("missing trigger condition: " + event, loading_route_issues(docs))
 
 
 if __name__ == "__main__":

@@ -202,6 +202,8 @@ plan.md를 읽고 `personas/plan_critic.md`의 비평 체크리스트를 순서�
 
 ## 세션 종료 시
 
+비평 실행 당시 유효한 critique.md 저장·확인 의무는 유지한다. 완료 보고 준비·완료 승인 후의 원본 수명은 `core/agent_rules_detail.md`의 "완료 산출물 정리"를 따른다. 현재 필요한 결정·승인·위험과 후속 검증 입력은 조기 삭제하지 않으며, 역할 종료 후 최소 최종 결론의 저장·대조와 참조/승인 확인이 끝나야 조건부 정리할 수 있다.
+
 1. 비평 결과를 `workspace/tasks/active/[태스크명]/critique.md`에 저장한다
 2. 메인 에이전트에 반환: "critique.md 저장 완료: [경로]" (내용 요약 없음)
 3. MPA 시스템 개선 발견 → local `workspace/issues/`에 `methodology_improvement` issue 기록
