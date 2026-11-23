@@ -3,14 +3,14 @@
 생성일: 2026-09-14
 타입: major
 실패비용: major
-상태: 테스트 중
+상태: 완료 승인
 승인해시: reqspec-v1:7109a1fa91c52401
 승인대상: 요구사항 명세
 ---
 
 # 작업 계획서: TOML 기반 MPA 참조 계약
 
-**파생 출처:** `workspace/issues/inbox/my-pacemaker-agent/config_toml_external_agent_reference.md` — 외부 에이전트와 자동 검증이 읽을 수 있는 MPA 규칙 계약 필요
+**파생 출처:** 외부 에이전트와 자동 검증이 읽을 수 있는 MPA 규칙 계약 제안. 완료 이슈 원본은 사용자 요청으로 삭제했으며 처리 근거는 [변경 이력](changelog.md)에 남겼다.
 
 ## 요구사항 명세
 
@@ -140,7 +140,7 @@ Runtime 변경자는 위 표에 걸린 값을 바꿀 때 validator와 source/dis
 
 ### 참고 파일 (수정 없음)
 
-- `workspace/issues/inbox/my-pacemaker-agent/config_toml_external_agent_reference.md` — 문제 제기와 초안 범위
+- [변경 이력](changelog.md) — 원래 제안과 채택한 읽기 전용 계약의 범위
 - `workspace/memory/shared/architecture.md` — Runtime source/dist와 release 경계
 - `.mpa/runtime/hooks/plan_hash.py`, `.mpa/runtime/hooks/code_gate.py` — 기존 상태·승인 동작의 소유자
 
@@ -164,6 +164,7 @@ Runtime 변경자는 위 표에 걸린 값을 바꿀 때 validator와 source/dis
 ### 사용자 결정·승인 필요
 
 - [x] 계획서 검토 후 읽기 전용 TOML 계약 V1 구현 승인.
+- [x] 2026-11-23 사용자 결과 확인 및 완료 승인.
 
 ## 검증 결과
 

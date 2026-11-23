@@ -56,6 +56,14 @@ CONSUMER_ROUTES = (
     ("templates/plan_minimal_template.md", "## 현재 상태", CLEANUP),
     ("templates/changelog_template.md", "## 계획·결정 변경 이력", CLEANUP),
     ("templates/verification_template.md", "## 검증 기준", CLEANUP),
+    (DETAIL, "## 작업 항목 완료 처리", "작업 INDEX 편집 안전성"),
+    (DETAIL, "## minor 경량 처리 절차", "작업 INDEX 편집 안전성"),
+    (DETAIL, "## minor 경량 처리 절차", "공통 방법론 계획의 범위 점검"),
+    (DETAIL, "## Layer 2 현황 표시", "작업 INDEX 편집 안전성"),
+    ("inject/layer1_design.md", "## 작업", "공통 방법론 계획의 범위 점검"),
+    ("inject/layer1_critique.md", "## 자기 점검 (self-check) — 모든 plan.md에 적용", "공통 방법론 계획의 범위 점검"),
+    ("inject/layer1_critique.md", "## 독립 비평 (critique) — 비평 기준 충족 시", "공통 방법론 계획의 범위 점검"),
+    ("inject/task_documents.md", "## 작성·승인·기준 확인", "공통 방법론 계획의 범위 점검"),
     (DETAIL, "## 작업 항목 완료 처리", LAYER2),
     ("inject/layer2_checkpoint.md", "## 세션 종료 시", LAYER2),
 )
@@ -125,6 +133,7 @@ def loading_route_issues(documents):
         elif not files:
             issues.append(f"unparseable trigger target: {target}")
     required_routes = (
+        ("작업 INDEX 편집 전", "작업 INDEX 편집 안전성"),
         ("완료 보고 준비 시", CLEANUP),
         ("완료 승인 후 보조 자료 정리 전", CLEANUP),
         ("계획 문서 생성·편집 전", MANAGEMENT),

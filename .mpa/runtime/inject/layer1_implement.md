@@ -130,8 +130,8 @@ plan.md YAML 프론트매터의 `실패비용`이 `minor`이면 먼저 `상태: 
    - 먼저 `core/agent_rules_detail.md`의 "작업 항목 완료 처리"에 따라 중복·목적지 충돌을 확인한다. 충돌 시 아래 상태·INDEX 변경과 이동을 진행하지 않는다.
    - plan.md 상태를 `완료 승인`으로 업데이트한다.
    - `core/agent_rules_detail.md`의 "완료 산출물 정리"에 따라 준비 범위·파일 상태를 재확인하고 정리·정합성 확인을 마친다. 정본·승인·필수 연결 실패면 이동을 보류하고, 불필요 원본의 단순 삭제 실패는 미정리로 보고한다.
-   - `workspace/tasks/INDEX.md`에서 해당 active/hold 항목을 제거한 뒤 `agent_rules.md`의 "INDEX.md 유지보수 원칙"을 수행한다.
-   - `workspace/tasks/active/yyyymmdd_[태스크명]/`을 `workspace/tasks/done/yyyymmdd_[태스크명]/`으로 이동한다.
+   - `core/agent_rules_detail.md`의 "작업 INDEX 편집 안전성"을 읽고 `workspace/tasks/INDEX.md`에서 해당 active/hold 항목을 제거한다.
+   - detail의 "작업 항목 완료 처리"에 따라 done으로 이동하고 해당 행과 경로를 대조한다. 재개·이동 실패에도 그 절차를 따른다.
 
 외부 동작 변경 시에도 위 정본에 따라 에이전트가 재판정한다. 위험·범위가 유지되면 응답 대기 없이 재개하고 누적 보고한다.
 
@@ -163,6 +163,6 @@ minor가 아닌 태스크 완료 후 다음을 자동으로 처리한다 (Zone 3
   · changelog.md — [주요 변경 요약 1줄]  
   · architecture.md — [추가/수정된 결정 요약] (변경 없으면 생략)  
   · contracts.md — [변경 내용 요약] (변경 없으면 생략)  
-  · INDEX.md 상태 갱신  
+  · INDEX.md의 해당 행이 실제로 바뀐 경우에만 갱신 내용
 
 11. **다음 행동:** 구현이 끝나면 에이전트 검증으로 이어간다. 사용자가 새 세션을 열거나 진행을 다시 승인하도록 요구하지 않는다.

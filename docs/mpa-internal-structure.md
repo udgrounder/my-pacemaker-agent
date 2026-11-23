@@ -21,6 +21,12 @@ minor는 `layer1_design.md`를 선행 조건으로 삼지 않는다. 이 규칙�
 
 Runtime 파일을 수정하면 `python3 release_manager.py sync-runtime`으로 `dist/.mpa/runtime/`를 동기화한다. 이는 source와 배포본의 파일을 맞추는 작업일 뿐, release 생성이나 설치 대상 배포를 수행하지 않는다.
 
+## 작업 INDEX와 공통 계획 점검
+
+일상 작업은 현재 작업 행과 실제 plan/폴더 위치만 대조한다. 다른 작업 행의 불일치나 선행 편집은 보존하며 전체 대조·정리는 사용자 명시 요청 범위에서 수행한다. 대상 행의 편집과 저장 후 보존 확인은 Runtime의 `core/agent_rules_detail.md`에 있다. 파생 작업도 최소 plan 저장 뒤 등록하고, 완료 이동은 기존 승인 뒤에 해당 행만 제거한다.
+
+공통 방법론 계획의 작성·자기 점검·독립 비평은 같은 상세 규칙의 범위 점검을 참조한다. 선택 설계·검증 문서에서도 출처 사례가 공통 합격 조건으로 쓰이는지 확인한다.
+
 ## Source 운영 코드
 
 `release_manager.py`는 CLI와 release 생성, backup/config, 이슈 수집 transaction, deploy/rollback 조정을 소유한다. 외부 CLI·함수 이름과 기존 테스트의 monkey patch 지점은 이 파일에 남긴다.

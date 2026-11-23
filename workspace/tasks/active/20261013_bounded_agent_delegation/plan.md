@@ -193,7 +193,7 @@
 - agent-specs/codex/inject/AGENTS.md — 진입점 참조 체인 유지.
 - project_config.py, install.py, release_manager.py — 기존 설치별 config 및 Runtime 동기화 경계. 이번에는 새 정책 자동 설치/migration을 추가하지 않음.
 - .mpa/runtime/contracts/agent_reference.toml 및 agent_reference_profile.md — inspect-only 유지, 실행 제어 데이터 추가 금지.
-- workspace/tasks/active/20260914_mpa_toml_reference_contract/plan.md — 별도 작업과 범위 충돌 방지.
+- workspace/tasks/done/20260914_mpa_toml_reference_contract/plan.md — 별도 작업과 범위 충돌 방지.
 
 ### 반례 (이 계획이 실패할 수 있는 시나리오)
 

@@ -4,7 +4,7 @@
 타입: major
 실패비용: major
 상태: 완료 승인
-승인해시: reqspec-v1:d1b1db79adcd0375
+승인해시: reqspec-v1:7180c48a771ed498
 승인대상: 요구사항 명세
 문서구성: roles-v1
 ---
@@ -16,7 +16,7 @@
 ### 요청 기준
 사용자 요청: “좋아, 이슈 채택하고 판단한 공통 원칙을 MPA에 반영할 계획서 작성해줘.”
 파생 출처: campingtalk-proj의 원천 데이터 단위 확인 전 가정 기반 업무 질문 방지 이슈.
-채택 이슈: [원본과 채택 기록](../../../issues/archived/2026/11/campingtalk-proj/20261116_unverified_source_granularity_assumptions.md).
+채택 이슈: [보존된 채택·구현 결론](changelog.md). 원본 20261116_unverified_source_granularity_assumptions.md는 처리 완료 후 2026-11-23 사용자 요청으로 삭제했다.
 
 ### 목적
 확인되지 않은 예외를 실제 업무의 전제로 다루어 질문·요구사항·설계를 연쇄 확대하는 행동을 줄인다. 기존 자료와 사용자 설명으로 업무를 파악하고 실제 결정이 필요한 질문에 집중하면서 중요한 위험의 반례 탐색을 유지한다.

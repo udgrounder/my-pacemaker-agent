@@ -41,7 +41,7 @@
 
 | 세션 | 페르소나 | 주입 컨텍스트 | 산출물 |
 |------|---------|-------------|--------|
-| layer0_init | Architect | 없음 (첫 세션) | memory 초안 전체 + tasks/INDEX.md |
+| layer0_init | Architect | 없음 (첫 세션) | memory 초안 및 첫 작업 후보·의존성·우선순위 인계 |
 | layer1_design | Task Designer | shared/ 전체 | 작업 항목 계획 (plan.md) |
 | layer1_critique | Plan Critic | shared/ + plan.md만 | 비평 결과 (권장 기준 → layer1_critique.md 참조) |
 | layer1_implement | Implementer | shared/ + 도메인/ + 작업 항목 계획 | 구현 코드 + 결정 목록 |
