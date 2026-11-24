@@ -8,4 +8,6 @@
 
 ## 현재 남은 이슈 — 2026-11-24
 
-남은 이슈는 0건이다. 위임 전 직렬화 확인 이슈는 완료 승인 후 사용자 요청으로 삭제했다. [처리 기록](../tasks/done/20261013_bounded_agent_delegation/changelog.md)
+검토 대기 이슈는 0건이다. campingtalk-proj에서 수집한 이슈 4건은 구현과 독립 검토를 마쳐 사용자 승인으로 완료했다. 해당 이슈 파일은 사용자 요청에 따라 삭제했으며 결과는 [완료 기록](../tasks/done/20261124_collected_issue_improvements/plan.md)에 보관한다.
+
+위임 전 직렬화 확인 이슈는 완료 승인 후 사용자 요청으로 삭제했다. [처리 기록](../tasks/done/20261013_bounded_agent_delegation/changelog.md)

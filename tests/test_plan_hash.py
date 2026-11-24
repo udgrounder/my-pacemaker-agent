@@ -108,6 +108,7 @@ class PlanHashTest(unittest.TestCase):
             "tool_input": {"file_path": str(root / "src.py")},
         }
         with mock.patch.dict(os.environ, {"MPA_GATE": mode}, clear=False), \
+             mock.patch.object(code_gate, "project_root", return_value=str(root)), \
              mock.patch.object(sys, "argv", ["code_gate.py", "--agent", "codex"]), \
              mock.patch.object(sys, "stdin", io.StringIO(json.dumps(data))), \
              contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):

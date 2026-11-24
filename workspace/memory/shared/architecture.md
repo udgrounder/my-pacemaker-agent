@@ -232,6 +232,8 @@ major·minor plan의 현행 승인 형식은 `승인해시`의 `reqspec-v1:<16�
 - `tests/test_release_manager.py`는 `importlib.util.spec_from_file_location`으로 모듈을 로드하고 경로 전역과 조정 함수를 교체해 임시 프로젝트·실패 상황을 만든다. 내부 구조를 바꿀 때 import 경로뿐 아니라 이 patch의 실제 호출 효과도 보존해야 한다.
 - `install.py`와 `release_manager.py`는 `project_config.py`를 직접 사용한다. install은 release_manager를 import하지 않는다.
 - source/설치 진입점과 native agent 등록은 `core/agent_rules.md`를 참조한다. `session_start.py`는 상태·라우팅 안내를 생성하며, 안내 출력만으로 호스트가 규칙 본문을 실제 읽었다고 볼 수 없다.
+- `hooks/project_root.py`는 Runtime 스크립트의 실제 위치로 소유 루트를 정한다. code_gate·session_start·turn_end의 상태 조회는 이 루트를 쓰고, 상대 파일·일반 mv 요청은 별도 실행 cwd에서 해석한다. 설치 hook 명령은 가장 가까운 Runtime을 찾아 cwd를 유지한다. `install.py --repair-hooks`는 명시 실행 시에만 알려진 관리 명령을 사용자 설정·권한을 보존하며 갱신하고, Runtime deploy는 agent 설정을 변경하지 않는다.
+- Layer 2 상세 결과·미해결 항목은 프로젝트 지정 위치 또는 `workspace/exploration/checkpoints/YYYYMMDD_<주제>.md`에 남긴다. INDEX에는 기존 완료 조건에 따른 날짜 마커 한 줄만 기록한다. 기록 위치 정본은 detail의 「실제 점검 완료 기록」과 layer2_checkpoint이며 과거 문서를 일괄 이관하지 않는다.
 
 ## 파일별 역할 (dist/.mpa/runtime/) — 구성 층위 기준
 

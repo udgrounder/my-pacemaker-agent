@@ -30,6 +30,7 @@ import os
 import re
 import sys
 from plan_hash import HASH_REQUIRED_STATUSES, approval_hash_issue, renewal_recovery_path
+from project_root import ProjectRootError, execution_cwd, project_root, relative_path
 
 # 항상 허용하는 경로 접두사 (방법론·프로젝트 데이터·agent 설정)
 ALLOW_PREFIXES = (
@@ -80,17 +81,8 @@ def extract_path(data):
     return get(tool_input, "file_path", "path", "filePath", "notebook_path", "absolute_path")
 
 
-def relativize(path, cwd):
-    if not path:
-        return None
-    p = os.path.normpath(path)
-    cwd = os.path.normpath(cwd)
-    if os.path.isabs(p):
-        try:
-            p = os.path.relpath(p, cwd)
-        except ValueError:
-            return p
-    return p
+def relativize(path, cwd, tool_cwd=None):
+    return relative_path(path, cwd, tool_cwd or cwd)
 
 
 def is_always_allowed(rel):
@@ -277,7 +269,7 @@ def check_done_write(rel, cwd, agent):
         return
     task_name = parts[3]
 
-    active_plan = os.path.join("workspace", "tasks", "active", task_name, "plan.md")
+    active_plan = os.path.join(cwd, "workspace", "tasks", "active", task_name, "plan.md")
     if not os.path.exists(active_plan):
         return  # 이미 이동됐거나 done/ 원본 파일 — 통과
 
@@ -292,30 +284,46 @@ def check_done_write(rel, cwd, agent):
         emit_warn(agent, msg)
 
 
-def check_bash_mv(data, cwd, mode, agent):
-    """GATE 2 — Bash mv tasks/active → tasks/done 절차 경고 또는 명시적 차단."""
+# Match a directly written mv with two literal operands, allowing quoted paths.
+# This is a workflow check and does not interpret shell programs.
+_MV_PATH = r"""("[^"\r\n]+"|'[^'\r\n]+'|[^ \t\r\n;&|()'"<>\\$`]+)"""
+_DIRECT_MV = re.compile(
+    r"^[ \t]*#[^\r\n]*|"
+    rf"""(?:^|[;&|])[ \t]*(?:(?:/usr)?/bin/)?mv[ \t]+(?:-[A-Za-z-]+[ \t]+)*"""
+    rf"""{_MV_PATH}[ \t]+{_MV_PATH}[ \t]*(?=$|[\r;&|#]|[0-9]*[<>])""",
+    re.MULTILINE,
+)
+
+
+def check_bash_mv(data, cwd, mode, agent, tool_cwd=None):
+    """Warn or block literal active-to-done moves until completion is approved."""
     tool_input = get(data, "tool_input", "toolInput", "input") or {}
     command = tool_input.get("command", "") if isinstance(tool_input, dict) else ""
+    if not isinstance(command, str):
+        return
 
-    # mv .../workspace/tasks/active/<task> ... 패턴 감지
-    pat = re.search(r"mv\s+\S*workspace/tasks/active/([^\s/]+)", command)
-    if not pat:
-        return  # 관련 없는 Bash 명령 — 통과
-
-    task_name = pat.group(1)
-    plan_path = os.path.join(cwd, "workspace", "tasks", "active", task_name, "plan.md")
-    status = parse_plan_status(plan_path)
-
-    if status != "완료 승인":
-        msg = (
-            f"⛔ 완료 처리 차단: '{task_name}' plan.md 상태가 '완료 승인'이 아닙니다"
-            f" (현재: {status or '미상'}).\n"
-            "사용자의 명시적 완료 승인 후 plan.md 상태를 '완료 승인'으로 업데이트하세요.\n"
-            "※ mv 이외의 방법(shutil, Python 파일 조작 등)으로 이동해도 동일 규칙이 적용됩니다."
-        )
-        if mode == "warn":
-            emit_warn(agent, msg)
-        else:
+    for match in _DIRECT_MV.finditer(command):
+        if match.group(1) is None:
+            continue  # Skip a full-line comment matched by the first alternative.
+        source, destination = (relativize(path[1:-1] if path[0] in "'\"" else path, cwd, tool_cwd)
+                               for path in match.groups())
+        if destination != "workspace/tasks/done" and not destination.startswith("workspace/tasks/done/"):
+            continue
+        prefix = "workspace/tasks/active/"
+        if not source.startswith(prefix):
+            continue
+        task_name = source[len(prefix):].split("/", 1)[0]
+        plan_path = os.path.join(cwd, "workspace", "tasks", "active", task_name, "plan.md")
+        status = parse_plan_status(plan_path)
+        if status != "완료 승인":
+            msg = (
+                f"완료 처리 차단: '{task_name}' plan.md 상태가 '완료 승인'이 아닙니다"
+                f" (현재: {status or '미상'}).\n"
+                "사용자의 명시적 완료 승인 후 plan.md 상태를 '완료 승인'으로 업데이트하세요.\n"
+                "mv 이외의 방법으로 이동해도 동일 규칙이 적용됩니다."
+            )
+            if mode == "warn":
+                emit_warn(agent, msg)
             emit_block(msg)
 
 
@@ -343,19 +351,30 @@ def main():
         sys.exit(0)
 
     data = read_input()
-    cwd = get(data, "cwd") or os.getcwd()
     tool = get(data, "tool_name", "toolName", "tool") or ""
+    try:
+        cwd = project_root(__file__)
+        tool_cwd = execution_cwd(get(data, "cwd"))
+        rel = relativize(extract_path(data), cwd, tool_cwd)
+    except ProjectRootError as error:
+        if mode == "warn":
+            emit_warn(args.agent, str(error))
+        emit_block(str(error))
 
     # ── GATE 2: Bash mv 차단 ──────────────────────────────────────────
     if tool in BASH_TOOLS:
-        check_bash_mv(data, cwd, mode, args.agent)
+        try:
+            check_bash_mv(data, cwd, mode, args.agent, tool_cwd)
+        except ProjectRootError as error:
+            if mode == "warn":
+                emit_warn(args.agent, str(error))
+            emit_block(str(error))
         sys.exit(0)
 
     # ── GATE 1: 소스 수정 차단 ────────────────────────────────────────
     if tool and tool not in EDIT_TOOLS:
         sys.exit(0)
 
-    rel = relativize(extract_path(data), cwd)
     check_done_write(rel, cwd, args.agent)  # GATE 2 절차 확인: done/ 직접 쓰기 경고
     if is_always_allowed(rel):
         sys.exit(0)

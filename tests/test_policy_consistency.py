@@ -5,6 +5,7 @@ cases and host integration need separate review; see the task's policy audit.
 """
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
@@ -192,9 +193,11 @@ class PolicyReferenceTest(unittest.TestCase):
 class GateBoundaryTest(unittest.TestCase):
     def run_gate(self, tool_input, mode="block", tool="Edit"):
         with tempfile.TemporaryDirectory() as directory:
+            runtime = Path(directory) / ".mpa/runtime"
+            shutil.copytree(RUNTIME, runtime, ignore=shutil.ignore_patterns("__pycache__"))
             payload = {"cwd": directory, "tool_name": tool, "tool_input": tool_input}
             return subprocess.run(
-                ["python3", str(RUNTIME / "hooks/code_gate.py"), "--agent", "codex"],
+                ["python3", str(runtime / "hooks/code_gate.py"), "--agent", "codex"],
                 input=json.dumps(payload), text=True, capture_output=True,
                 env={**os.environ, "MPA_GATE": mode}, check=False,
             )

@@ -4,7 +4,9 @@ import unittest
 import json
 import importlib.util
 import os
+import shutil
 from pathlib import Path
+from unittest import mock
 
 import project_config
 
@@ -337,6 +339,113 @@ class InstallDryRunTest(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("[my-pacemaker-agent] 세션 시작 루틴", result.stdout)
+
+
+class HookMigrationTest(unittest.TestCase):
+    def settings(self, root, agent, data):
+        folder, name = install.HOOK_SETTINGS_PATH[agent]
+        path = root / folder / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        path.chmod(0o640)
+        return path
+
+    def test_exact_legacy_commands_migrate_without_touching_user_fields(self):
+        for agent in ("claude", "codex"):
+            with self.subTest(agent=agent), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                original = {"user": {"keep": True}, "hooks": install.build_hook_block(agent)}
+                for event, entries in original["hooks"].items():
+                    command = entries[0]["hooks"][0]
+                    script = {"SessionStart": "session_start.py", "PreToolUse": "code_gate.py", "Stop": "turn_end.py"}[event]
+                    command["command"] = f"python3 .mpa/runtime/hooks/{script} --agent {agent}"
+                    command["timeout"] = 123
+                    entries[0]["custom"] = "keep"
+                    entries[0]["hooks"].insert(0, {"type": "command", "command": "user-check"})
+                    entries.append({"matcher": "UserTool", "hooks": [{"command": "user-other"}]})
+                path = self.settings(root, agent, original)
+                self.assertTrue(install.wire_hooks(agent, root))
+                actual = json.loads(path.read_text())
+                expected = json.loads(json.dumps(original))
+                for event, entries in expected["hooks"].items():
+                    entries[0]["hooks"][1]["command"] = install.build_hook_block(agent)[event][0]["hooks"][0]["command"]
+                self.assertEqual(actual, expected)
+                self.assertEqual(path.stat().st_mode & 0o777, 0o640)
+                once = path.read_bytes()
+                self.assertTrue(install.wire_hooks(agent, root))
+                self.assertEqual(path.read_bytes(), once)
+
+    def test_all_recognized_previous_command_forms_can_be_repaired(self):
+        for agent in ("claude", "codex"):
+            for command in install._legacy_hook_commands("code_gate.py", agent):
+                with self.subTest(agent=agent, command=command), tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    block = install.build_hook_block(agent)
+                    block["PreToolUse"][0]["hooks"][0]["command"] = command
+                    path = self.settings(root, agent, {"hooks": block})
+                    self.assertTrue(install.wire_hooks(agent, root))
+                    actual = json.loads(path.read_text())["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+                    self.assertEqual(actual, install._hook_cmd("code_gate.py", agent))
+
+    def test_unknown_user_modified_command_is_preserved_without_duplicate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            block = install.build_hook_block("codex")
+            block["PreToolUse"][0]["hooks"][0]["command"] = "CUSTOM=1 python3 .mpa/runtime/hooks/code_gate.py --agent codex"
+            path = self.settings(root, "codex", {"hooks": block})
+            before = path.read_bytes()
+            self.assertFalse(install.wire_hooks("codex", root))
+            self.assertEqual(path.read_bytes(), before)
+
+    def test_failed_save_preserves_original_bytes_permissions_and_cleans_temp(self):
+        for stage in ("fsync", "replace"):
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                path = self.settings(root, "claude", {"user": "keep"})
+                before = path.read_bytes()
+                with mock.patch.object(install.os, stage, side_effect=OSError("injected save failure")):
+                    with self.assertRaisesRegex(OSError, "injected"):
+                        install.wire_hooks("claude", root)
+                self.assertEqual(path.read_bytes(), before)
+                self.assertEqual(path.stat().st_mode & 0o777, 0o640)
+                self.assertEqual(sorted(p.name for p in path.parent.iterdir()), [path.name])
+
+    def test_malformed_json_hooks_and_symlink_are_preserved(self):
+        for value in ("broken json", '[1]', '{"hooks": []}'):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                path = self.settings(root, "claude", {})
+                path.write_text(value)
+                self.assertFalse(install.wire_hooks("claude", root))
+                self.assertEqual(path.read_text(), value)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = self.settings(root, "claude", {})
+            target = root / "user.json"
+            path.rename(target)
+            path.symlink_to(target)
+            self.assertFalse(install.wire_hooks("claude", root))
+            self.assertTrue(path.is_symlink())
+            self.assertEqual(target.read_text(), "{}")
+
+    def test_repair_cli_dry_run_and_update_touch_only_hook_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".mpa/runtime", root / ".mpa/runtime",
+                            ignore=shutil.ignore_patterns("__pycache__"))
+            block = install.build_hook_block("codex")
+            block["PreToolUse"][0]["hooks"][0]["command"] = "python3 .mpa/runtime/hooks/code_gate.py --agent codex"
+            path = self.settings(root, "codex", {"hooks": block})
+            before = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+            command = ["python3", "install.py", "--project", str(root), "--agents", "codex", "--repair-hooks"]
+            preview = subprocess.run(command + ["--dry-run"], cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(preview.returncode, 0, preview.stdout + preview.stderr)
+            self.assertEqual(path.read_bytes(), before[path.relative_to(root)])
+            result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            after = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+            self.assertEqual(set(before), set(after))
+            self.assertEqual([p for p in before if before[p] != after[p]], [path.relative_to(root)])
 
 
 if __name__ == "__main__":

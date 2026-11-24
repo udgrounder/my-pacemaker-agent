@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import sys
+from project_root import ProjectRootError, project_root
 
 
 def read_cwd_from_stdin():
@@ -45,7 +46,11 @@ def main():
     ap.add_argument("--agent", default="claude")
     args = ap.parse_args()
 
-    cwd = read_cwd_from_stdin()
+    try:
+        cwd = project_root(__file__)
+    except ProjectRootError as error:
+        sys.stderr.write(str(error) + "\n")
+        return
     if not has_active_task(cwd):
         sys.exit(0)
 

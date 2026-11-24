@@ -234,6 +234,21 @@ python3 release_manager.py rollback \
 > **hook 동작:** `.mpa/runtime/hooks/` 의 스크립트가 세션 시작 시 진행 태스크·라우팅 규칙을 주입한다. 기본 `MPA_GATE=warn`에서는 `구현 중` 태스크 없는 소스 수정을 경고로 안내한다. 사용자가 `workspace/tasks/CURRENT_TASK`로 선택한 critical 작업의 승인 전·승인해시 불일치는 차단하며, `MPA_GATE=block`은 모든 active 작업에 엄격하게 적용한다.
 > 구현 승인 후에는 `plan_hash.py approve`로 `승인해시`를 갱신하며, 이후 plan.md 본문이 바뀌면 재승인이 필요하다.
 > Codex는 `.codex/hooks.json`의 `PreToolUse` matcher에 `apply_patch|write_file|replace|edit` 등을 포함해 게이트 실효성을 확보한다.
+
+### 기존 hook 명령 갱신
+
+루트 판정을 지원하는 최신 Runtime을 별도 배포한 프로젝트는 설치 도구의 hook 전용 갱신을 실행할 수 있다. Runtime·workspace·진입점 문서는 교체하지 않으며 선택한 agent의 settings 파일만 다룬다.
+
+```bash
+python3 install.py --project /path/to/project --agents claude,codex --repair-hooks --dry-run
+python3 install.py --project /path/to/project --agents claude,codex --repair-hooks
+```
+
+`--repair-hooks`는 기존 Runtime과 `hooks/project_root.py`가 있어야 실행된다. Runtime 배포 자체는 agent 설정을 변경하지 않으므로 이 명령은 별도 명시적으로 실행한다. 일반 설치 재실행이나 `--upgrade`는 기존 설치를 갱신하지 않는다.
+
+생성된 명령은 현재 작업 폴더에서 가장 가까운 Runtime을 찾아 경로를 따옴표로 보호해 실행하며 작업 폴더를 바꾸지 않는다. Git 최상위나 `CLAUDE_PROJECT_DIR` 값만으로 프로젝트를 선택하지 않는다. hook 내부는 실행 스크립트의 실제 위치에서 소유 루트를 구하고, 상대 대상 경로는 호출 당시 작업 폴더에서 해석한다.
+
+알려진 이전 MPA 생성 명령만 교체하며 사용자 hook 순서·matcher·추가 필드는 유지한다. 사용자 수정 MPA 명령은 보존하고 수동 확인을 안내하며 미해결이면 종료 코드 1을 반환한다. 손상 JSON·symlink 설정도 자동 교정하지 않는다. 저장은 임시 파일을 거쳐 교체하고 기존 권한을 유지하며, 저장 실패 시 원본을 보존하고 실패를 보고한다. 실제 호스트가 hook을 호출하는지는 해당 Claude·Codex 환경에서 별도로 확인한다.
 > 게이트 강도는 환경변수 `MPA_GATE`(block/warn/off)로 조절한다.
 
 기존 설치본의 Runtime 업데이트는 배포 전 `.mpa/runtime/`와 예정된 `runtime.*` 설정을 `.mpa/backups/`에 보관한 뒤 교체·추가한다. 일반 deploy·upgrade는 기존 release, deployment history·receipt, Runtime backup을 자동 삭제하지 않는다. 사용자가 명시적으로 이력 정리를 요청하면 `history-cleanup`이 먼저 전체 후보를 dry-run으로 제시하고, 사용자 승인 뒤에만 release·등록 대상의 history/receipt·검증된 성공 Runtime ZIP backup을 기본 보관 기준에 따라 정리한다. 실패 backup과 marker 없는 사용자 snapshot은 보존한다. deployment dry-run과 deploy·rollback receipt/history는 대상 절대경로를 저장하지 않고 fingerprint로 대상 동일성을 확인하며, operator 입력의 credential·machine path는 정제한다. 배포·rollback은 `.mpa/config/config.yaml`의 기존 project/user 값, agent 설정, `workspace/`, 루트 `docs/`, 일반 소스를 변경하지 않는다. migration으로 추가된 MPA 설정은 rollback 때 함께 복원하며, 그 밖의 설정 변경과 전체 프로젝트 백업은 Runtime 프로젝트 자체의 절차로 처리한다.

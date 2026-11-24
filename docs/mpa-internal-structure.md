@@ -45,6 +45,14 @@ Runtime 파일을 수정하면 `python3 release_manager.py sync-runtime`으로 `
 
 deploy는 여러 복구 실패를 수집해 계속 복구를 시도한다. rollback은 현재의 별도 복구 동작을 유지한다. 구조 변경에서 두 흐름을 공통화하거나 관측 가능한 오류·receipt·history 동작을 바꾸지 않는다.
 
+## Hook 루트와 설치 설정
+
+`hooks/project_root.py`는 실행 스크립트의 실제 `.mpa/runtime/hooks/` 위치에서 소유 프로젝트를 확인한다. code_gate·session_start·turn_end는 이 루트로 작업 상태를 읽는다. code_gate의 상대 파일·일반적인 `mv active/... done/` 요청은 입력 cwd(없으면 프로세스 cwd)에서 해석한 뒤 소유 루트에 상대화한다. Bash 감시는 줄 시작이나 일반 명령 구분자 뒤에 직접 적힌 일반 `mv`의 리터럴 출발·도착 경로를 확인하는 보조 절차다. 완료 승인 확인의 정본은 작업 항목 완료 처리 규칙이다. 경계 밖·외부로 이어지는 symlink 대상에는 workspace 허용 prefix를 적용하지 않는다. Bash 검사는 shell 전체를 실행·해석하는 보안 경계가 아니다.
+
+`install.py --repair-hooks`는 최신 Runtime이 있는 대상에서 선택한 Claude·Codex settings의 알려진 MPA 명령만 갱신한다. 생성 명령은 가장 가까운 Runtime을 찾되 cwd를 변경하지 않는다. 기존 사용자 설정·모르는 명령은 보존하며 JSON 임시 저장·원본 변경 대조·권한 유지·파일 교체로 저장 실패의 원본 손상을 방지한다. Runtime deploy/rollback은 이 설정을 변경하지 않는다.
+
+`tests/test_hook_project_root.py`는 복사한 실제 Runtime과 생성 명령을 실행해 중첩 cwd·상대 파일·critical 승인·해시·symlink 경계·SessionStart/Stop·일반 mv 판정을 확인한다. `tests/test_install.py`는 관리 명령 이관·사용자 설정 보존·저장 실패와 hook 전용 CLI를 확인한다. `test_plan_hash.py`의 단위 fixture는 소유 루트 resolver만 주입하고 승인 로직을 직접 검증하며, 실제 경로 판정은 별도 통합 fixture가 검증한다. 단위·명령 테스트로 호스트 hook 지원을 보장하지 않는다.
+
 ## 검증
 
 구조를 바꿀 때 기존 `tests/test_release_manager.py`와 `tests/test_release_manager_compatibility.py`를 실행한다. 전자는 release, deploy, rollback, issue collection의 정상·실패 경로를 다루며, 후자는 source-root spec loader·CLI·11개 facade patch·source-only release artifact 경계와 ZIP leaf 실패의 deploy/rollback Runtime·issue·config·receipt 복구를 고정한다. Runtime 문서 변경은 `tests/test_structure_loading.py`로 대표 요청 경로, minor 직접 경로, source/dist 전체 파일 parity를 확인한다.
