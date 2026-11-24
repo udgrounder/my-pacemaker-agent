@@ -67,7 +67,7 @@ inject/task_documents.md를 읽고 task_documents.py inputs --stage critique로 
 
 ## 서브에이전트 실행 방법
 
-Agent 도구를 사용해 서브에이전트를 생성하고 아래 프롬프트 템플릿을 전달한다.
+호출 전에 `inject/agent_delegation.md`로 모델·상속·호스트 설정을 확인한다. 안전한 호출이 확인되면 대화 미상속으로 아래 입력만 전달한다. 확인 실패는 `inject/_agent_execution_priority.md`의 미완료 경로를 적용한다.
 
 **전달할 것 (프롬프트에 포함):**
 - `inject/_agent_execution_priority.md`의 "소통 언어 전달"에 따른 소통 언어·결과 작성 언어·예외 (언어 조건만 전달하며 설계 대화는 제외)

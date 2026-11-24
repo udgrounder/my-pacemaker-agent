@@ -5,4 +5,5 @@
 | 문서 | 용도 |
 |---|---|
 | [선택형 작업 문서](task-documents.md) | 최소 계획서·역할 문서·독립 입력·큰 작업 분리 가이드 |
+| [에이전트 위임과 모델 상한](agent-delegation.md) | 설치별 허용 정책·순차 구현·확인 가능한 호출의 범위 |
 | [MPA 내부 구조](mpa-internal-structure.md) | Runtime 정책 로딩과 source 운영 코드의 유지보수 경계 |

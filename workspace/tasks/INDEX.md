@@ -2,7 +2,6 @@
 
 | 태스크명 | 타입 | 상태 | 요약 | 생성일 |
 |---------|------|------|------|--------|
-| [bounded_agent_delegation](active/20261013_bounded_agent_delegation/plan.md) | major | active | 현재 창 모델을 상한으로 하는 자동 서브에이전트 위임 설계, 구현 미승인 | 2026-10-13 |
 | [mpa_effectiveness_pilot](hold/20260914_mpa_effectiveness_pilot/plan.md) | major | hold | 실제 효과 측정 pilot 보류 | 2026-09-14 |
 
 [Layer 2 완료] 2026-06-04

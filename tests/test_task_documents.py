@@ -167,15 +167,17 @@ class TaskDocumentsTest(unittest.TestCase):
 
     def test_minimal_single_plan_inputs(self):
         self.bind([])
-        self.plan.write_text(self.plan.read_text() + "\n## 설계 기준\n설계\n## 실행 계획\n실행\n## 검증 기준\n검증\n## 현재 상태\nPLAN_CANARY")
+        self.plan.write_text(self.plan.read_text() + "\n## 설계 기준\n설계\n### 실행 결과\nDESIGN_RESULT\n## 실행 계획\n실행\n## 검증 기준\n검증\n## 현재 상태\nPLAN_CANARY")
         first = str(docs.inputs(self.plan, "review1"))
         self.assertIn("설계", first)
         self.assertIn("검증", first)
         self.assertNotIn("PLAN_CANARY", first)
+        self.assertNotIn("DESIGN_RESULT", first)
         self.assertIn("실행", str(docs.inputs(self.plan, "implement")))
         second = str(docs.inputs(self.plan, "review2"))
         self.assertIn("실행", second)
         self.assertIn("PLAN_CANARY", second)
+        self.assertIn("DESIGN_RESULT", second)
 
     def test_large_research_nested_path_is_optional_and_registered(self):
         self.write_doc("research/topic/brief.md", "research")
@@ -285,12 +287,14 @@ LEGACY_CONSTRAINT
             with self.subTest(stage=stage), self.assertRaisesRegex(ValueError, "복구 필요"):
                 docs.inputs(self.plan, stage)
 
-    def test_legacy_design_criteria_retained_without_execution_claims(self):
+    def test_legacy_design_criteria_retained_without_mixed_result_checklist(self):
         self.bind([])
         self.plan.write_text(self.plan.read_text() + """
 ## 실행 계획 (Implementation Plan)
 ### 사전 조사
 LEGACY_RESEARCH
+#### 실행 결과
+LEGACY_RESEARCH_RESULT
 ### 구현 단계
 LEGACY_EXECUTION
 ### 예상 조용한 결정
@@ -301,18 +305,37 @@ LEGACY_COUNTEREXAMPLE
 LEGACY_DONE
 ## 검증 결과
 ### 검증 체크리스트
-LEGACY_CRITERION
+- [x] LEGACY_CRITERION. LEGACY_INLINE_RESULT
 ### 완료 시 문서 업데이트 대상
 LEGACY_DOC_DONE
 """)
         first = str(docs.inputs(self.plan, "review1"))
-        for criterion in ["LEGACY_RESEARCH", "LEGACY_DESIGN", "LEGACY_COUNTEREXAMPLE", "LEGACY_CRITERION"]:
+        for criterion in ["LEGACY_RESEARCH", "LEGACY_DESIGN", "LEGACY_COUNTEREXAMPLE"]:
             self.assertIn(criterion, first)
-        for claim in ["LEGACY_EXECUTION", "LEGACY_DONE", "LEGACY_DOC_DONE"]:
+        for claim in ["LEGACY_EXECUTION", "LEGACY_DONE", "LEGACY_DOC_DONE", "LEGACY_CRITERION", "LEGACY_INLINE_RESULT", "LEGACY_RESEARCH_RESULT"]:
             self.assertNotIn(claim, first)
         second = str(docs.inputs(self.plan, "review2"))
         self.assertIn("LEGACY_EXECUTION", second)
         self.assertIn("LEGACY_DONE", second)
+        self.assertIn("LEGACY_INLINE_RESULT", second)
+        self.assertIn("LEGACY_RESEARCH_RESULT", second)
+
+    def test_review1_selects_role_criteria_review2_keeps_execution_results(self):
+        verification = self.write_doc("verification.md", "verification")
+        verification.write_text(VERIFICATION + "\n### 검증 결과\nNESTED_RUN_RESULT\n### 검증 체크리스트\nMORE_CRITERIA\n## 검증 결과\nRUN_RESULT")
+        ui = self.write_doc("ui.md", "ui_design")
+        ui.write_text("# 화면\n**디자인 원본:** UI_SOURCE\n## 화면 설계 기준\nUI_CRITERION\n## HTML 미리보기 (요청 시)\nRENDER_RESULT")
+        self.bind([{"role": "verification", "path": "verification.md"},
+                   {"role": "ui_design", "path": "ui.md"}])
+        first = str(docs.inputs(self.plan, "review1"))
+        second = str(docs.inputs(self.plan, "review2"))
+        self.assertIn("실패 경로", first)
+        self.assertIn("UI_CRITERION", first)
+        self.assertIn("UI_SOURCE", first)
+        self.assertIn("MORE_CRITERIA", first)
+        for claim in ["RUN_RESULT", "NESTED_RUN_RESULT", "RENDER_RESULT"]:
+            self.assertNotIn(claim, first)
+            self.assertIn(claim, second)
 
     def test_unrelated_missing_document_only_blocks_consuming_stages(self):
         records = [{"role": "research", "path": "research/brief.md"}]

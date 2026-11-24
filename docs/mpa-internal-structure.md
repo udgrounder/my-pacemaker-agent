@@ -27,6 +27,10 @@ Runtime 파일을 수정하면 `python3 release_manager.py sync-runtime`으로 `
 
 공통 방법론 계획의 작성·자기 점검·독립 비평은 같은 상세 규칙의 범위 점검을 참조한다. 선택 설계·검증 문서에서도 출처 사례가 공통 합격 조건으로 쓰이는지 확인한다.
 
+## 에이전트 위임
+
+`inject/agent_delegation.md`는 호출 전 위임 판단·모델 상한·단일 수정자 인계의 정본이다. `hooks/agent_policy.py`는 JSON으로 받은 근거를 평가하며 설치·호스트 연결을 수정하지 않는다. `.mpa/config/agent_policy.json`은 설치별 사용자가 관리한다. 필수 독립 실행의 격리·실패 처리는 기존 정본을 따른다.
+
 ## Source 운영 코드
 
 `release_manager.py`는 CLI와 release 생성, backup/config, 이슈 수집 transaction, deploy/rollback 조정을 소유한다. 외부 CLI·함수 이름과 기존 테스트의 monkey patch 지점은 이 파일에 남긴다.

@@ -132,6 +132,10 @@ def loading_route_issues(documents):
                     issues.append(f"missing trigger heading: {path}: {name}")
         elif not files:
             issues.append(f"unparseable trigger target: {target}")
+    delegation = [(path, names) for condition, path, names in rows
+                  if condition == "선택적 위임 판단·서브에이전트 호출 전"]
+    if delegation != [("inject/agent_delegation.md", ["호출 전 확인"])]:
+        issues.append("missing or incorrect delegation trigger")
     required_routes = (
         ("작업 INDEX 편집 전", "작업 INDEX 편집 안전성"),
         ("완료 보고 준비 시", CLEANUP),

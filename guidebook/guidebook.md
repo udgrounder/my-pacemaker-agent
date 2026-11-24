@@ -26,6 +26,8 @@
 
 설치된 프로젝트의 외부 도구는 .mpa/runtime/contracts/agent_reference.toml을 읽어 MPA의 작업·문서 경로, 상태 모델, 규칙 문서 진입점을 확인할 수 있다. 이 계약은 experimental이며 읽기·검증 전용이다. 기존 agent의 승인·라우팅·hook 동작을 바꾸지 않고, 외부 도구에도 hook 실행·파일 수정·승인·배포 권한을 주지 않는다.
 
+서브에이전트 위임은 분리 이익과 검증 가능성을 확인한 뒤 사용한다. 최초·현재 메인 모델의 허용 집합을 교차 확인하며, 구현은 전체 작업을 단일 수정자에게 순차 인계한다. 실제 호출 모델이 확인되는 범위에서 모델 사용을 보고한다. [위임 운영 지침](../docs/agent-delegation.md)
+
 프로젝트 root에서 다음처럼 검사한다.
 
     python3 .mpa/runtime/hooks/contract_reference.py --project-root .

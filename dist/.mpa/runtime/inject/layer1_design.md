@@ -2,6 +2,8 @@
 
 ## 문서 선택 선행
 
+설계 중 선택적 탐색·검토 위임을 고려하기 전에 `inject/agent_delegation.md`를 읽고 프로젝트의 단일 수정자·기존 실행 제약과 독립성·분리 이익을 확인한다.
+
 계획 문서 생성·편집 전과 검증 입력 준비 전에는 `core/agent_rules_detail.md`의 "계획서와 변경 이력 관리"를 먼저 읽는다. 같은 변경 단위에서 이미 읽은 내용은 반복 로드하지 않는다.
 
 새 작업은 templates/plan_minimal_template.md를 읽고 inject/task_documents.md를 따른다. plan의 구현 단계·반례·검증 참조는 선택된 implementation/verification이 있으면 그 문서를 뜻한다. 없으면 plan에 필요한 만큼 둔다. 비평에는 선택 문서의 기준도 전달한다. 추가 문서나 모든 템플릿 칸을 강제하지 않는다.

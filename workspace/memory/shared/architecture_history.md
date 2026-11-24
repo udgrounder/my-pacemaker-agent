@@ -82,3 +82,9 @@ Layer 2 완료 시 `workspace/tasks/INDEX.md` 하단에 `[Layer 2 완료] YYYY-M
 ### 선택형 작업 문서
 
 plan은 최소 요구사항·승인·전체 상태 정본이다. major/minor는 문서 수를 강제하지 않는다. implementation(설계/실행/진행), verification(검증 방법), ui_design(화면 기준)은 분리 이익이 있는 경우만 선택한다. inject/task_documents.md는 선택·인계·전환의 정본, hooks/task_documents.py는 읽기 전용 구성/경로/기준 검사 및 역할 입력의 소유자다. plan_hash의 승인/복구 거래는 유지하고 audit/approve/check·gate·SessionStart는 문서 연결 문제를 승인 복구와 구분한다. 큰 작업/조사의 하위 자료는 상위 plan에 연결하며 단일 수정자 원칙과 별개다.
+
+## 2026-11-23 — 모델 상한과 순차 위임
+
+- 이전: 단일 순차 구현과 독립 검증 격리를 적용했다. 선택 위임의 공통 모델 판단 도구는 없었다.
+- 변경: 최초와 현재 메인 모델의 직접 허용 집합을 교차하고 설치별 가용 근거를 확인한다. 승인된 한 작업 전체의 쓰기 책임만 순차 인계한다.
+- 근거: 작업 `20261013_bounded_agent_delegation`의 사용자 구현 승인과 계획서.

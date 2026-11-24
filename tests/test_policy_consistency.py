@@ -16,16 +16,20 @@ RUNTIME = ROOT / ".mpa/runtime"
 PRIORITY = "inject/_agent_execution_priority.md"
 DETAIL = "core/agent_rules_detail.md"
 CORE = "core/agent_rules.md"
+DELEGATION = "inject/agent_delegation.md"
 
 # Stage workers need these references even when they have not loaded core.
 REFERENCES = {
-    CORE: (PRIORITY, DETAIL),
+    CORE: (PRIORITY, DETAIL, DELEGATION),
+    PRIORITY: (DELEGATION,),
+    DELEGATION: (PRIORITY,),
+    "inject/task_documents.md": (DELEGATION,),
     DETAIL: (CORE, PRIORITY),
     "core/session_protocol.md": (CORE, DETAIL, PRIORITY),
-    "inject/layer1_design.md": (DETAIL,),
-    "inject/layer1_implement.md": (CORE, DETAIL, PRIORITY),
-    "inject/layer1_critique.md": (PRIORITY,),
-    "inject/layer1_review.md": (CORE, PRIORITY),
+    "inject/layer1_design.md": (DETAIL, DELEGATION),
+    "inject/layer1_implement.md": (CORE, DETAIL, PRIORITY, DELEGATION),
+    "inject/layer1_critique.md": (PRIORITY, DELEGATION),
+    "inject/layer1_review.md": (CORE, PRIORITY, DELEGATION),
     "inject/layer1_discovery.md": (CORE,),
     "personas/mpa_system_designer.md": (CORE, PRIORITY),
     "personas/implementer.md": (CORE,),
@@ -36,6 +40,8 @@ for workflow in ("new_feature", "bug_fix", "refactoring", "code_review", "team_c
     REFERENCES[f"workflows/{workflow}.md"] = (CORE, DETAIL, PRIORITY)
 
 RETIRED = (
+    "사용자(또는 위임 에이전트)",
+    "사용자 또는 위임 에이전트의 완료 확인",
     "자가 비평/검증으로 대체",
     "서브에이전트(1순위) → 자가 비평",
     "사용자 응답 후 plan.md를 작성",
@@ -136,6 +142,15 @@ class PolicyReferenceTest(unittest.TestCase):
         self.assertIn("상태: 구현 중", implement)
         self.assertIn("유효한 `reqspec-v1:` 승인해시", implement)
         self.assertIn("구현·최소 확인을 시작하지 않고", implement)
+
+    def test_minor_completion_waits_for_user_before_recording_approval(self):
+        for root in (RUNTIME, ROOT / "dist/.mpa/runtime"):
+            docs = self.load(root)
+            self.assertIn("구현 중 ⛔사용자 완료 승인 → 완료 승인 → done", docs[CORE])
+            fast_path = docs["inject/layer1_implement.md"]
+            self.assertLess(fast_path.index("사용자가 완료를 확인하면"),
+                            fast_path.index("상태를 `완료 승인`으로 업데이트"))
+            self.assertIn("위임 에이전트의 결과는 검증 근거로만 사용한다", docs[DETAIL])
 
     def test_runtime_sync_does_not_instruct_target_deployment(self):
         detail = (RUNTIME / "core/agent_rules_detail.md").read_text(encoding="utf-8")

@@ -79,6 +79,33 @@ def basis_text(text):
     return "\n".join(output).strip()
 
 
+def review_basis(text):
+    """Exclude named result subsections without changing the approved basis hash."""
+    output, excluded_level = [], None
+    result_headings = PROGRESS | {"실행 기록", "실행 TODO", "실행 중 변경 기록"}
+    for line, fenced in lines_with_context(text):
+        heading = HEADING.match(line) if not fenced else None
+        if heading:
+            level = len(line) - len(line.lstrip("#"))
+            if excluded_level is not None and level <= excluded_level:
+                excluded_level = None
+            if excluded_level is None and heading.group(1) in result_headings:
+                excluded_level = level
+        if excluded_level is None:
+            output.append(line)
+    return basis_text("\n".join(output))
+
+
+def ui_review_basis(text):
+    sources = []
+    for line, fenced in lines_with_context(text):
+        if not fenced and HEADING.match(line) and line.startswith("##"):
+            break
+        if not fenced and line.startswith("**디자인 원본:**"):
+            sources.append(line)
+    return review_basis("\n".join([*sources, section(text, "화면 설계 기준")]))
+
+
 def basis_hash(text):
     return hashlib.sha256(basis_text(text).encode("utf-8")).hexdigest()
 
@@ -210,6 +237,10 @@ def inputs(plan_path, stage):
     if check["issues"]:
         raise ValueError("; ".join(check["issues"]))
     front_end = text.find("\n---", 4) if text.startswith("---\n") else -1
+    verification = section(text, "검증 기준")
+    # A legacy checklist under results may mix criteria with execution claims.
+    if stage != "review1" and not verification:
+        verification = section(text, "검증 체크리스트", 3)
     base = {
         "source": "plan.md",
         "content": "\n\n".join(filter(None, [
@@ -217,9 +248,11 @@ def inputs(plan_path, stage):
             section(text, "요구사항 명세"),
             section(text, "선택 문서"),
             section(text, "설계 기준"),
-            section(text, "검증 기준") or section(text, "검증 체크리스트", 3),
+            verification,
         ])),
     }
+    if stage == "review1":
+        base["content"] = review_basis(base["content"])
     # Pre-reqspec plans have no fixed requirement headings. Preserve their
     # reviewed basis for critique instead of silently returning metadata only.
     # This never changes execution approval or the isolated review1 input.
@@ -239,7 +272,7 @@ def inputs(plan_path, stage):
     if stage == "review1" and not section(text, "설계 기준") and not any(
             d["role"] == "implementation" for d in check["documents"]):
         legacy_design = section(text, "실행 계획 (Implementation Plan)")
-        criteria = [section(legacy_design, title, 3) for title in (
+        criteria = [review_basis(section(legacy_design, title, 3)) for title in (
             "생략 항목과 사유", "사전 조사", "예상 조용한 결정",
             "반례 (이 계획이 실패할 수 있는 시나리오)")]
         if any(criteria):
@@ -252,9 +285,11 @@ def inputs(plan_path, stage):
         content = safe_document(plan_path, record["path"]).read_text(encoding="utf-8")
         if stage == "review1":
             if role == "implementation":
-                content = section(content, "설계 기준")
-            elif role in {"verification", "ui_design"}:
-                content = basis_text(content)
+                content = review_basis(section(content, "설계 기준"))
+            elif role == "verification":
+                content = review_basis(section(content, "검증 기준"))
+            elif role == "ui_design":
+                content = ui_review_basis(content)
             else:
                 continue
         elif stage == "implement":
